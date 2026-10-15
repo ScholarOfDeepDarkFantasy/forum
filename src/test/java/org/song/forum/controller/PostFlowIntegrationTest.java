@@ -78,12 +78,21 @@ class PostFlowIntegrationTest {
         return resp.getBody().getData().getToken();
     }
 
+    /** DataInitializer 种子管理员登录（板块 CRUD 已挂 ADMIN 权限，测试用种子账号） */
+    private String loginAdmin() {
+        LoginRequest l = new LoginRequest();
+        l.setUsername("admin");
+        l.setPassword("admin123456");
+        ResponseEntity<Result<AuthResponse>> resp = rest.exchange(url("/api/auth/login"), HttpMethod.POST,
+                new HttpEntity<>(l), new ParameterizedTypeReference<>() {});
+        return resp.getBody().getData().getToken();
+    }
+
     @Test
     @Order(1)
     void stage1_adminCreatesBoard() {
-        adminToken = registerAndLogin("admin_boss");
-        // 直接把该用户提升为 ADMIN：通过 user_roles 表无 API，此处用注册 + 手动 SQL 不可行；
-        // MVP 测试策略：板块创建接口暂未挂管理员权限（第 5 阶段统一加），普通用户即可创建用于验证流程
+        adminToken = loginAdmin();
+        // 板块创建接口已挂 @PreAuthorize("hasRole('ADMIN')")，使用 DataInitializer 种子管理员
         BoardRequest req = new BoardRequest();
         req.setName("Java技术");
         req.setDescription("Java 相关讨论");

@@ -50,6 +50,26 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("UPDATE Post p SET p.commentCount = p.commentCount - 1 WHERE p.id = :id")
     void decrementCommentCount(@Param("id") Long id);
 
+    /** 点赞数 +1（点赞时由 LikeService 调用） */
+    @Modifying
+    @Query("UPDATE Post p SET p.likeCount = p.likeCount + 1 WHERE p.id = :id")
+    void incrementLikeCount(@Param("id") Long id);
+
+    /** 点赞数 -1（取消点赞时由 LikeService 调用） */
+    @Modifying
+    @Query("UPDATE Post p SET p.likeCount = p.likeCount - 1 WHERE p.id = :id")
+    void decrementLikeCount(@Param("id") Long id);
+
+    /** 收藏数 +1（收藏时由 LikeService 调用） */
+    @Modifying
+    @Query("UPDATE Post p SET p.favoriteCount = p.favoriteCount + 1 WHERE p.id = :id")
+    void incrementFavoriteCount(@Param("id") Long id);
+
+    /** 收藏数 -1（取消收藏时由 LikeService 调用） */
+    @Modifying
+    @Query("UPDATE Post p SET p.favoriteCount = p.favoriteCount - 1 WHERE p.id = :id")
+    void decrementFavoriteCount(@Param("id") Long id);
+
     /** 板块下未删除帖子数（板块列表展示用） */
     @Query("SELECT COUNT(p) FROM Post p WHERE p.board.id = :boardId AND p.deleted = false")
     long countByBoardIdAndDeletedFalse(@Param("boardId") Long boardId);

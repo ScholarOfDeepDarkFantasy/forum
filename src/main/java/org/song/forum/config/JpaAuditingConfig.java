@@ -1,4 +1,4 @@
-package org.song.forum;
+package org.song.forum.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

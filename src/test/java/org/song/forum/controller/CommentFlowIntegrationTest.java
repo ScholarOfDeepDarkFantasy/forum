@@ -80,15 +80,26 @@ class CommentFlowIntegrationTest {
         return resp.getBody().getData().getToken();
     }
 
+    /** DataInitializer 种子管理员登录（板块 CRUD 已挂 ADMIN 权限，测试用种子账号） */
+    private String loginAdmin() {
+        LoginRequest l = new LoginRequest();
+        l.setUsername("admin");
+        l.setPassword("admin123456");
+        ResponseEntity<Result<AuthResponse>> resp = rest.exchange(url("/api/auth/login"), HttpMethod.POST,
+                new HttpEntity<>(l), new ParameterizedTypeReference<>() {});
+        return resp.getBody().getData().getToken();
+    }
+
     @Test
     @Order(1)
     void stage1_preparePost() {
         opToken = registerAndLogin("op_user");
+        String adminToken = loginAdmin();
         BoardRequest board = new BoardRequest();
         board.setName("评论测试板块");
         board.setSortOrder(1);
         Long boardId = rest.exchange(url("/api/boards"), HttpMethod.POST,
-                new HttpEntity<>(board, bearer(opToken)),
+                new HttpEntity<>(board, bearer(adminToken)),
                 new ParameterizedTypeReference<Result<BoardResponse>>() {}).getBody().getData().getId();
 
         PostRequest post = new PostRequest();

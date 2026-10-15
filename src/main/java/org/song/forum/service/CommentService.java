@@ -15,6 +15,7 @@ import org.song.forum.entity.Notification;
 import org.song.forum.entity.NotificationType;
 import org.song.forum.entity.Post;
 import org.song.forum.entity.User;
+import org.song.forum.entity.UserStatus;
 import org.song.forum.exception.BusinessException;
 import org.song.forum.repository.CommentRepository;
 import org.song.forum.repository.NotificationRepository;
@@ -48,6 +49,21 @@ public class CommentService {
         }
         User author = userRepository.findById(authorId)
                 .orElseThrow(() -> new BusinessException("用户不存在"));
+        // 禁言/封禁拦截（管理员/版主不受限）
+        boolean privileged = author.getRoles().stream()
+                .anyMatch(r -> "ADMIN".equals(r.getName()) || "MODERATOR".equals(r.getName()));
+        if (!privileged) {
+            if (author.getStatus() == UserStatus.BANNED) {
+                throw new BusinessException("账号已被封禁，不能评论");
+            }
+            if (author.getStatus() == UserStatus.MUTED) {
+                if (author.getMutedUntil() != null && author.getMutedUntil().isAfter(java.time.LocalDateTime.now())) {
+                    throw new BusinessException("已被禁言至 " + author.getMutedUntil() + "，暂不能评论");
+                }
+                author.setStatus(UserStatus.ACTIVE);
+                author.setMutedUntil(null);
+            }
+        }
 
         Comment parent = null;
         if (req.getParentId() != null) {
@@ -107,12 +123,12 @@ public class CommentService {
         return PageResponse.of(mapped);
     }
 
-    /** 软删除评论：内容替换为占位，保持楼中楼结构 */
+    /** 软删除评论：内容替换为占位，保持楼中楼结构。作者本人可删；管理员/版主可删任何评论 */
     @Transactional
     public void delete(Long commentId, Long userId) {
         Comment comment = commentRepository.findWithDetailsById(commentId)
                 .orElseThrow(() -> new BusinessException("评论不存在"));
-        if (!comment.getAuthor().getId().equals(userId)) {
+        if (!comment.getAuthor().getId().equals(userId) && !isModerator(userId)) {
             throw new BusinessException("只能删除自己的评论");
         }
         if (comment.getDeleted()) {
@@ -126,6 +142,14 @@ public class CommentService {
     }
 
     // ---------- 内部方法 ----------
+
+    /** 是否管理员/版主（用于越权放行删除） */
+    private boolean isModerator(Long userId) {
+        return userRepository.findById(userId)
+                .map(u -> u.getRoles().stream()
+                        .anyMatch(r -> "ADMIN".equals(r.getName()) || "MODERATOR".equals(r.getName())))
+                .orElse(false);
+    }
 
     private CommentResponse toResponse(Comment c) {
         boolean deleted = Boolean.TRUE.equals(c.getDeleted());

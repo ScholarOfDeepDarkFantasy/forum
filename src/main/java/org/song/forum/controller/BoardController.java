@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.song.forum.dto.board.BoardRequest;
 import org.song.forum.dto.board.BoardResponse;
@@ -36,6 +37,7 @@ public class BoardController {
 
     /** 创建板块（管理员） */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Result<BoardResponse>> create(@Valid @RequestBody BoardRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Result.ok(boardService.create(req), "板块已创建"));
@@ -43,12 +45,14 @@ public class BoardController {
 
     /** 更新板块（管理员） */
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<BoardResponse> update(@PathVariable Long id, @Valid @RequestBody BoardRequest req) {
         return Result.ok(boardService.update(id, req), "板块已更新");
     }
 
     /** 删除板块（管理员；板块下有帖子时拒绝） */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> delete(@PathVariable Long id) {
         boardService.delete(id);
         return Result.ok(null, "板块已删除");

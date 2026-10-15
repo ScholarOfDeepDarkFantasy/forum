@@ -43,10 +43,11 @@ public class PostService {
     /** 发帖 */
     @Transactional
     public PostDetailResponse create(Long authorId, PostRequest req) {
-        Board board = boardRepository.findById(req.getBoardId())
-                .orElseThrow(() -> new BusinessException("板块不存在"));
         User author = userRepository.findById(authorId)
                 .orElseThrow(() -> new BusinessException("用户不存在"));
+        requireNotMuted(author);
+        Board board = boardRepository.findById(req.getBoardId())
+                .orElseThrow(() -> new BusinessException("板块不存在"));
 
         Post post = Post.builder()
                 .board(board)
@@ -77,15 +78,35 @@ public class PostService {
         return toDetail(postRepository.save(post));
     }
 
-    /** 软删除帖子（作者本人） */
+    /** 软删除帖子：作者本人可删；管理员/版主可删任何帖子 */
     @Transactional
     public void delete(Long postId, Long userId) {
         Post post = postRepository.findWithDetailsById(postId)
                 .orElseThrow(() -> new BusinessException("帖子不存在"));
-        requireOwner(post, userId);
+        if (!post.getAuthor().getId().equals(userId) && !isModerator(userId)) {
+            throw new BusinessException("只能操作自己的帖子");
+        }
         post.setDeleted(true);
         postRepository.save(post);
         log.info("帖子 {} 被用户 {} 软删除", postId, userId);
+    }
+
+    /** 置顶/取消置顶（管理员/版主） */
+    @Transactional
+    public PostDetailResponse setPinned(Long postId, boolean pinned) {
+        Post post = postRepository.findWithDetailsById(postId)
+                .orElseThrow(() -> new BusinessException("帖子不存在"));
+        post.setIsPinned(pinned);
+        return toDetail(postRepository.save(post));
+    }
+
+    /** 加精/取消加精（管理员/版主） */
+    @Transactional
+    public PostDetailResponse setExquisite(Long postId, boolean exquisite) {
+        Post post = postRepository.findWithDetailsById(postId)
+                .orElseThrow(() -> new BusinessException("帖子不存在"));
+        post.setIsExquisite(exquisite);
+        return toDetail(postRepository.save(post));
     }
 
     /** 帖子分页列表：boardId 可选，keyword 可选；置顶优先，其余默认按创建时间倒序 */
@@ -120,10 +141,38 @@ public class PostService {
 
     // ---------- 内部方法 ----------
 
-    /** 作者本人校验（管理员留待第 5 阶段扩展） */
+    /** 作者本人校验（编辑帖子用；删除已扩展为版主以上放行） */
     private void requireOwner(Post post, Long userId) {
         if (!post.getAuthor().getId().equals(userId)) {
             throw new BusinessException("只能操作自己的帖子");
+        }
+    }
+
+    /** 是否管理员/版主（用于删除帖子越权放行） */
+    private boolean isModerator(Long userId) {
+        return userRepository.findById(userId)
+                .map(u -> u.getRoles().stream()
+                        .anyMatch(r -> "ADMIN".equals(r.getName()) || "MODERATOR".equals(r.getName())))
+                .orElse(false);
+    }
+
+    /** 禁言拦截：BANNED/MUTED 用户不能发帖（管理员/版主不受限） */
+    private void requireNotMuted(User user) {
+        boolean privileged = user.getRoles().stream()
+                .anyMatch(r -> "ADMIN".equals(r.getName()) || "MODERATOR".equals(r.getName()));
+        if (privileged) {
+            return;
+        }
+        if (user.getStatus() == org.song.forum.entity.UserStatus.BANNED) {
+            throw new BusinessException("账号已被封禁，不能发帖");
+        }
+        if (user.getStatus() == org.song.forum.entity.UserStatus.MUTED) {
+            if (user.getMutedUntil() != null && user.getMutedUntil().isAfter(java.time.LocalDateTime.now())) {
+                throw new BusinessException("已被禁言至 " + user.getMutedUntil() + "，暂不能发帖");
+            }
+            // 禁言已到期，自动恢复
+            user.setStatus(org.song.forum.entity.UserStatus.ACTIVE);
+            user.setMutedUntil(null);
         }
     }
 

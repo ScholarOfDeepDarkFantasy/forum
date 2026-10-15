@@ -39,7 +39,7 @@ public class CommentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(Result.ok(resp, "评论成功"));
     }
 
-    /** 删除评论（仅作者本人，软删除占位） */
+    /** 删除评论（作者本人或管理员/版主，软删除占位） */
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long postId, @PathVariable Long id) {
         commentService.delete(id, SecurityUtils.currentUserId());
