@@ -1,25 +1,20 @@
-package org.song.forum.config;
+package org.song.forum;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.data.domain.AuditorAware;
+
+import java.util.Optional;
 
 /**
- * JPA 审计配置：配合实体中的 @CreatedDate / @LastModifiedDate
- * 自动填充 create_time / update_time
+ * JPA 审计操作人：MVP 阶段暂不记录操作人，仅使用时间审计
+ * （@EnableJpaAuditing 在主启动类上，保证测试切片也能生效）
  */
 @Configuration
-@EnableJpaAuditing
 public class JpaAuditingConfig {
 
     @Bean
-    public org.springframework.data.domain.AuditorAware<String> auditorProvider() {
-        // MVP 阶段暂不记录操作人，仅使用时间审计；第 3 阶段接入 Security 后可返回当前用户名
-        return new org.springframework.data.domain.AuditorAware<String>() {
-            @Override
-            public java.util.Optional<String> getCurrentAuditor() {
-                return java.util.Optional.empty();
-            }
-        };
+    public AuditorAware<String> auditorProvider() {
+        return Optional::empty;
     }
 }

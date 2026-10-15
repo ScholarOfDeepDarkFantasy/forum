@@ -48,8 +48,9 @@ class RepositoryTests {
 
     @Test
     void saveAndQueryFullChain() {
-        // 角色
-        Role role = roleRepository.save(Role.builder().name("USER").build());
+        // 角色（import.sql 已预置 USER 角色，直接查用，避免与种子数据主键冲突）
+        Role role = roleRepository.findByName("USER")
+                .orElseThrow(() -> new AssertionError("import.sql 未预置 USER 角色"));
         assertThat(role.getId()).isNotNull();
 
         // 用户 + 板块 + 帖子 + 标签
@@ -92,8 +93,8 @@ class RepositoryTests {
         assertThat(commentRepository.countByPostIdAndDeletedFalse(post.getId())).isEqualTo(2);
         assertThat(commentRepository.findByParentIdAndDeletedFalseOrderByIdAsc(top.getId())).hasSize(1);
         assertThat(likeRepository.countByPostId(post.getId())).isEqualTo(1);
-        assertThat(postRepository.search(null, "forum", org.springframework.data.domain.PageRequest.of(0, 10)))
-                .totalElementsEqualTo(1);
+        assertThat(postRepository.search(null, "forum", org.springframework.data.domain.PageRequest.of(0, 10))
+                .getTotalElements()).isEqualTo(1);
         assertThat(notificationRepository.countByRecipientIdAndIsReadFalse(author.getId())).isEqualTo(1);
     }
 

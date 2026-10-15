@@ -44,6 +44,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.fail("未登录或登录已过期"));
     }
 
+    /** 纵深防御：匿名请求穿透到 Service 层时兜底转 401（正常应被 Security 过滤器拦截为 401） */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Result<Void>> handleIllegalState(IllegalStateException e) {
+        if (e.getMessage() != null && e.getMessage().contains("未登录")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.fail("未登录或登录已过期"));
+        }
+        return ResponseEntity.badRequest().body(Result.fail(e.getMessage()));
+    }
+
     /** 已登录但无权限 → 403 */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Result<Void>> handleAccessDenied(AccessDeniedException e) {

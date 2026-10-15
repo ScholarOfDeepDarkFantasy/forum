@@ -2,6 +2,9 @@ package org.song.forum.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * 用户
@@ -40,4 +43,12 @@ public class User extends BaseEntity {
     /** 禁言截止时间，仅 MUTED 状态下有意义 */
     @Column(name = "muted_until")
     private LocalDateTime mutedUntil;
+
+    /** 用户角色（关联表 user_roles） */
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id"))
+    @Builder.Default
+    private Set<Role> roles = new HashSet<>();
 }
