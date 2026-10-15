@@ -39,4 +39,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Modifying
     @Query("UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
     void incrementViewCount(@Param("id") Long id);
+
+    /** 板块下未删除帖子数（板块列表展示用） */
+    @Query("SELECT COUNT(p) FROM Post p WHERE p.board.id = :boardId AND p.deleted = false")
+    long countByBoardIdAndDeletedFalse(@Param("boardId") Long boardId);
 }
