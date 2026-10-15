@@ -40,6 +40,16 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("UPDATE Post p SET p.viewCount = p.viewCount + 1 WHERE p.id = :id")
     void incrementViewCount(@Param("id") Long id);
 
+    /** 评论数 +1（发评论时由 CommentService 调用） */
+    @Modifying
+    @Query("UPDATE Post p SET p.commentCount = p.commentCount + 1 WHERE p.id = :id")
+    void incrementCommentCount(@Param("id") Long id);
+
+    /** 评论数 -1（软删除评论时由 CommentService 调用） */
+    @Modifying
+    @Query("UPDATE Post p SET p.commentCount = p.commentCount - 1 WHERE p.id = :id")
+    void decrementCommentCount(@Param("id") Long id);
+
     /** 板块下未删除帖子数（板块列表展示用） */
     @Query("SELECT COUNT(p) FROM Post p WHERE p.board.id = :boardId AND p.deleted = false")
     long countByBoardIdAndDeletedFalse(@Param("boardId") Long boardId);
