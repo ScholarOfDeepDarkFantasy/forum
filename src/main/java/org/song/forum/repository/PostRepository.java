@@ -20,8 +20,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             SELECT p FROM Post p
             WHERE p.deleted = false
               AND (:boardId IS NULL OR p.board.id = :boardId)
-              AND (:keyword IS NULL OR LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                                   OR LOWER(p.content) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:keyword = '' OR LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                                 OR LOWER(p.content) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """)
     Page<Post> search(@Param("boardId") Long boardId,
                       @Param("keyword") String keyword,

@@ -113,7 +113,10 @@ public class PostService {
     @Transactional(readOnly = true)
     public PageResponse<PostSummaryResponse> list(Long boardId, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, pinnedFirstSort());
-        return PageResponse.of(postRepository.search(boardId, blankToNull(keyword), pageable)
+        // 注意：keyword 不能传 null——pgJDBC 会把无类型 null 绑定为 bytea，
+        // PostgreSQL 报 "function lower(bytea) does not exist"（SQLState 42883）。
+        // 空串有确定类型（varchar），JPQL 端用 = '' 表示"无关键字"。
+        return PageResponse.of(postRepository.search(boardId, blankToEmpty(keyword), pageable)
                 .map(this::toSummary));
     }
 
@@ -197,6 +200,11 @@ public class PostService {
 
     private String blankToNull(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
+    }
+
+    /** 空白转空串（非 null）：PostgreSQL 下无类型 null 绑定会变 bytea */
+    private String blankToEmpty(String s) {
+        return (s == null || s.isBlank()) ? "" : s.trim();
     }
 
     private PostSummaryResponse toSummary(Post p) {

@@ -1,0 +1,144 @@
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { Bell, User, SwitchButton, Connection, Setting } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
+import { notificationApi } from '@/api'
+
+const router = useRouter()
+const auth = useAuthStore()
+const unread = ref(0)
+
+async function loadUnread() {
+  if (!auth.isLoggedIn) return
+  try {
+    const data = await notificationApi.unreadCount()
+    unread.value = data?.count ?? 0
+  } catch {
+    /* 静默失败 */
+  }
+}
+
+function handleUserCommand(command) {
+  if (command === 'profile') {
+    router.push('/profile')
+  } else if (command === 'admin') {
+    router.push('/admin')
+  } else if (command === 'logout') {
+    auth.logout()
+    ElMessage.success('已退出登录')
+    router.push('/')
+  }
+}
+
+onMounted(() => {
+  loadUnread()
+  // 登录状态下每 60 秒刷新未读数
+  setInterval(loadUnread, 60_000)
+})
+</script>
+
+<template>
+  <el-container class="layout">
+    <el-header class="header">
+      <div class="header-inner">
+        <router-link to="/" class="brand">
+          <el-icon :size="22"><Connection /></el-icon>
+          <span>JavaForum</span>
+        </router-link>
+
+        <div class="nav-actions">
+          <template v-if="auth.isLoggedIn">
+            <el-badge :value="unread" :hidden="unread === 0" class="bell-badge">
+              <el-button :icon="Bell" circle text @click="router.push('/notifications')" />
+            </el-badge>
+            <el-dropdown @command="handleUserCommand">
+              <span class="user-chip">
+                <el-avatar :size="28">{{ (auth.user?.nickname || auth.user?.username || '?').slice(0, 1) }}</el-avatar>
+                <span class="username">{{ auth.user?.nickname || auth.user?.username }}</span>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="profile" :icon="User">个人中心</el-dropdown-item>
+                  <el-dropdown-item v-if="auth.isAdmin" command="admin" :icon="Setting">管理后台</el-dropdown-item>
+                  <el-dropdown-item command="logout" :icon="SwitchButton" divided>退出登录</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </template>
+          <template v-else>
+            <el-button text @click="router.push('/login')">登录</el-button>
+            <el-button type="primary" @click="router.push('/register')">注册</el-button>
+          </template>
+        </div>
+      </div>
+    </el-header>
+
+    <el-main class="main">
+      <router-view :key="$route.fullPath" />
+    </el-main>
+
+    <el-footer class="footer">
+      JavaForum · Spring Boot 3 + Vue 3 MVP
+    </el-footer>
+  </el-container>
+</template>
+
+<style scoped>
+.layout {
+  min-height: 100vh;
+}
+.header {
+  background: #fff;
+  border-bottom: 1px solid #e4e7ed;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #409eff;
+}
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.username {
+  font-size: 14px;
+}
+.main {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+.footer {
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+  padding: 20px 0;
+}
+.bell-badge :deep(.el-badge__content) {
+  top: 6px;
+  right: 10px;
+}
+</style>
