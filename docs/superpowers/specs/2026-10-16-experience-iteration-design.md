@@ -1,9 +1,10 @@
 # JavaForum 体验迭代（第一轮）设计文档
 
 - 日期：2026-10-16
-- 状态：待用户审阅
+- 状态：已确认（含 1 处后端小改动）
 - 范围：视觉信息层级（A） + 手机窄屏适配（B） + 通知与互动闭环（C）
 - 明确不做：Markdown 渲染、标签检索、公开个人主页、头像上传、深色模式
+- 用户决策：接受后端补 `comment_id`（选项一），通知精确锚定被回复评论
 
 ## 1. 背景与目标
 
@@ -18,7 +19,7 @@ JavaForum 六个阶段的 MVP 已完成：后端 Spring Boot 3.5 + PostgreSQL，
 
 ## 2. 非目标
 
-- 不引入任何后端接口变更；如发现必须改动，先回到设计确认。
+- 除通知补 `commentId` 外，不引入其他后端接口变更；如发现必须改动，先回到设计确认。
 - 不做主题切换与深色模式。
 - 不做国际化。
 - 不调整既有权限模型与安全配置。
@@ -79,7 +80,14 @@ frontend/src/
 - `LIKE` / `FAVORITE` 且 `postId` 存在 → `{ path: '/posts/{postId}', hash: '' }`
 - `SYSTEM` 或无 `postId` → `null`（不可点击，仅展示）
 
-约束：`NotificationResponse` 当前不含 `commentId`。若跳转需要评论级锚点，需后端在通知响应中补该字段——**这属于后端变更，须在实现计划的第 0 步先确认**。若用户不接受后端改动，降级为帖子级跳转（`hash: ''`）。
+约束：`NotificationResponse` 当前不含 `commentId`。经用户确认（选项一），本轮接受后端小改动补该字段：
+
+- **V2 Flyway 迁移**：`ALTER TABLE notifications ADD COLUMN comment_id BIGINT REFERENCES comments(id) ON DELETE SET NULL;`
+- **实体与写入**：`entity/Notification.java` 增加 `comment` 关联（`@ManyToOne(LAZY)`，可空）；`CommentService` 在创建 REPLY 通知时写入被回复的评论。
+- **响应**：`NotificationResponse` 增加 `commentId`；`NotificationService.toResponse()` 补该字段。
+- **用途**：`REPLY` 类型通知携带 `commentId` 时映射为 `#comment-{commentId}` 锚点；`LIKE`/`FAVORITE` 无该值，跳转到帖子。
+
+后端改动须保持既有 19 个测试全绿，并为通知携带 `commentId` 增加至少 1 条集成测试断言。
 
 **评论锚点渲染**：帖子详情页每条评论容器加 `id="comment-{id}"`；路由进入带 `hash` 时滚动到该元素并加高亮类，2 秒后移除。
 
