@@ -40,11 +40,35 @@ describe('usePostActions', () => {
   })
 
   it('点赞失败时回滚到原计数', async () => {
-    postApi.like.mockRejectedValue(new Error('network'))
     const actions = usePostActions()
     actions.syncFromPost({ id: 34, likeCount: 8, favoriteCount: 0 })
+
+    // 注意：计数只在 await 成功后才写入，失败时不会中途改变，
+    // 因此本用例实际锚定的是 liked 的回滚与「失败不改变已有状态」这一契约；
+    // 计数回滚分支在当前实现下不可达（若将来改为乐观更新，此断言即会生效）。
+    // 先成功一次把计数推到 9，再让下一次失败，使“失败后计数仍为 9”具备可判别性。
+    postApi.like.mockResolvedValueOnce({ active: true, count: 9 })
+    await actions.toggleLike(34)
+    expect(actions.stateFor(34)).toMatchObject({ liked: true, likeCount: 9 })
+
+    postApi.like.mockRejectedValueOnce(new Error('network'))
     await expect(actions.toggleLike(34)).rejects.toThrow('network')
-    expect(actions.stateFor(34)).toMatchObject({ liked: false, likeCount: 8 })
+    expect(actions.stateFor(34)).toMatchObject({ liked: true, likeCount: 9 })
+  })
+
+  it('收藏失败时回滚到原计数', async () => {
+    const actions = usePostActions()
+    actions.syncFromPost({ id: 37, likeCount: 0, favoriteCount: 4 })
+
+    // 同「点赞失败时回滚到原计数」：计数回滚分支当前不可达，
+    // 此处同样只锚定 favorited 的回滚与「失败不改变已有状态」。
+    postApi.favorite.mockResolvedValueOnce({ active: true, count: 5 })
+    await actions.toggleFavorite(37)
+    expect(actions.stateFor(37)).toMatchObject({ favorited: true, favoriteCount: 5 })
+
+    postApi.favorite.mockRejectedValueOnce(new Error('network'))
+    await expect(actions.toggleFavorite(37)).rejects.toThrow('network')
+    expect(actions.stateFor(37)).toMatchObject({ favorited: true, favoriteCount: 5 })
   })
 
   it('收藏成功后写入返回的计数并标记 favorited', async () => {
