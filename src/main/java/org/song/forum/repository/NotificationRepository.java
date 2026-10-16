@@ -11,8 +11,8 @@ import org.song.forum.entity.Notification;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
-    /** 我的通知列表，抓取 sender/post 标题所需关联 */
-    @EntityGraph(attributePaths = {"sender", "post"})
+    /** 我的通知列表，抓取 sender/post 标题与 comment 锚点所需关联（comment 多为 null，实为 left join） */
+    @EntityGraph(attributePaths = {"sender", "post", "comment"})
     Page<Notification> findByRecipientIdOrderByCreateTimeDesc(Long recipientId, Pageable pageable);
 
     /** 未读数量 */
