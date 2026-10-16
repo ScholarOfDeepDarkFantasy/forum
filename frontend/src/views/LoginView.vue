@@ -3,10 +3,12 @@ import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notifications'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const notifications = useNotificationStore()
 const loading = ref(false)
 
 const form = reactive({ username: '', password: '' })
@@ -19,6 +21,11 @@ async function submit() {
   loading.value = true
   try {
     await auth.login(form)
+    // App.vue 的 onMounted 只对「挂载时就已登录」的会话刷新角标，登录发生在挂载之后，
+    // 因此必须在这里主动拉一次，否则登录后角标会一直停在 0。
+    // 不 await、也不捕获：refreshUnread 内部吞掉所有错误、永不 reject，
+    // 计数晚几十毫秒到位可接受，而等待会白白拖慢跳转（失败更不能挡住导航）。
+    notifications.refreshUnread()
     ElMessage.success('登录成功')
     router.push(route.query.redirect || '/')
   } finally {

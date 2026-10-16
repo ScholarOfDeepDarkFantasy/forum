@@ -25,7 +25,8 @@ function handleUserCommand(command) {
 
 onMounted(() => {
   // 未登录时不注册定时器：refreshUnread 会打到后端换回 401，拦截器随即弹「请先登录」并整页跳转 /login，
-  // 游客停在首页也会被莫名踢走。兜底轮询只对已登录会话有意义；登录后的首次计数由登录页负责触发。
+  // 游客停在首页也会被莫名踢走。兜底轮询只对已登录会话有意义；
+  // 本分支只覆盖「带着 token 刷新/直接进入页面」的会话，登录页在登录成功后另行触发一次。
   if (!auth.isLoggedIn) return
   notifications.refreshUnread()
   // 兜底轮询：主要刷新由点赞/收藏/评论等操作后主动触发
