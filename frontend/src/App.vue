@@ -1,24 +1,14 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Bell, User, SwitchButton, Connection, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import { notificationApi } from '@/api'
+import { useNotificationStore } from '@/stores/notifications'
 
 const router = useRouter()
 const auth = useAuthStore()
-const unread = ref(0)
-
-async function loadUnread() {
-  if (!auth.isLoggedIn) return
-  try {
-    const data = await notificationApi.unreadCount()
-    unread.value = data?.count ?? 0
-  } catch {
-    /* 静默失败 */
-  }
-}
+const notifications = useNotificationStore()
 
 function handleUserCommand(command) {
   if (command === 'profile') {
@@ -27,15 +17,19 @@ function handleUserCommand(command) {
     router.push('/admin')
   } else if (command === 'logout') {
     auth.logout()
+    notifications.unreadCount = 0
     ElMessage.success('已退出登录')
     router.push('/')
   }
 }
 
 onMounted(() => {
-  loadUnread()
-  // 登录状态下每 60 秒刷新未读数
-  setInterval(loadUnread, 60_000)
+  // 未登录时不注册定时器：refreshUnread 会打到后端换回 401，拦截器随即弹「请先登录」并整页跳转 /login，
+  // 游客停在首页也会被莫名踢走。兜底轮询只对已登录会话有意义；登录后的首次计数由登录页负责触发。
+  if (!auth.isLoggedIn) return
+  notifications.refreshUnread()
+  // 兜底轮询：主要刷新由点赞/收藏/评论等操作后主动触发
+  setInterval(() => notifications.refreshUnread(), 120_000)
 })
 </script>
 
@@ -50,7 +44,7 @@ onMounted(() => {
 
         <div class="nav-actions">
           <template v-if="auth.isLoggedIn">
-            <el-badge :value="unread" :hidden="unread === 0" class="bell-badge">
+            <el-badge :value="notifications.unreadCount" :hidden="notifications.unreadCount === 0" class="bell-badge">
               <el-button :icon="Bell" circle text @click="router.push('/notifications')" />
             </el-badge>
             <el-dropdown @command="handleUserCommand">
