@@ -1,0 +1,45 @@
+/**
+ * JavaForum 设计令牌
+ * 页面只引用令牌，避免各视图写死间距/字号/圆角。
+ */
+:root {
+  /* 颜色 */
+  --jf-color-primary: #409eff;
+  --jf-color-text-1: #303133;
+  --jf-color-text-2: #606266;
+  --jf-color-text-3: #909399;
+  --jf-color-border: #e4e7ed;
+  --jf-color-bg-page: #f5f6f8;
+  --jf-color-bg-card: #ffffff;
+  --jf-color-bg-hover: #f8f9fb;
+
+  /* 间距阶梯 4/8/12/16/24/32 */
+  --jf-space-1: 4px;
+  --jf-space-2: 8px;
+  --jf-space-3: 12px;
+  --jf-space-4: 16px;
+  --jf-space-5: 24px;
+  --jf-space-6: 32px;
+
+  /* 圆角 */
+  --jf-radius-sm: 4px;
+  --jf-radius-md: 8px;
+  --jf-radius-lg: 12px;
+
+  /* 阴影 */
+  --jf-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --jf-shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  /* 字号阶梯 */
+  --jf-font-title-lg: 22px;
+  --jf-font-title-md: 16px;
+  --jf-font-body: 14px;
+  --jf-font-meta: 13px;
+  --jf-font-small: 12px;
+
+  /* 响应式断点（JS 侧 useResponsive 使用同一数值 768） */
+  --jf-breakpoint-mobile: 768px;
+
+  /* 覆盖 Element Plus 主色，保持全站一致 */
+  --el-color-primary: var(--jf-color-primary);
+}
