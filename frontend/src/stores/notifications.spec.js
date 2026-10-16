@@ -25,11 +25,26 @@ describe('notifications store', () => {
     expect(store.unreadCount).toBe(4)
   })
 
-  it('refreshUnread 失败时计数归零且不抛出', async () => {
-    notificationApi.unreadCount.mockRejectedValue(new Error('boom'))
+  it('refreshUnread 遇到 401 时计数归零且不抛出', async () => {
+    notificationApi.unreadCount.mockResolvedValueOnce({ count: 4 })
     const store = useNotificationStore()
+    await store.refreshUnread()
+    expect(store.unreadCount).toBe(4)
+
+    notificationApi.unreadCount.mockRejectedValueOnce({ response: { status: 401 } })
     await expect(store.refreshUnread()).resolves.toBeUndefined()
     expect(store.unreadCount).toBe(0)
+  })
+
+  it('refreshUnread 失败时保留上次成功计数', async () => {
+    notificationApi.unreadCount.mockResolvedValueOnce({ count: 5 })
+    const store = useNotificationStore()
+    await store.refreshUnread()
+    expect(store.unreadCount).toBe(5)
+
+    notificationApi.unreadCount.mockRejectedValueOnce(new Error('offline'))
+    await store.refreshUnread()
+    expect(store.unreadCount).toBe(5)
   })
 
   it('markAllRead 之后未读归零', async () => {
