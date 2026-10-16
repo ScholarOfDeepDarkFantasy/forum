@@ -25,6 +25,9 @@ public class NotificationResponse {
     private Long postId;
     private String postTitle;
 
+    /** 被回复评论的 id，仅 REPLY 类型有值 */
+    private Long commentId;
+
     /** REPLY / LIKE / FAVORITE / SYSTEM */
     private String type;
 

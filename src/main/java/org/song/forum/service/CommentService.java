@@ -98,6 +98,7 @@ public class CommentService {
                     .recipient(parent.getAuthor())
                     .sender(author)
                     .post(post)
+                    .comment(parent)
                     .type(NotificationType.REPLY)
                     .content(author.getUsername() + " 回复了你的评论")
                     .build());

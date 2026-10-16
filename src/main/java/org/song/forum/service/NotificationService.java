@@ -50,6 +50,7 @@ public class NotificationService {
                 .senderNickname(n.getSender() == null ? null : n.getSender().getNickname())
                 .postId(n.getPost() == null ? null : n.getPost().getId())
                 .postTitle(n.getPost() == null ? null : n.getPost().getTitle())
+                .commentId(n.getComment() == null ? null : n.getComment().getId())
                 .type(n.getType().name())
                 .content(n.getContent())
                 .isRead(n.getIsRead())

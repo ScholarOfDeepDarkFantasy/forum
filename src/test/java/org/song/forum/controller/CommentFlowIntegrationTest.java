@@ -175,6 +175,10 @@ class CommentFlowIntegrationTest {
         assertThat(notifs.getBody().getData().totalElements()).isEqualTo(1);
         assertThat(notifs.getBody().getData().content().get(0).get("type")).isEqualTo("REPLY");
 
+        // 新增：REPLY 通知应携带被回复评论的 id，供前端锚点跳转
+        Map<String, Object> replyNotif = notifs.getBody().getData().content().get(0);
+        assertThat(((Number) replyNotif.get("commentId")).longValue()).isEqualTo(rootCommentId);
+
         // 楼主不应收到通知（他只回复别人，顶级评论是 ap_user 发的，楼主自己没被回复）
         ResponseEntity<Result<PageResponse<Map<String, Object>>>> opNotifs = rest.exchange(
                 url("/api/notifications"), HttpMethod.GET,

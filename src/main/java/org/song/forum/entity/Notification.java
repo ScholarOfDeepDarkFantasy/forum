@@ -28,6 +28,11 @@ public class Notification extends BaseEntity {
     @JoinColumn(name = "post_id")
     private Post post;
 
+    /** 关联评论（仅 REPLY 通知有值），用于前端跳转锚点 */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "comment_id")
+    private Comment comment;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private NotificationType type;
