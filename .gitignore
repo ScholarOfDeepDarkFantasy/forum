@@ -31,3 +31,4 @@ frontend/dist/
 
 # 工具
 .xcodemap/
+.superpowers/
