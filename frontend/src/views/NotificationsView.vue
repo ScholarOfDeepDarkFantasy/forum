@@ -1,12 +1,19 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { PAGE_SIZE, useNotificationStore } from '@/stores/notifications'
 import { resolveNotificationTarget } from '@/utils/notificationLink'
 
 const router = useRouter()
 const notifications = useNotificationStore()
 const loading = ref(false)
+/**
+ * 全部已读的在途标志，与 loading 分开：loading 表示"列表正在拉取"（翻页也会置位），
+ * 若共用，翻页期间按钮会闪 loading 且被禁用，markAll 的早退守卫还会把这次点击静默吞掉。
+ * 这里只用于标记这个变更请求本身在途，防止连点造成响应乱序覆盖列表。
+ */
+const marking = ref(false)
 
 async function load(p = 0) {
   loading.value = true
@@ -17,8 +24,19 @@ async function load(p = 0) {
   }
 }
 
+/**
+ * 全部已读。成功后才提示：清空通知在本页不可撤销，而角标归零、行去掉加粗这类反馈
+ * 很容易在浏览列表时被忽略。失败不需要 catch，axios 拦截器已统一弹出错误。
+ */
 async function markAll() {
-  await notifications.markAllRead()
+  if (marking.value) return
+  marking.value = true
+  try {
+    await notifications.markAllRead()
+    ElMessage.success('已全部标记为已读')
+  } finally {
+    marking.value = false
+  }
 }
 
 function openNotification(n) {
@@ -53,7 +71,7 @@ onMounted(() => {
     <template #header>
       <div class="head">
         <span>我的通知</span>
-        <el-button size="small" @click="markAll">全部已读</el-button>
+        <el-button size="small" :loading="marking" @click="markAll">全部已读</el-button>
       </div>
     </template>
 
