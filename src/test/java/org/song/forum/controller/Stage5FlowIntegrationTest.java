@@ -167,6 +167,71 @@ class Stage5FlowIntegrationTest {
 
     @Test
     @Order(3)
+    void stage2b_likedFavoritedFlagsVisibleToFrontend() {
+        // 游客详情：未登录时互动状态一律 false（不能因缺少认证而报错）
+        ResponseEntity<Result<PostDetailResponse>> anonDetail = rest.exchange(url("/api/posts/" + postId),
+                HttpMethod.GET, null, new ParameterizedTypeReference<Result<PostDetailResponse>>() {});
+        assertThat(anonDetail.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(anonDetail.getBody().getData().getLiked()).isFalse();
+        assertThat(anonDetail.getBody().getData().getFavorited()).isFalse();
+
+        // 游客列表同样返回 false
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> anonList =
+                rest.exchange(url("/api/posts"), HttpMethod.GET, null,
+                        new ParameterizedTypeReference<Result<PageResponse<PostSummaryResponse>>>() {});
+        assertThat(anonList.getBody().getData().content()).isNotEmpty();
+        assertThat(anonList.getBody().getData().content().get(0).getLiked()).isFalse();
+        assertThat(anonList.getBody().getData().content().get(0).getFavorited()).isFalse();
+
+        // liker 收藏（stage2 已收藏过，不再重复点击以免切换回未收藏）+ 点赞
+        rest.exchange(url("/api/posts/" + postId + "/like"), HttpMethod.POST,
+                new HttpEntity<>(bearer(mutedToken)), new ParameterizedTypeReference<Result<LikeToggleResponse>>() {});
+
+        // 刷新后重新拉详情：liked/favorited 必须为 true（前端刷新场景）
+        ResponseEntity<Result<PostDetailResponse>> detail = rest.exchange(url("/api/posts/" + postId),
+                HttpMethod.GET, new HttpEntity<>(bearer(mutedToken)),
+                new ParameterizedTypeReference<Result<PostDetailResponse>>() {});
+        assertThat(detail.getBody().getData().getLiked()).isTrue();
+        assertThat(detail.getBody().getData().getLikeCount()).isEqualTo(1);
+        assertThat(detail.getBody().getData().getFavorited()).isTrue();
+        assertThat(detail.getBody().getData().getFavoriteCount()).isEqualTo(1);
+
+        // 列表接口也要带上同样的互动状态
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> list =
+                rest.exchange(url("/api/posts"), HttpMethod.GET, new HttpEntity<>(bearer(mutedToken)),
+                        new ParameterizedTypeReference<Result<PageResponse<PostSummaryResponse>>>() {});
+        PostSummaryResponse first = list.getBody().getData().content().stream()
+                .filter(p -> p.getId().equals(postId)).findFirst().orElseThrow();
+        assertThat(first.getLiked()).isTrue();
+        assertThat(first.getFavorited()).isTrue();
+
+        // /mine 同样走 toSummary：作者本人未赞未藏
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> mine =
+                rest.exchange(url("/api/posts/mine"), HttpMethod.GET, new HttpEntity<>(bearer(userToken)),
+                        new ParameterizedTypeReference<Result<PageResponse<PostSummaryResponse>>>() {});
+        PostSummaryResponse minePost = mine.getBody().getData().content().stream()
+                .filter(p -> p.getId().equals(postId)).findFirst().orElseThrow();
+        assertThat(minePost.getLiked()).isFalse();
+        assertThat(minePost.getFavorited()).isFalse();
+
+        // 我的收藏列表：favorited 定义上恒为 true，liked 反映真实点赞状态
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> favorites =
+                rest.exchange(url("/api/posts/favorites/mine"), HttpMethod.GET,
+                        new HttpEntity<>(bearer(mutedToken)),
+                        new ParameterizedTypeReference<Result<PageResponse<PostSummaryResponse>>>() {});
+        assertThat(favorites.getBody().getData().content().get(0).getFavorited()).isTrue();
+        assertThat(favorites.getBody().getData().content().get(0).getLiked()).isTrue();
+
+        // 写接口（置顶）返回的详情也带互动状态：管理员视角未赞未藏
+        ResponseEntity<Result<PostDetailResponse>> pin = rest.exchange(
+                url("/api/posts/" + postId + "/pin?pinned=false"), HttpMethod.PUT,
+                new HttpEntity<>(bearer(adminToken)), new ParameterizedTypeReference<Result<PostDetailResponse>>() {});
+        assertThat(pin.getBody().getData().getLiked()).isFalse();
+        assertThat(pin.getBody().getData().getFavorited()).isFalse();
+    }
+
+    @Test
+    @Order(4)
     void stage3_pinExquisiteAndModDelete() {
         // 普通用户置顶 → 403
         ResponseEntity<Result<PostDetailResponse>> forbidden = rest.exchange(
@@ -200,7 +265,7 @@ class Stage5FlowIntegrationTest {
     }
 
     @Test
-    @Order(4)
+    @Order(5)
     void stage4_muteBanAndUserAdmin() {
         // 查目标用户 id（liker）
         ResponseEntity<Result<PageResponse<AdminUserResponse>>> users = rest.exchange(

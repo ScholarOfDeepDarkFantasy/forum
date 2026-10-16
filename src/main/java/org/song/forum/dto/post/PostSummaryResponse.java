@@ -27,4 +27,12 @@ public class PostSummaryResponse {
     private Boolean isExquisite;
     private List<String> tags;
     private LocalDateTime createTime;
+
+    /** 当前登录用户是否已点赞；游客恒为 false */
+    @Builder.Default
+    private Boolean liked = false;
+
+    /** 当前登录用户是否已收藏；游客恒为 false */
+    @Builder.Default
+    private Boolean favorited = false;
 }

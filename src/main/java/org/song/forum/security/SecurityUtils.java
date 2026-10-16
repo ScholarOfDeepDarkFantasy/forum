@@ -29,6 +29,16 @@ public final class SecurityUtils {
         return details.getUserId();
     }
 
+    /**
+     * 当前用户 ID；未登录返回 null（不抛异常）。
+     * 供公共可匿名访问的接口使用（如帖子列表/详情需要读取"当前用户是否已点赞"），
+     * 避免在 permitAll 路径上因缺少认证而中断请求。
+     */
+    public static Long currentUserIdOrNull() {
+        ForumUserDetails details = currentUser();
+        return details == null ? null : details.getUserId();
+    }
+
     /** 是否已登录 */
     public static boolean isAuthenticated() {
         return currentUser() != null;

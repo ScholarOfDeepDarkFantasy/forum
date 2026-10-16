@@ -2,6 +2,7 @@ package org.song.forum.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,10 @@ import org.song.forum.repository.NotificationRepository;
 import org.song.forum.repository.PostRepository;
 import org.song.forum.repository.UserRepository;
 import org.song.forum.util.PageResponse;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * 点赞/收藏服务：切换式点赞收藏（已赞再点取消），联动 posts 冗余计数，
@@ -98,10 +103,14 @@ public class LikeService {
     /** 我的收藏列表（时间倒序） */
     @Transactional(readOnly = true)
     public PageResponse<PostSummaryResponse> myFavorites(Long userId, int page, int size) {
-        return PageResponse.of(favoriteRepository
-                .findByUserIdOrderByCreateTimeDesc(userId, PageRequest.of(page, Math.min(size, 50),
-                        Sort.by(Sort.Direction.DESC, "createTime")))
-                .map(f -> toSummary(f.getPost())));
+        Page<Favorite> favorites = favoriteRepository.findByUserIdOrderByCreateTimeDesc(userId,
+                PageRequest.of(page, Math.min(size, 50), Sort.by(Sort.Direction.DESC, "createTime")));
+        // favorited 定义上恒为 true；liked 仍需按真实点赞记录计算，用一条批量查询取回本页已赞帖子 ID
+        List<Long> postIds = favorites.getContent().stream().map(f -> f.getPost().getId()).toList();
+        Set<Long> likedIds = postIds.isEmpty()
+                ? Set.of()
+                : new HashSet<>(likeRepository.findLikedPostIds(userId, postIds));
+        return PageResponse.of(favorites.map(f -> toSummary(f.getPost(), likedIds.contains(f.getPost().getId()))));
     }
 
     // ---------- 内部方法 ----------
@@ -115,7 +124,7 @@ public class LikeService {
         return post;
     }
 
-    private PostSummaryResponse toSummary(Post post) {
+    private PostSummaryResponse toSummary(Post post, boolean liked) {
         return PostSummaryResponse.builder()
                 .id(post.getId())
                 .boardId(post.getBoard().getId())
@@ -131,6 +140,8 @@ public class LikeService {
                 .isExquisite(post.getIsExquisite())
                 .tags(post.getTags().stream().map(t -> t.getName()).toList())
                 .createTime(post.getCreateTime())
+                .liked(liked)
+                .favorited(true)   // 我的收藏列表里的条目必然已收藏
                 .build();
     }
 }

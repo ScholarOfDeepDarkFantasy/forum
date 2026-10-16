@@ -17,9 +17,12 @@ import org.song.forum.entity.Tag;
 import org.song.forum.entity.User;
 import org.song.forum.exception.BusinessException;
 import org.song.forum.repository.BoardRepository;
+import org.song.forum.repository.FavoriteRepository;
+import org.song.forum.repository.LikeRepository;
 import org.song.forum.repository.PostRepository;
 import org.song.forum.repository.TagRepository;
 import org.song.forum.repository.UserRepository;
+import org.song.forum.security.SecurityUtils;
 import org.song.forum.util.PageResponse;
 
 import java.util.HashSet;
@@ -39,6 +42,8 @@ public class PostService {
     private final BoardRepository boardRepository;
     private final UserRepository userRepository;
     private final TagRepository tagRepository;
+    private final LikeRepository likeRepository;
+    private final FavoriteRepository favoriteRepository;
 
     /** 发帖 */
     @Transactional
@@ -58,7 +63,8 @@ public class PostService {
         post.setTags(resolveTags(req.getTags()));
         post = postRepository.save(post);
         log.info("用户 {} 发帖: {}", author.getUsername(), post.getTitle());
-        return toDetail(post);
+        // 新帖对当前用户必然未赞未藏，带出 false 保持一致
+        return toDetail(post, false, false);
     }
 
     /** 编辑帖子（仅作者本人） */
@@ -75,7 +81,7 @@ public class PostService {
         post.setContent(req.getContent());
         post.getTags().clear();
         post.getTags().addAll(resolveTags(req.getTags()));
-        return toDetail(postRepository.save(post));
+        return toDetail(postRepository.save(post), userId);
     }
 
     /** 软删除帖子：作者本人可删；管理员/版主可删任何帖子 */
@@ -116,16 +122,16 @@ public class PostService {
         // 注意：keyword 不能传 null——pgJDBC 会把无类型 null 绑定为 bytea，
         // PostgreSQL 报 "function lower(bytea) does not exist"（SQLState 42883）。
         // 空串有确定类型（varchar），JPQL 端用 = '' 表示"无关键字"。
-        return PageResponse.of(postRepository.search(boardId, blankToEmpty(keyword), pageable)
-                .map(this::toSummary));
+        Page<Post> posts = postRepository.search(boardId, blankToEmpty(keyword), pageable);
+        return PageResponse.of(mapSummaries(posts));
     }
 
     /** 我的帖子 */
     @Transactional(readOnly = true)
     public PageResponse<PostSummaryResponse> myPosts(Long authorId, int page, int size) {
-        return PageResponse.of(postRepository.findByAuthorIdAndDeletedFalse(authorId,
-                        PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createTime")))
-                .map(this::toSummary));
+        Page<Post> posts = postRepository.findByAuthorIdAndDeletedFalse(authorId,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createTime")));
+        return PageResponse.of(mapSummaries(posts));
     }
 
     /** 帖子详情：浏览量原子 +1 后返回 */
@@ -207,7 +213,7 @@ public class PostService {
         return (s == null || s.isBlank()) ? "" : s.trim();
     }
 
-    private PostSummaryResponse toSummary(Post p) {
+    private PostSummaryResponse toSummary(Post p, boolean liked, boolean favorited) {
         return PostSummaryResponse.builder()
                 .id(p.getId())
                 .boardId(p.getBoard().getId())
@@ -223,14 +229,49 @@ public class PostService {
                 .isExquisite(p.getIsExquisite())
                 .tags(p.getTags().stream().map(Tag::getName).toList())
                 .createTime(p.getCreateTime())
+                .liked(liked)
+                .favorited(favorited)
                 .build();
     }
 
     private PostDetailResponse toDetail(Post p) {
-        PostSummaryResponse s = toSummary(p);
+        return toDetail(p, null);
+    }
+
+    /**
+     * 组装详情：互动状态按当前登录用户计算（游客为 false）。
+     *
+     * @param userId 已知的当前用户 ID；传 null 时从 SecurityContext 读取，未登录则视为游客。
+     *               显式传入可避免在已有 userId 参数的写接口里重复读取上下文。
+     */
+    private PostDetailResponse toDetail(Post p, Long userId) {
+        Long uid = userId != null ? userId : SecurityUtils.currentUserIdOrNull();
+        boolean liked = uid != null && likeRepository.findByUserIdAndPostId(uid, p.getId()).isPresent();
+        boolean favorited = uid != null && favoriteRepository.findByUserIdAndPostId(uid, p.getId()).isPresent();
+        return toDetail(p, liked, favorited);
+    }
+
+    private PostDetailResponse toDetail(Post p, boolean liked, boolean favorited) {
+        PostSummaryResponse s = toSummary(p, liked, favorited);
         PostDetailResponse d = PostDetailResponse.of(s, p.getContent());
         d.setFavoriteCount(p.getFavoriteCount());
         d.setUpdateTime(p.getUpdateTime());
         return d;
+    }
+
+    /**
+     * 列表映射：先用一条批量查询取回"当前用户在本页帖子中已赞/已藏的帖子 ID"，
+     * 再在内存里判断，避免逐行查询导致 N+1（游客或空页直接跳过查询）。
+     */
+    private Page<PostSummaryResponse> mapSummaries(Page<Post> posts) {
+        List<Long> postIds = posts.getContent().stream().map(Post::getId).toList();
+        Long uid = SecurityUtils.currentUserIdOrNull();
+        Set<Long> likedIds = new HashSet<>();
+        Set<Long> favoritedIds = new HashSet<>();
+        if (uid != null && !postIds.isEmpty()) {
+            likedIds.addAll(likeRepository.findLikedPostIds(uid, postIds));
+            favoritedIds.addAll(favoriteRepository.findFavoritedPostIds(uid, postIds));
+        }
+        return posts.map(p -> toSummary(p, likedIds.contains(p.getId()), favoritedIds.contains(p.getId())));
     }
 }

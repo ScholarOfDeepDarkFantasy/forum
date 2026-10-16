@@ -31,7 +31,15 @@ public class PostDetailResponse {
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 
-    /** 从列表项 + 正文组装详情 */
+    /** 当前登录用户是否已点赞；游客恒为 false */
+    @Builder.Default
+    private Boolean liked = false;
+
+    /** 当前登录用户是否已收藏；游客恒为 false */
+    @Builder.Default
+    private Boolean favorited = false;
+
+    /** 从列表项 + 正文组装详情（继承列表项已按当前用户算好的互动状态） */
     public static PostDetailResponse of(PostSummaryResponse s, String content) {
         return PostDetailResponse.builder()
                 .id(s.getId())
@@ -49,6 +57,8 @@ public class PostDetailResponse {
                 .tags(s.getTags())
                 .createTime(s.getCreateTime())
                 .content(content)
+                .liked(s.getLiked())
+                .favorited(s.getFavorited())
                 .build();
     }
 }
