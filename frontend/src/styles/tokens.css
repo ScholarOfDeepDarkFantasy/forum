@@ -37,9 +37,18 @@
   --jf-font-meta: 13px;
   --jf-font-small: 12px;
 
-  /* 响应式断点（JS 侧 useResponsive 使用同一数值 768） */
+  /* 仅供参考：@media 无法使用 var()，故此变量无消费方。
+     本变量 + 三处 @media (max-width: 768px) + useResponsive.js 的
+     MOBILE_BREAKPOINT = 768，共五处出现，其中四处字面量控制行为；
+     改断点须在同一提交内同步。 */
   --jf-breakpoint-mobile: 768px;
 
-  /* 覆盖 Element Plus 主色，保持全站一致 */
+  /* 覆盖 Element Plus 主色。
+     注意：EP 的派生色（--el-color-primary-light-3/5/7/8/9、--el-color-primary-dark-2）
+     在其构建期由 EP 自身默认蓝算出，不随本变量联动。若将来改动 --jf-color-primary，
+     须同时声明这六个变量，否则会出现「半改主题」（按钮 hover、el-tag 底色、表格
+     选中行、菜单激活项仍是旧蓝）。派生规则：light-N 为与白色混合（3≈30%、5≈50%、
+     7≈70%、8≈80%、9≈90%），dark-2 为与黑色混合（≈20%）。可用
+     color-mix(in srgb, var(--jf-color-primary) 70%, #fff) 等形式覆盖。 */
   --el-color-primary: var(--jf-color-primary);
 }

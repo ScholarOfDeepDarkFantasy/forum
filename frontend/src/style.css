@@ -4,10 +4,10 @@
 
 body {
   margin: 0;
-  background: #f5f6f8;
+  background: var(--jf-color-bg-page);
   font-family: 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', sans-serif;
-  color: #303133;
+  color: var(--jf-color-text-1);
 }
 
 a {
