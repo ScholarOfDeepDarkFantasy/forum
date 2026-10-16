@@ -90,4 +90,73 @@ describe('usePostActions', () => {
     actions.syncFromPost({ id: 36, likeCount: 8, favoriteCount: 0 })
     expect(actions.stateFor(36).likeCount).toBe(9)
   })
+
+  it('同步服务端的 liked/favorited 标志（首次同步即生效）', () => {
+    const actions = usePostActions()
+    actions.syncFromPost({ id: 41, likeCount: 3, favoriteCount: 2, liked: true, favorited: true })
+    expect(actions.stateFor(41)).toMatchObject({
+      liked: true,
+      favorited: true,
+      likeCount: 3,
+      favoriteCount: 2
+    })
+  })
+
+  it('服务端标志为 false 时不要把本地状态当成 true', () => {
+    const actions = usePostActions()
+    actions.syncFromPost({ id: 42, likeCount: 0, favoriteCount: 0, liked: false, favorited: false })
+    expect(actions.stateFor(42)).toMatchObject({ liked: false, favorited: false })
+  })
+
+  it('同步不含标志的响应（未登录/缺字段）不会凭空造出 true', () => {
+    const actions = usePostActions()
+    actions.syncFromPost({ id: 43, likeCount: 1, favoriteCount: 1 })
+    expect(actions.stateFor(43)).toMatchObject({ liked: false, favorited: false })
+  })
+
+  it('用户已操作后，陈旧的同步不会把 liked/favorited 改回去', async () => {
+    postApi.like.mockResolvedValue({ active: true, count: 4 })
+    postApi.favorite.mockResolvedValue({ active: true, count: 3 })
+    const actions = usePostActions()
+    // 列表数据（用户操作前抓取）：未点赞、未收藏
+    actions.syncFromPost({ id: 44, likeCount: 3, favoriteCount: 2, liked: false, favorited: false })
+
+    await actions.toggleLike(44)
+    await actions.toggleFavorite(44)
+    expect(actions.stateFor(44)).toMatchObject({ liked: true, favorited: true })
+
+    // 同一个陈旧列表负载再次到达：不得回退用户刚做的操作，也不得与计数自相矛盾
+    actions.syncFromPost({ id: 44, likeCount: 3, favoriteCount: 2, liked: false, favorited: false })
+    expect(actions.stateFor(44)).toMatchObject({
+      liked: true,
+      favorited: true,
+      likeCount: 4,
+      favoriteCount: 3
+    })
+  })
+
+  it('刷新详情页（同 id、用户未操作）会用服务端标志覆盖默认的 false', () => {
+    // 复现本任务要修的 bug：刷新后点赞按钮变灰。
+    // 先经 stateFor 建立默认状态（模拟上一轮渲染已把 id 放进 stateMap），
+    // 再让详情接口返回 liked/favorited=true，此时用户并未操作，标志必须被写入。
+    const actions = usePostActions()
+    expect(actions.stateFor(45)).toMatchObject({ liked: false, favorited: false })
+
+    actions.syncFromPost({ id: 45, likeCount: 5, favoriteCount: 2, liked: true, favorited: true })
+    expect(actions.stateFor(45)).toMatchObject({ liked: true, favorited: true })
+  })
+
+  it('用户取消点赞后，服务端返回的旧 true 不会把按钮重新点亮', async () => {
+    postApi.like.mockResolvedValue({ active: false, count: 5 })
+    const actions = usePostActions()
+    actions.syncFromPost({ id: 46, likeCount: 6, favoriteCount: 0, liked: true })
+    expect(actions.stateFor(46).liked).toBe(true)
+
+    await actions.toggleLike(46)
+    expect(actions.stateFor(46)).toMatchObject({ liked: false, likeCount: 5 })
+
+    // 陈旧负载仍说 liked=true
+    actions.syncFromPost({ id: 46, likeCount: 6, favoriteCount: 0, liked: true })
+    expect(actions.stateFor(46).liked).toBe(false)
+  })
 })

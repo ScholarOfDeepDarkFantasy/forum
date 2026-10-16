@@ -25,8 +25,13 @@ const submitting = ref(false)
 const isAuthor = computed(() => auth.user && post.value && post.value.authorId === auth.user.id)
 
 async function loadPost() {
-  post.value = await postApi.detail(route.params.id)
-  actions.syncFromPost(post.value)
+  const detail = await postApi.detail(route.params.id)
+  actions.syncFromPost(detail)
+  // 模板通篇读 post.*，故把共享状态里的互动标志写回本地 model，
+  // 使刷新后按钮能反映服务端的 liked/favorited（而非只有点击时才被赋值）。
+  // syncFromPost 只接收帖子对象，不适合由它反写调用方数据，因此在此处合并。
+  const s = actions.stateFor(detail.id)
+  post.value = { ...detail, liked: s.liked, favorited: s.favorited, likeCount: s.likeCount, favoriteCount: s.favoriteCount }
 }
 
 /**
@@ -105,7 +110,7 @@ async function toggleLike() {
 async function toggleFavorite() {
   if (!auth.isLoggedIn) return router.push({ name: 'login', query: { redirect: route.fullPath } })
   const r = await actions.toggleFavorite(post.value.id)
-  post.value = { ...post.value, favoriteCount: r.count }
+  post.value = { ...post.value, favoriteCount: r.count, favorited: r.active }
   ElMessage.success(r.active ? '已收藏' : '已取消收藏')
 }
 
@@ -183,8 +188,8 @@ watch(() => route.hash, scrollToHash)
         <el-button round :type="post.liked ? 'primary' : 'default'" @click="toggleLike">
           👍 点赞 {{ post.likeCount }}
         </el-button>
-        <el-button round @click="toggleFavorite">
-          <el-icon><Star /></el-icon> 收藏 {{ post.favoriteCount }}
+        <el-button round :type="post.favorited ? 'warning' : 'default'" @click="toggleFavorite">
+          <el-icon><component :is="post.favorited ? StarFilled : Star" /></el-icon> 收藏 {{ post.favoriteCount }}
         </el-button>
       </div>
     </el-card>
