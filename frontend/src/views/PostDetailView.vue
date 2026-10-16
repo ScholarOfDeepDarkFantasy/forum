@@ -1,14 +1,18 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View, ChatDotRound, Star, StarFilled, CaretTop, Medal, Delete, Edit } from '@element-plus/icons-vue'
 import { postApi, commentApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { usePostActions } from '@/composables/usePostActions'
+import { useNotificationStore } from '@/stores/notifications'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const actions = usePostActions()
+const notifications = useNotificationStore()
 
 const post = ref(null)
 const comments = ref([])
@@ -22,6 +26,25 @@ const isAuthor = computed(() => auth.user && post.value && post.value.authorId =
 
 async function loadPost() {
   post.value = await postApi.detail(route.params.id)
+  actions.syncFromPost(post.value)
+}
+
+/**
+ * 把 URL 锚点（#comment-N）滚动定位到对应评论并短暂高亮。
+ *
+ * 用 getElementById 而非 querySelector：hash 来自用户可控的 URL，直接喂给
+ * querySelector 时非法选择器（如 #comment-]）会抛 SyntaxError。
+ * id 不是 #comment-N 形态或元素不存在（评论已删、在其它评论分页）时静默返回。
+ * 同页内跳到另一条评论只改 hash、不重新挂载组件，由调用方 watch 触发本函数。
+ */
+function scrollToHash() {
+  const hash = route.hash
+  if (!hash || !hash.startsWith('#comment-')) return
+  const el = document.getElementById(hash.slice(1))
+  if (!el) return
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  el.classList.add('anchor-highlight')
+  setTimeout(() => el.classList.remove('anchor-highlight'), 2000)
 }
 
 async function loadComments(page = 0) {
@@ -50,6 +73,7 @@ async function submitComment() {
     replyTo.value = null
     await loadComments(0)
     await loadPost()
+    notifications.refreshUnread()
   } finally {
     submitting.value = false
   }
@@ -73,14 +97,14 @@ async function removeComment(comment) {
 
 async function toggleLike() {
   if (!auth.isLoggedIn) return router.push({ name: 'login', query: { redirect: route.fullPath } })
-  const r = await postApi.like(post.value.id)
-  post.value = { ...post.value, likeCount: r.count }
+  const r = await actions.toggleLike(post.value.id)
+  post.value = { ...post.value, likeCount: r.count, liked: r.active }
   ElMessage.success(r.active ? '已点赞' : '已取消点赞')
 }
 
 async function toggleFavorite() {
   if (!auth.isLoggedIn) return router.push({ name: 'login', query: { redirect: route.fullPath } })
-  const r = await postApi.favorite(post.value.id)
+  const r = await actions.toggleFavorite(post.value.id)
   post.value = { ...post.value, favoriteCount: r.count }
   ElMessage.success(r.active ? '已收藏' : '已取消收藏')
 }
@@ -110,7 +134,13 @@ function canDeleteComment(c) {
 onMounted(async () => {
   await loadPost()
   await loadComments()
+  // 评论渲染完毕后再定位：nextTick 让 DOM 跟上本轮 await 拿到的数据
+  await nextTick()
+  scrollToHash()
 })
+
+// 已在本页时再次点击指向另一条评论的通知（仅 hash 变化）不会重新挂载组件
+watch(() => route.hash, scrollToHash)
 </script>
 
 <template>
@@ -188,7 +218,7 @@ onMounted(async () => {
       </div>
 
       <template v-if="comments.length">
-        <div v-for="c in comments" :key="c.id" class="comment">
+        <div v-for="c in comments" :key="c.id" :id="`comment-${c.id}`" class="comment">
           <div class="comment-head">
             <el-avatar :size="26">{{ (c.authorNickname || c.authorUsername || '?').slice(0, 1) }}</el-avatar>
             <span class="comment-author">{{ c.authorNickname || c.authorUsername }}</span>
@@ -202,7 +232,7 @@ onMounted(async () => {
 
           <!-- 楼中楼 -->
           <div v-if="c.replies?.length" class="replies">
-            <div v-for="r in c.replies" :key="r.id" class="reply">
+            <div v-for="r in c.replies" :key="r.id" :id="`comment-${r.id}`" class="reply">
               <div class="comment-head">
                 <el-avatar :size="22">{{ (r.authorNickname || r.authorUsername || '?').slice(0, 1) }}</el-avatar>
                 <span class="comment-author">{{ r.authorNickname || r.authorUsername }}</span>
@@ -328,5 +358,9 @@ onMounted(async () => {
 .pager {
   margin-top: 16px;
   justify-content: center;
+}
+.anchor-highlight {
+  background: #fff8e6;
+  transition: background 0.4s ease;
 }
 </style>
