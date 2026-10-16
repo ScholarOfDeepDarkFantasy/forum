@@ -22,8 +22,12 @@ describe('resolveNotificationTarget', () => {
     expect(result).toEqual({ path: '/posts/9', hash: '' })
   })
 
-  it('SYSTEM 通知不可跳转', () => {
-    expect(resolveNotificationTarget({ type: 'SYSTEM', postId: null, commentId: null })).toBeNull()
+  it('SYSTEM 通知即使有 postId 也不可跳转', () => {
+    expect(resolveNotificationTarget({ type: 'SYSTEM', postId: 3, commentId: null })).toBeNull()
+  })
+
+  it('未知类型不因默认而变得可跳转', () => {
+    expect(resolveNotificationTarget({ type: 'MENTION', postId: 4, commentId: null })).toBeNull()
   })
 
   it('缺少 postId 的通知不可跳转', () => {

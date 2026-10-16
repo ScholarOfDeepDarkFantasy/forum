@@ -1,6 +1,12 @@
+/** 可点击跳转的通知类型；其余类型（如 SYSTEM）仅展示不可点击 */
+const NAVIGABLE_TYPES = ['REPLY', 'LIKE', 'FAVORITE']
+
 /**
  * 把通知映射为路由目标。
  * 返回 { path, hash }，无法跳转时返回 null。
+ *
+ * 用可跳转类型的白名单而非针对 SYSTEM 的黑名单：NotificationType 未来新增成员时
+ * 应默认不可点击，而不是静默变得可点击（SYSTEM 通知即便带有 postId 也只展示）。
  *
  * REPLY 仅在 commentId 存在时才附锚点：V2 迁移新增的 comment_id 列为可空且未回填
  * （见 V2__notification_comment_id.sql），历史 REPLY 行该字段为 NULL，
@@ -9,6 +15,9 @@
  */
 export function resolveNotificationTarget(notification) {
   if (!notification || !notification.postId) {
+    return null
+  }
+  if (!NAVIGABLE_TYPES.includes(notification.type)) {
     return null
   }
   const path = `/posts/${notification.postId}`
