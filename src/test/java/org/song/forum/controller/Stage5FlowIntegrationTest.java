@@ -165,6 +165,22 @@ class Stage5FlowIntegrationTest {
                 .containsExactly(postId);
     }
 
+    /**
+     * 把切换式接口（like/favorite）驱动到指定终态：先切换一次，若结果与期望不符再切换一次。
+     * 这样调用方只依赖"最终状态"，不依赖其它用例遗留的数据。
+     */
+    private void ensureToggled(String path, String token, boolean expectedActive) {
+        ResponseEntity<Result<LikeToggleResponse>> resp = rest.exchange(url(path), HttpMethod.POST,
+                new HttpEntity<>(bearer(token)), new ParameterizedTypeReference<Result<LikeToggleResponse>>() {});
+        assertThat(resp.getStatusCode().is2xxSuccessful()).isTrue();
+        if (resp.getBody().getData().isActive() != expectedActive) {
+            resp = rest.exchange(url(path), HttpMethod.POST,
+                    new HttpEntity<>(bearer(token)), new ParameterizedTypeReference<Result<LikeToggleResponse>>() {});
+            assertThat(resp.getStatusCode().is2xxSuccessful()).isTrue();
+        }
+        assertThat(resp.getBody().getData().isActive()).isEqualTo(expectedActive);
+    }
+
     @Test
     @Order(3)
     void stage2b_likedFavoritedFlagsVisibleToFrontend() {
@@ -183,9 +199,10 @@ class Stage5FlowIntegrationTest {
         assertThat(anonList.getBody().getData().content().get(0).getLiked()).isFalse();
         assertThat(anonList.getBody().getData().content().get(0).getFavorited()).isFalse();
 
-        // liker 收藏（stage2 已收藏过，不再重复点击以免切换回未收藏）+ 点赞
-        rest.exchange(url("/api/posts/" + postId + "/like"), HttpMethod.POST,
-                new HttpEntity<>(bearer(mutedToken)), new ParameterizedTypeReference<Result<LikeToggleResponse>>() {});
+        // 本用例自建前置状态：stage2 可能已收藏/取消收藏过，切换式接口再点一次会翻转，
+        // 所以按返回的 active 判断，必要时补一次点击，使断言不依赖 stage2 的残留状态。
+        ensureToggled("/api/posts/" + postId + "/favorite", mutedToken, true);
+        ensureToggled("/api/posts/" + postId + "/like", mutedToken, true);
 
         // 刷新后重新拉详情：liked/favorited 必须为 true（前端刷新场景）
         ResponseEntity<Result<PostDetailResponse>> detail = rest.exchange(url("/api/posts/" + postId),
@@ -222,9 +239,10 @@ class Stage5FlowIntegrationTest {
         assertThat(favorites.getBody().getData().content().get(0).getFavorited()).isTrue();
         assertThat(favorites.getBody().getData().content().get(0).getLiked()).isTrue();
 
-        // 写接口（置顶）返回的详情也带互动状态：管理员视角未赞未藏
+        // 写接口（置顶）返回的详情也带互动状态：管理员视角未赞未藏。
+        // 这里传 true：帖此时必然是未置顶的（stage3 才置顶），因此不改变任何共享状态。
         ResponseEntity<Result<PostDetailResponse>> pin = rest.exchange(
-                url("/api/posts/" + postId + "/pin?pinned=false"), HttpMethod.PUT,
+                url("/api/posts/" + postId + "/pin?pinned=true"), HttpMethod.PUT,
                 new HttpEntity<>(bearer(adminToken)), new ParameterizedTypeReference<Result<PostDetailResponse>>() {});
         assertThat(pin.getBody().getData().getLiked()).isFalse();
         assertThat(pin.getBody().getData().getFavorited()).isFalse();

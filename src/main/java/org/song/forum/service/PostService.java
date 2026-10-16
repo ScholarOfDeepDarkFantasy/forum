@@ -32,6 +32,10 @@ import java.util.Set;
 
 /**
  * 帖子服务：发帖/编辑/删除（作者本人）、分页搜索、详情+浏览量
+ * <p>注意：{@code toDetail(Post)} / {@code mapSummaries} 通过 {@link SecurityUtils} 从
+ * {@code SecurityContextHolder} 读取当前登录用户，属于请求线程作用域（request-thread scoped）。
+ * 因此它们不得在异步或定时任务（{@code @Async} / {@code @Scheduled} / {@code CompletableFuture}
+ * 等脱离请求线程的代码）中调用，否则会静默按游客处理。</p>
  */
 @Slf4j
 @Service
@@ -63,8 +67,8 @@ public class PostService {
         post.setTags(resolveTags(req.getTags()));
         post = postRepository.save(post);
         log.info("用户 {} 发帖: {}", author.getUsername(), post.getTitle());
-        // 新帖对当前用户必然未赞未藏，带出 false 保持一致
-        return toDetail(post, false, false);
+        // 与其它写接口保持一致：按作者推导互动状态（新帖查无记录，结果同样是 false）
+        return toDetail(post, authorId);
     }
 
     /** 编辑帖子（仅作者本人） */
