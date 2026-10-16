@@ -1,11 +1,15 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Plus, View, ChatDotRound, CaretTop, Medal } from '@element-plus/icons-vue'
+import { Search, Plus, View, ChatDotRound, CaretTop, Medal, Star } from '@element-plus/icons-vue'
 import { boardApi, postApi } from '@/api'
+import { usePostActions } from '@/composables/usePostActions'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
+const actions = usePostActions()
 
 const boards = ref([])
 const pageData = ref({ content: [], totalElements: 0, totalPages: 0 })
@@ -24,10 +28,29 @@ async function loadBoards() {
 async function loadPosts() {
   loading.value = true
   try {
-    pageData.value = await postApi.list(query.value)
+    const data = await postApi.list(query.value)
+    // 列表响应里的 liked/favorited 播种进共享状态，使首页与详情页读到同一份标志
+    data.content.forEach((p) => actions.syncFromPost(p))
+    pageData.value = data
   } finally {
     loading.value = false
   }
+}
+
+/**
+ * 列表行内的点赞：游客先跳登录，已登录则切换共享状态。
+ *
+ * 计数一律取自共享状态而非 p.likeCount：toggleLike 返回的 count 是最新的，
+ * 直接渲染响应字段会在下次翻页/搜索重新拉取前显示旧值，与详情页不一致。
+ * syncFromPost 的「仅当本地为 0 才播种」规则保证了本地已切换过的计数
+ * 不会被后续的陈旧列表负载回退。
+ */
+async function toggleLike(p) {
+  if (!auth.isLoggedIn) {
+    router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  await actions.toggleLike(p.id)
 }
 
 function search() {
@@ -134,6 +157,15 @@ loadPosts()
             <span><el-icon><View /></el-icon>{{ p.viewCount }}</span>
             <span><el-icon><ChatDotRound /></el-icon>{{ p.commentCount }}</span>
           </div>
+          <button
+            type="button"
+            class="like-btn"
+            :class="{ active: actions.stateFor(p.id).liked }"
+            :title="actions.stateFor(p.id).liked ? '取消点赞' : '点赞'"
+            @click.stop="toggleLike(p)"
+          >
+            <el-icon><Star /></el-icon>{{ actions.stateFor(p.id).likeCount }}
+          </button>
         </div>
       </template>
       <el-empty v-else description="暂无帖子" />
@@ -155,20 +187,20 @@ loadPosts()
 .home {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-top: 16px;
+  gap: var(--jf-space-4);
+  padding-top: var(--jf-space-4);
 }
 .board-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--jf-space-2);
 }
 .board-tag {
   cursor: pointer;
 }
 .toolbar {
   display: flex;
-  gap: 12px;
+  gap: var(--jf-space-3);
 }
 .search-input {
   flex: 1;
@@ -177,15 +209,15 @@ loadPosts()
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 8px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 14px var(--jf-space-2);
+  border-bottom: 1px solid var(--jf-color-border);
   cursor: pointer;
 }
 .post-item:last-of-type {
   border-bottom: none;
 }
 .post-item:hover {
-  background: #f8f9fb;
+  background: var(--jf-color-bg-hover);
 }
 .post-title-line {
   display: flex;
@@ -196,7 +228,7 @@ loadPosts()
   flex-shrink: 0;
 }
 .post-title {
-  font-size: 16px;
+  font-size: var(--jf-font-title-md);
   font-weight: 600;
 }
 .post-meta {
@@ -204,28 +236,81 @@ loadPosts()
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #909399;
-  font-size: 13px;
+  color: var(--jf-color-text-3);
+  font-size: var(--jf-font-meta);
   flex-wrap: wrap;
 }
 .tags {
   display: inline-flex;
-  gap: 4px;
+  gap: var(--jf-space-1);
 }
 .post-stats {
   display: flex;
   gap: 14px;
-  color: #909399;
-  font-size: 13px;
+  color: var(--jf-color-text-3);
+  font-size: var(--jf-font-meta);
   flex-shrink: 0;
 }
 .post-stats span {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--jf-space-1);
+}
+.like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jf-space-1);
+  margin-left: var(--jf-space-3);
+  padding: var(--jf-space-1) var(--jf-space-2);
+  border: 1px solid var(--jf-color-border);
+  border-radius: var(--jf-radius-sm);
+  background: var(--jf-color-bg-card);
+  color: var(--jf-color-text-3);
+  font-size: var(--jf-font-meta);
+  font-family: inherit;
+  line-height: 1.5;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.like-btn:hover {
+  background: var(--jf-color-bg-hover);
+}
+.like-btn.active {
+  border-color: var(--jf-color-primary);
+  color: var(--jf-color-primary);
 }
 .pager {
-  margin-top: 16px;
+  margin-top: var(--jf-space-4);
   justify-content: center;
+}
+
+/* 窄屏：板块标签横滑、工具栏堆叠，避免标题被挤压换行 */
+@media (max-width: 768px) {
+  .board-list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .board-list::-webkit-scrollbar {
+    display: none;
+  }
+  .board-tag {
+    flex-shrink: 0;
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .post-item {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .post-meta {
+    gap: var(--jf-space-1);
+  }
+  .post-stats {
+    margin-left: var(--jf-space-2);
+  }
 }
 </style>
