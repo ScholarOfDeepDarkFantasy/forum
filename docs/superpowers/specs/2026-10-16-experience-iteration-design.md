@@ -1,10 +1,11 @@
 # JavaForum 体验迭代（第一轮）设计文档
 
 - 日期：2026-10-16
-- 状态：已确认（含 1 处后端小改动）
+- 状态：已确认（含 2 处后端小改动）
 - 范围：视觉信息层级（A） + 手机窄屏适配（B） + 通知与互动闭环（C）
 - 明确不做：Markdown 渲染、标签检索、公开个人主页、头像上传、深色模式
 - 用户决策：接受后端补 `comment_id`（选项一），通知精确锚定被回复评论
+- 用户决策（追加）：接受后端补 `liked` / `favorited`（选项一），使互动状态在刷新后仍正确
 
 ## 1. 背景与目标
 
@@ -102,6 +103,7 @@ frontend/src/
 - 以 `postId` 为键维护 `{ liked, likeCount, favorited, favoriteCount }` 的响应式映射，首页列表与详情页读写同一来源。
 - 切换动作调用现有 `postApi.like/favorite`，用返回的 `active` 与 `count` 覆盖本地状态；失败时回滚并提示。
 - 说明：后端切换接口返回的是本次操作后的状态与计数，因此无需额外查询即可保持一致性。
+- **实现期补充（后端）**：`liked` / `favorited` 原先不存在于任何响应中，导致刷新后点赞按钮恒为未选中，`syncFromPost` 也无从写入这两个标志。已新增 `PostDetailResponse` / `PostSummaryResponse` 的 `liked` / `favorited`（登录用户视角，游客为 `false`），列表路径用两条批量 `IN` 查询取当前用户在当页的点赞/收藏集合，详情路径用单行查询。前端 `syncFromPost` 据此写入标志。
 
 ## 4. 数据流
 
