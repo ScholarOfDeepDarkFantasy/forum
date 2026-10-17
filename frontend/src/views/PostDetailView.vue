@@ -337,7 +337,7 @@ watch(() => route.hash, scrollToHash)
   font-size: var(--jf-font-body);
 }
 /* #c0c4cc：占位/失效态浅灰，tokens.css 未提供对应令牌，保留字面量。
-   若将来补令牌，应与 NotificationsView.vue:142 的同类用法一并替换。 */
+   若将来补令牌，应与 NotificationsView.vue 的 .notif-time 一并替换。 */
 .comment-time {
   color: #c0c4cc;
   font-size: var(--jf-font-small);

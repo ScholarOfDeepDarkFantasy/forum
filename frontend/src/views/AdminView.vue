@@ -252,17 +252,17 @@ onMounted(() => {
 
 <style scoped>
 .admin-card {
-  margin: 16px auto;
+  margin: var(--jf-space-4) auto;
   max-width: 1100px;
 }
 .mb {
-  margin-bottom: 12px;
+  margin-bottom: var(--jf-space-3);
 }
 .role-tag {
-  margin-right: 4px;
+  margin-right: var(--jf-space-1);
 }
 .pager {
-  margin-top: 16px;
+  margin-top: var(--jf-space-4);
   justify-content: center;
 }
 

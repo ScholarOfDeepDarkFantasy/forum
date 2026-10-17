@@ -85,8 +85,8 @@ onMounted(() => {
   min-height: 100vh;
 }
 .header {
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  background: var(--jf-color-bg-card);
+  border-bottom: 1px solid var(--jf-color-border);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -102,24 +102,24 @@ onMounted(() => {
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--jf-space-2);
   font-size: 20px;
   font-weight: 700;
-  color: #409eff;
+  color: var(--jf-color-primary);
 }
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--jf-space-3);
 }
 .user-chip {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--jf-space-2);
   cursor: pointer;
 }
 .username {
-  font-size: 14px;
+  font-size: var(--jf-font-body);
 }
 .main {
   max-width: 1100px;
@@ -128,8 +128,8 @@ onMounted(() => {
 }
 .footer {
   text-align: center;
-  color: #909399;
-  font-size: 13px;
+  color: var(--jf-color-text-3);
+  font-size: var(--jf-font-meta);
   padding: 20px 0;
 }
 .bell-badge :deep(.el-badge__content) {

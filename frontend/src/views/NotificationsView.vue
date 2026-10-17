@@ -107,7 +107,7 @@ onMounted(() => {
 
 <style scoped>
 .notif-card {
-  margin: 16px auto;
+  margin: var(--jf-space-4) auto;
   max-width: 860px;
 }
 .head {
@@ -119,12 +119,16 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 4px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: var(--jf-space-3) var(--jf-space-1);
+  border-bottom: 1px solid var(--jf-color-border);
 }
 .notif:last-of-type {
   border-bottom: none;
 }
+/* #f0f7ff：未读行的淡蓝底，是一次性语义色，tokens.css 无对应令牌。
+   最接近的 --jf-color-bg-hover(#f8f9fb) 几乎看不出颜色，换上后「未读」
+   与「可点击行的 hover」两种状态将无法区分，故保留字面量。
+   （与 PostDetailView.vue 的 #fff8e6 同一处理方式。） */
 .notif.unread {
   background: #f0f7ff;
 }
@@ -136,15 +140,34 @@ onMounted(() => {
 }
 .notif-content {
   flex: 1;
-  font-size: 14px;
+  font-size: var(--jf-font-body);
 }
+/* #c0c4cc：时间等次要信息的浅灰，语义比 --jf-color-text-3(#909399) 更弱，
+   tokens.css 未提供对应令牌，保留字面量；若将来补令牌，
+   应与 PostDetailView.vue 的 .comment-time / .comment-content.deleted 一并替换。 */
 .notif-time {
   color: #c0c4cc;
-  font-size: 12px;
+  font-size: var(--jf-font-small);
   flex-shrink: 0;
 }
 .pager {
-  margin-top: 16px;
+  margin-top: var(--jf-space-4);
   justify-content: center;
+}
+
+/* 窄屏：一行要容纳类型标签、正文、时间、帖子标题标签、未读标签。
+   .notif-time 设了 flex-shrink:0，不会缩；el-tag 内部是 nowrap，
+   被压缩只会变成省略号；而 .notif-content 的 flex:1 等价于 flex-basis:0，
+   换行算法把它当零宽，既不会为它换行，它也只能分到扣掉这些固定项后的
+   余量（375px 下估算 90~140px，正文每行只剩 6~9 个汉字）。
+   故允许换行（放不下的标签顺延下一行），并把正文基准宽度设为整行，
+   让它独占一行，读起来更接近一整条通知。 */
+@media (max-width: 768px) {
+  .notif {
+    flex-wrap: wrap;
+  }
+  .notif-content {
+    flex: 1 1 100%;
+  }
 }
 </style>
