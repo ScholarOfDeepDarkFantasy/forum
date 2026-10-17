@@ -6,7 +6,6 @@
   /* 颜色 */
   --jf-color-primary: #409eff;
   --jf-color-text-1: #303133;
-  --jf-color-text-2: #606266;
   --jf-color-text-3: #909399;
   --jf-color-border: #e4e7ed;
   --jf-color-bg-page: #f5f6f8;
@@ -21,14 +20,12 @@
   --jf-space-5: 24px;
   --jf-space-6: 32px;
 
-  /* 圆角 */
+  /* 圆角：只保留有消费方的两档（sm 用于 HomeView 点赞按钮，md 用于 AdminView 卡片）。
+     本轮已删除无消费方的 --jf-color-text-2 / --jf-radius-lg / --jf-shadow-card /
+     --jf-shadow-hover：预留令牌会让「这份令牌集是否真被使用」无从判断。
+     需要新阶梯时，请连同首个消费方一起加，不要先占位。 */
   --jf-radius-sm: 4px;
   --jf-radius-md: 8px;
-  --jf-radius-lg: 12px;
-
-  /* 阴影 */
-  --jf-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --jf-shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.08);
 
   /* 字号阶梯 */
   --jf-font-title-lg: 22px;

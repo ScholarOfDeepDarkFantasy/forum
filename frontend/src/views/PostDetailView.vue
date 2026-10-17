@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, nextTick, watch } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View, ChatDotRound, Star, StarFilled, CaretTop, Medal, Delete, Edit } from '@element-plus/icons-vue'
@@ -24,29 +24,65 @@ const submitting = ref(false)
 
 const isAuthor = computed(() => auth.user && post.value && post.value.authorId === auth.user.id)
 
+/**
+ * 详情页展示模型：正文/作者/标签等字段来自详情接口，四个互动字段一律实时取自共享状态。
+ *
+ * 不能在 loadPost 时把 liked/favorited/likeCount/favoriteCount 合并进 post.value 快照：
+ * 首页列表是响应式读 usePostActions 的同一份状态，详情页若快照副本，二者会在竞态下
+ * 显示相反的状态。具体路径：用户在首页点了赞、请求尚未返回就打开帖子详情——
+ * locallyToggled 已置位，于是 syncFromPost 有意不覆盖标志，计数也非 0 而被跳过，
+ * 详情页便会渲染「未点赞 + 旧计数」，与首页列表相反，且此时点详情页按钮发的是
+ * 取消请求、还会提示「已取消点赞」。同源响应式读取后，任何操作序列都不可能让两者不一致。
+ */
+const view = computed(() => {
+  if (!post.value) return null
+  const s = actions.stateFor(post.value.id)
+  return {
+    ...post.value,
+    liked: s.liked,
+    favorited: s.favorited,
+    likeCount: s.likeCount,
+    favoriteCount: s.favoriteCount
+  }
+})
+
 async function loadPost() {
   const detail = await postApi.detail(route.params.id)
+  // 只把服务端数据播种进共享状态；互动字段不在此处落盘，由 view 每次渲染时取用
   actions.syncFromPost(detail)
-  // 模板通篇读 post.*，故把共享状态里的互动标志写回本地 model，
-  // 使刷新后按钮能反映服务端的 liked/favorited（而非只有点击时才被赋值）。
-  // syncFromPost 只接收帖子对象，不适合由它反写调用方数据，因此在此处合并。
-  const s = actions.stateFor(detail.id)
-  post.value = { ...detail, liked: s.liked, favorited: s.favorited, likeCount: s.likeCount, favoriteCount: s.favoriteCount }
+  post.value = detail
 }
 
 /**
  * 把 URL 锚点（#comment-N）滚动定位到对应评论并短暂高亮。
  *
  * 用 getElementById 而非 querySelector：hash 来自用户可控的 URL，直接喂给
- * querySelector 时非法选择器（如 #comment-]）会抛 SyntaxError。
- * id 不是 #comment-N 形态或元素不存在（评论已删、在其它评论分页）时静默返回。
- * 同页内跳到另一条评论只改 hash、不重新挂载组件，由调用方 watch 触发本函数。
+ * querySelector 时非法选择器（如 #comment-]）会抛 SyntaxError。这里先用
+ * /^comment-\d+$/ 收窄形态，非法 id 直接忽略。
+ *
+ * 已知限制：评论列表每页只取 10 条根评论（服务端按 createTime 升序返回根评论，
+ * 子回复随父评论一起平铺）。REPLY 通知锚定的根评论若排在第 11 条之后，就不在本页
+ * DOM 里。此时不再静默失败，而是在确实「还有更多评论可分页」（commentTotal > 10）
+ * 时给一条非阻塞提示，避免用户以为点击没生效。评论已删除会命中同一分支，这是本轮
+ * 接受的误报（见 README「已知限制」）。
+ *
+ * 同页内跳到另一条评论（仅 hash 变化、不重新挂载）这一步不需要额外 watch：
+ * App.vue 的 router-view :key="$route.fullPath" 会在 hash 变化时强制重新挂载
+ * 本组件，onMounted 会再次走到这里；若将来去掉那个 key，须在此处补回 watch。
  */
 function scrollToHash() {
   const hash = route.hash
   if (!hash || !hash.startsWith('#comment-')) return
-  const el = document.getElementById(hash.slice(1))
-  if (!el) return
+  const id = hash.slice(1)
+  if (!/^comment-\d+$/.test(id)) return
+  const el = document.getElementById(id)
+  if (!el) {
+    // 未找到：可能评论已删，也可能目标根评论在后面的评论分页里
+    if (commentTotal.value > 10) {
+      ElMessage.info('目标评论可能在后面的评论分页里，可翻页查看')
+    }
+    return
+  }
   el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   el.classList.add('anchor-highlight')
   setTimeout(() => el.classList.remove('anchor-highlight'), 2000)
@@ -102,16 +138,23 @@ async function removeComment(comment) {
 
 async function toggleLike() {
   if (!auth.isLoggedIn) return router.push({ name: 'login', query: { redirect: route.fullPath } })
-  const r = await actions.toggleLike(post.value.id)
-  post.value = { ...post.value, likeCount: r.count, liked: r.active }
-  ElMessage.success(r.active ? '已点赞' : '已取消点赞')
+  try {
+    const r = await actions.toggleLike(post.value.id)
+    ElMessage.success(r.active ? '已点赞' : '已取消点赞')
+  } catch {
+    // 失败回滚由 usePostActions 完成，面向用户的错误提示由 axios 拦截器统一给出；
+    // 这里必须吞掉 rejection，否则点击处理器会抛出未处理的 Promise 拒绝
+  }
 }
 
 async function toggleFavorite() {
   if (!auth.isLoggedIn) return router.push({ name: 'login', query: { redirect: route.fullPath } })
-  const r = await actions.toggleFavorite(post.value.id)
-  post.value = { ...post.value, favoriteCount: r.count, favorited: r.active }
-  ElMessage.success(r.active ? '已收藏' : '已取消收藏')
+  try {
+    const r = await actions.toggleFavorite(post.value.id)
+    ElMessage.success(r.active ? '已收藏' : '已取消收藏')
+  } catch {
+    // 同上：回滚已做，提示归拦截器
+  }
 }
 
 async function removePost() {
@@ -143,13 +186,10 @@ onMounted(async () => {
   await nextTick()
   scrollToHash()
 })
-
-// 已在本页时再次点击指向另一条评论的通知（仅 hash 变化）不会重新挂载组件
-watch(() => route.hash, scrollToHash)
 </script>
 
 <template>
-  <div class="detail" v-if="post">
+  <div class="detail" v-if="view">
     <!-- 帖子主体 -->
     <el-card shadow="never">
       <div class="post-head">
@@ -185,11 +225,11 @@ watch(() => route.hash, scrollToHash)
       </div>
 
       <div class="post-actions">
-        <el-button round :type="post.liked ? 'primary' : 'default'" @click="toggleLike">
-          👍 点赞 {{ post.likeCount }}
+        <el-button round :type="view.liked ? 'primary' : 'default'" @click="toggleLike">
+          👍 点赞 {{ view.likeCount }}
         </el-button>
-        <el-button round :type="post.favorited ? 'warning' : 'default'" @click="toggleFavorite">
-          <el-icon><component :is="post.favorited ? StarFilled : Star" /></el-icon> 收藏 {{ post.favoriteCount }}
+        <el-button round :type="view.favorited ? 'warning' : 'default'" @click="toggleFavorite">
+          <el-icon><component :is="view.favorited ? StarFilled : Star" /></el-icon> 收藏 {{ view.favoriteCount }}
         </el-button>
       </div>
     </el-card>

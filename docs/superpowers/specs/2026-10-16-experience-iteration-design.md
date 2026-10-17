@@ -88,7 +88,7 @@ frontend/src/
 - **响应**：`NotificationResponse` 增加 `commentId`；`NotificationService.toResponse()` 补该字段。
 - **用途**：`REPLY` 类型通知携带 `commentId` 时映射为 `#comment-{commentId}` 锚点；`LIKE`/`FAVORITE` 无该值，跳转到帖子。
 
-后端改动须保持既有 19 个测试全绿，并为通知携带 `commentId` 增加至少 1 条集成测试断言。
+后端改动须保持既有 19 个测试全绿，并为通知携带 `commentId` 增加至少 1 条集成测试断言（完成后总计 20 条）。
 
 **评论锚点渲染**：帖子详情页每条评论容器加 `id="comment-{id}"`；路由进入带 `hash` 时滚动到该元素并加高亮类，2 秒后移除。
 
@@ -96,7 +96,8 @@ frontend/src/
 
 - state：`unreadCount`、`list`、`listPage`
 - actions：`refreshUnread()`、`loadList(page)`、`markAllRead()`
-- 顶栏角标与通知页共用该 store；点赞、收藏、评论成功后由调用方触发 `refreshUnread()`，替代原先仅靠 60 秒轮询的做法（轮询保留为兜底，间隔放宽到 120 秒）。
+- 顶栏角标与通知页共用该 store。角标刷新的时机共四处：登录后（`App.vue` 挂载）、进入通知页（`NotificationsView` 挂载）、`markAllRead()` 归零、以及 120 秒兜底轮询（替代原先仅靠 60 秒轮询的做法，间隔放宽到 120 秒）。
+- **实现期修正（原文有误）**：本节原先写「点赞、收藏、评论成功后由调用方触发 `refreshUnread()`」，但该行为不可能产生效果——后端对自发行为不写通知（`LikeService` 与 `CommentService` 均跳过 recipient 为操作者本人的通知），当前用户自己的任何操作都不会改变自己的未读数，调用只会白跑一次请求。故 `submitComment` 中已有的一次 `refreshUnread()` 不构成刷新来源，点赞/收藏路径不触发；角标反映的是**他人**操作产生的通知，最迟 120 秒后由轮询补齐。
 
 **互动状态一致性（composables/usePostActions.js）**
 
@@ -108,13 +109,14 @@ frontend/src/
 ## 4. 数据流
 
 1. 用户点击通知 → `resolveNotificationTarget` 得到 `path + hash` → `router.push` → 详情页 `onMounted` 读取 `route.hash` 并滚动定位。
-2. 用户在详情页点赞 → `usePostActions.toggleLike(postId)` → 调用 API → 更新共享状态 → 触发 `notifications.refreshUnread()`。
+2. 用户在详情页点赞 → `usePostActions.toggleLike(postId)` → 调用 API → 更新共享状态（首页列表与详情页同时反映；不刷新未读角标，原因见 §3.3）。
 3. 用户回到首页 → 列表项从共享状态读取 `liked/likeCount`，与详情页显示一致。
 
 ## 5. 错误处理
 
 - 通知跳转目标为 `null` 时，通知项渲染为不可点击且不显示指针样式。
-- 滚动定位失败（评论已删除或不存在）时静默忽略，页面停留在顶部，不弹错误。
+- 滚动定位失败（评论已删除，或目标根评论位于后面的评论分页）时页面停留在顶部，不阻塞操作；当该帖评论总数大于 10 时给一条非阻塞 `ElMessage.info` 提示「目标评论可能在后面的评论分页里」，避免用户以为点击无效。评论已删除会命中同一提示，是本轮接受的误报。
+  - 权衡：更彻底的做法是按 `commentId` 从第 0 页逐页回溯（列表按 `createTime` 升序，可顺序扫描，上限如 10 页），找到后选中该页再滚动。本轮未采用：目标根评论越新越靠后（用户刚收到回复的评论往往在最后一页），乐观估计也要多次串行请求，且超过页数上限后仍会失败——用一条诚实的提示换取零额外请求，更符合本轮「小而准」的目标。
 - 互动切换失败：回滚本地状态 + 由既有 axios 拦截器统一提示。
 
 ## 6. 测试策略
@@ -126,16 +128,16 @@ frontend/src/
 - `notifications.store.spec.js`：验证 `markAllRead` 后未读归零、`refreshUnread` 更新计数。
 - 组件级：`HomeView` 窄屏渲染分支（mock `matchMedia` 为 mobile）断言工具栏与列表结构。
 
-后端：不改动，保持 `mvn clean test` 19 个测试全绿作为回归门槛。
+后端：除 §3.3 已确认的 `commentId` 改动外不改动；回归门槛为原 19 条用例保持全绿，加上新增的 1 条集成测试断言后共 20 条。
 
 ## 7. 验收标准
 
 - [ ] `frontend/src/styles/tokens.css` 建立，各视图不再出现硬编码的间距/字号魔数（允许保留 Element Plus 内部样式与一次性布局值）
 - [ ] 768px 及以下宽度下：首页板块导航横向滚动、列表元信息不溢出、评论缩进收窄、后台表格以卡片呈现
 - [ ] 点击 REPLY 类通知可跳转到帖子并定位高亮对应评论；无 `postId` 的通知不可点击
-- [ ] 点赞/收藏/评论成功后，顶栏未读角标在 1 秒内更新
+- [ ] 他人操作触发的通知在进入通知页或 120 秒轮询后反映到角标；登录后角标立即拉取一次（自己点赞/收藏/评论不改变自己的未读数：后端对自发行为不写通知）
 - [ ] 同一帖子的点赞状态在首页列表与详情页显示一致
-- [ ] `pnpm test` 前端测试通过；`mvn clean test` 19 个测试全绿
+- [ ] `pnpm test` 前端测试通过；`mvn clean test` 20 个测试全绿
 - [ ] `pnpm build` 无错误
 
 ## 8. 风险与待确认

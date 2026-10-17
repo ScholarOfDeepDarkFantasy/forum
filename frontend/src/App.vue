@@ -29,7 +29,12 @@ onMounted(() => {
   // 本分支只覆盖「带着 token 刷新/直接进入页面」的会话，登录页在登录成功后另行触发一次。
   if (!auth.isLoggedIn) return
   notifications.refreshUnread()
-  // 兜底轮询：主要刷新由点赞/收藏/评论等操作后主动触发
+  // 角标刷新的全部时机：登录后（此处）、进入通知页（NotificationsView onMounted）、
+  // 「全部已读」后（store.markAllRead 归零）、以及下面这条 120 秒兜底轮询——
+  // 用于反映**他人**操作产生的通知。
+  // 点赞/收藏/评论成功后刻意不刷新：后端对自发行为不写通知（LikeService 与
+  // CommentService 均跳过 recipient 为操作者本人的通知），当前用户自己的任何
+  // 操作都不可能改变自己的未读数，补一次请求只会白跑。
   setInterval(() => notifications.refreshUnread(), 120_000)
 })
 </script>

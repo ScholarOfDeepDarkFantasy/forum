@@ -50,7 +50,12 @@ async function toggleLike(p) {
     router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
-  await actions.toggleLike(p.id)
+  try {
+    await actions.toggleLike(p.id)
+  } catch {
+    // 失败回滚已由 usePostActions 完成，面向用户的提示由 axios 拦截器统一给出；
+    // 这里吞掉 rejection，避免点击处理器抛出未处理的 Promise 拒绝
+  }
 }
 
 function search() {
