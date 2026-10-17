@@ -830,10 +830,13 @@ git commit -m "feat: 点击通知时标记单条已读"
 - Modify: `frontend/src/views/PostDetailView.vue`
 - Modify: `frontend/src/views/NotificationsView.vue`
 - Modify: `frontend/src/views/AdminView.vue`
+- Modify: `frontend/src/views/ProfileView.vue`（计划漏列，实际也存在一份 `fmt`）
+
+**状态：已完成。** 实际共 5 个视图各删掉一份本地 `fmt`/`fmtTime`：HomeView 用 `formatRelative`（列表里"28 分钟前"比绝对时间更有用），其余四处用 `formatDateTime`。用例数最终为 `Test Files 12 passed / Tests 84 passed`（计划写 77 时 Task 4 的用例尚未计入）。
 
 **背景：** 同一个"后端 ISO 时间 → 显示文本"的转换在 4 个视图各写了一遍，实现略有差异（有的截到分钟，有的原样返回）。抽成工具函数后行为一致，也好统一补上"刚刚"/"3 分钟前"这类相对时间。
 
-- [ ] **Step 1: 写失败的测试**
+- [x] **Step 1: 写失败的测试**
 
 创建 `frontend/src/utils/format.spec.js`：
 
@@ -878,12 +881,12 @@ describe('formatRelative', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `cd frontend && pnpm test -- src/utils/format.spec.js`
 Expected: FAIL，`Failed to resolve import "./format"`
 
-- [ ] **Step 3: 写实现**
+- [x] **Step 3: 写实现**
 
 创建 `frontend/src/utils/format.js`：
 
@@ -917,12 +920,12 @@ export function formatRelative(value, now = Date.now()) {
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `cd frontend && pnpm test -- src/utils/format.spec.js`
 Expected: `Tests 8 passed`
 
-- [ ] **Step 5: 替换 HomeView 的本地实现**
+- [x] **Step 5: 替换 HomeView 的本地实现**
 
 在 `frontend/src/views/HomeView.vue` 中，删除本地的 `fmtTime` 函数，并在 import 区加入：
 
@@ -932,7 +935,7 @@ import { formatRelative } from '@/utils/format'
 
 模板里所有 `fmtTime(` 改为 `formatRelative(`。
 
-- [ ] **Step 6: 替换 PostDetailView 的本地实现**
+- [x] **Step 6: 替换 PostDetailView 的本地实现**
 
 在 `frontend/src/views/PostDetailView.vue` 中，删除本地的 `fmt` 函数，import 区加入：
 
@@ -942,7 +945,7 @@ import { formatDateTime } from '@/utils/format'
 
 模板里所有 `fmt(` 改为 `formatDateTime(`。
 
-- [ ] **Step 7: 替换 NotificationsView 的本地实现**
+- [x] **Step 7: 替换 NotificationsView 的本地实现**
 
 在 `frontend/src/views/NotificationsView.vue` 中，删除本地的 `fmt` 函数，import 区加入：
 
@@ -952,7 +955,7 @@ import { formatRelative } from '@/utils/format'
 
 模板里所有 `fmt(` 改为 `formatRelative(`。
 
-- [ ] **Step 8: 替换 AdminView 的本地实现**
+- [x] **Step 8: 替换 AdminView 的本地实现**
 
 在 `frontend/src/views/AdminView.vue` 中，删除本地的 `fmt` 函数，import 区加入：
 
@@ -962,17 +965,17 @@ import { formatDateTime } from '@/utils/format'
 
 模板里所有 `fmt(` 改为 `formatDateTime(`。
 
-- [ ] **Step 9: 确认没有残留的本地定义**
+- [x] **Step 9: 确认没有残留的本地定义**
 
 Run: `Select-String -Path frontend/src/views/*.vue -Pattern 'function fmt|function fmtTime'`
 Expected: 无输出
 
-- [ ] **Step 10: 全量测试与构建**
+- [x] **Step 10: 全量测试与构建**
 
 Run: `cd frontend && pnpm test && pnpm build`
 Expected: `Test Files 11 passed`，`Tests 77 passed`；构建成功
 
-- [ ] **Step 11: 提交**
+- [x] **Step 11: 提交**
 
 ```bash
 git add frontend/src/utils/format.js frontend/src/utils/format.spec.js \

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { PAGE_SIZE, useNotificationStore } from '@/stores/notifications'
 import { resolveNotificationTarget } from '@/utils/notificationLink'
+import { formatRelative } from '@/utils/format'
 
 const router = useRouter()
 const notifications = useNotificationStore()
@@ -66,10 +67,6 @@ function targetOf(n) {
   return resolveNotificationTarget(n)
 }
 
-function fmt(t) {
-  return t ? t.replace('T', ' ').slice(0, 16) : ''
-}
-
 onMounted(() => {
   load()
   // App.vue 只在应用挂载时刷一次角标，之后靠 120s 轮询兜底；用户停留在通知页时
@@ -99,7 +96,7 @@ onMounted(() => {
           {{ { REPLY: '回复', LIKE: '点赞', FAVORITE: '收藏', SYSTEM: '系统' }[n.type] || n.type }}
         </el-tag>
         <span class="notif-content">{{ n.content }}</span>
-        <span class="notif-time">{{ fmt(n.createTime) }}</span>
+        <span class="notif-time">{{ formatRelative(n.createTime) }}</span>
         <el-tag v-if="n.postId" size="small" type="primary" effect="plain">{{ n.postTitle }}</el-tag>
         <el-tag v-if="!n.isRead" size="small" type="success" effect="dark">未读</el-tag>
       </div>

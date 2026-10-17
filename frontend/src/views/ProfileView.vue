@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { postApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { formatDateTime } from '@/utils/format'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -64,10 +65,6 @@ async function removePost(p) {
   await loadMyPosts(myPostPage.value)
 }
 
-function fmt(t) {
-  return t ? t.replace('T', ' ').slice(0, 16) : ''
-}
-
 onMounted(() => {
   loadProfile()
   loadMyPosts()
@@ -102,7 +99,7 @@ onMounted(() => {
         <template v-if="myPosts.content.length">
           <div v-for="p in myPosts.content" :key="p.id" class="row-item" @click="router.push(`/posts/${p.id}`)">
             <span class="row-title">{{ p.title }}</span>
-            <span class="row-meta">{{ fmt(p.createTime) }} · 评论 {{ p.commentCount }} · 赞 {{ p.likeCount }}</span>
+            <span class="row-meta">{{ formatDateTime(p.createTime) }} · 评论 {{ p.commentCount }} · 赞 {{ p.likeCount }}</span>
             <el-button size="small" type="danger" plain @click.stop="removePost(p)">删除</el-button>
           </div>
           <el-pagination
@@ -123,7 +120,7 @@ onMounted(() => {
         <template v-if="myFavorites.content.length">
           <div v-for="p in myFavorites.content" :key="p.id" class="row-item" @click="router.push(`/posts/${p.id}`)">
             <span class="row-title">{{ p.title }}</span>
-            <span class="row-meta">{{ p.boardName }} · {{ fmt(p.createTime) }}</span>
+            <span class="row-meta">{{ p.boardName }} · {{ formatDateTime(p.createTime) }}</span>
           </div>
           <el-pagination
             v-if="myFavorites.totalPages > 1"

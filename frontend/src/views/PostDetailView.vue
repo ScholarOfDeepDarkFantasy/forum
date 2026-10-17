@@ -7,6 +7,7 @@ import { postApi, commentApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { usePostActions } from '@/composables/usePostActions'
 import { useNotificationStore } from '@/stores/notifications'
+import { formatDateTime } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -170,10 +171,6 @@ async function moderate(key, value) {
   ElMessage.success('操作成功')
 }
 
-function fmt(t) {
-  return t ? t.replace('T', ' ').slice(0, 16) : ''
-}
-
 function canDeleteComment(c) {
   if (!auth.user) return false
   return c.authorId === auth.user.id || auth.isModerator
@@ -201,7 +198,7 @@ onMounted(async () => {
         <div class="post-meta">
           <span>{{ post.authorNickname || post.authorUsername }}</span>
           <span>· {{ post.boardName }}</span>
-          <span>· {{ fmt(post.createTime) }}</span>
+          <span>· {{ formatDateTime(post.createTime) }}</span>
           <span>· <el-icon><View /></el-icon> {{ post.viewCount }}</span>
         </div>
         <div class="mod-actions" v-if="auth.isModerator || isAuthor">
@@ -267,7 +264,7 @@ onMounted(async () => {
           <div class="comment-head">
             <el-avatar :size="26">{{ (c.authorNickname || c.authorUsername || '?').slice(0, 1) }}</el-avatar>
             <span class="comment-author">{{ c.authorNickname || c.authorUsername }}</span>
-            <span class="comment-time">{{ fmt(c.createTime) }}</span>
+            <span class="comment-time">{{ formatDateTime(c.createTime) }}</span>
           </div>
           <div class="comment-content" :class="{ deleted: c.deleted }">{{ c.content }}</div>
           <div class="comment-actions" v-if="!c.deleted">
@@ -281,7 +278,7 @@ onMounted(async () => {
               <div class="comment-head">
                 <el-avatar :size="22">{{ (r.authorNickname || r.authorUsername || '?').slice(0, 1) }}</el-avatar>
                 <span class="comment-author">{{ r.authorNickname || r.authorUsername }}</span>
-                <span class="comment-time">{{ fmt(r.createTime) }}</span>
+                <span class="comment-time">{{ formatDateTime(r.createTime) }}</span>
               </div>
               <div class="comment-content" :class="{ deleted: r.deleted }">{{ r.content }}</div>
               <div class="comment-actions" v-if="!r.deleted">

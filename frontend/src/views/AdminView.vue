@@ -3,6 +3,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { boardApi, adminApi } from '@/api'
 import { useResponsive } from '@/composables/useResponsive'
+import { formatDateTime } from '@/utils/format'
 
 // 表格与卡片的 DOM 结构不同，媒体查询无法切换模板，只能由 JS 判定
 const { isMobile } = useResponsive()
@@ -93,10 +94,6 @@ function statusTag(s) {
   return { ACTIVE: 'success', MUTED: 'warning', BANNED: 'danger' }[s] || 'info'
 }
 
-function fmt(t) {
-  return t ? t.replace('T', ' ').slice(0, 16) : ''
-}
-
 onMounted(() => {
   loadBoards()
   loadUsers(0)
@@ -155,7 +152,7 @@ onMounted(() => {
               </div>
               <div class="card-row">
                 <span class="card-label">禁言至</span>
-                <span>{{ u.mutedUntil ? fmt(u.mutedUntil) : '-' }}</span>
+                <span>{{ u.mutedUntil ? formatDateTime(u.mutedUntil) : '-' }}</span>
               </div>
               <div class="card-row">
                 <span class="card-label">角色</span>
@@ -182,7 +179,7 @@ onMounted(() => {
             </template>
           </el-table-column>
           <el-table-column label="禁言至" width="160">
-            <template #default="{ row }">{{ row.mutedUntil ? fmt(row.mutedUntil) : '-' }}</template>
+            <template #default="{ row }">{{ row.mutedUntil ? formatDateTime(row.mutedUntil) : '-' }}</template>
           </el-table-column>
           <el-table-column label="角色" width="180">
             <template #default="{ row }">

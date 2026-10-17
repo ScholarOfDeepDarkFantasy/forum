@@ -5,6 +5,7 @@ import { Search, Plus, View, ChatDotRound, CaretTop, Medal, Star } from '@elemen
 import { boardApi, postApi } from '@/api'
 import { usePostActions } from '@/composables/usePostActions'
 import { useAuthStore } from '@/stores/auth'
+import { formatRelative } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -72,10 +73,6 @@ function selectBoard(id) {
 function changePage(p) {
   query.value.page = p - 1
   loadPosts()
-}
-
-function fmtTime(t) {
-  return t ? t.replace('T', ' ').slice(0, 16) : ''
 }
 
 onMounted(loadBoards)
@@ -152,7 +149,7 @@ loadPosts()
             <div class="post-meta">
               <span>{{ p.authorNickname || p.authorUsername }}</span>
               <span>· {{ p.boardName }}</span>
-              <span>· {{ fmtTime(p.createTime) }}</span>
+              <span>· {{ formatRelative(p.createTime) }}</span>
               <span v-if="p.tags?.length" class="tags">
                 <el-tag v-for="t in p.tags" :key="t" size="small" type="info" effect="plain">{{ t }}</el-tag>
               </span>
