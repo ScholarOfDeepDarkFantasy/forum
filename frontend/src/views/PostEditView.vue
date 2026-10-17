@@ -111,10 +111,10 @@ async function submit() {
 <style scoped>
 .editor-card {
   max-width: 860px;
-  margin: 16px auto;
+  margin: var(--jf-space-4) auto;
 }
 .title {
-  margin: 0 0 16px;
+  margin: 0 0 var(--jf-space-4);
 }
 .actions {
   display: flex;

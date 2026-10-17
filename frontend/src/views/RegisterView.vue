@@ -101,7 +101,7 @@ async function submit() {
   width: 440px;
 }
 .title {
-  margin: 0 0 16px;
+  margin: 0 0 var(--jf-space-4);
   text-align: center;
 }
 .submit {
@@ -110,10 +110,20 @@ async function submit() {
 .tip {
   margin-top: 14px;
   text-align: center;
-  color: #909399;
-  font-size: 13px;
+  color: var(--jf-color-text-3);
+  font-size: var(--jf-font-meta);
 }
 .link {
-  color: #409eff;
+  color: var(--jf-color-primary);
+}
+
+/* 窄屏：卡片占满可用宽度，避免 440px 固定宽在手机上溢出；页面内边距同步收窄 */
+@media (max-width: 768px) {
+  .auth-card {
+    width: 100%;
+  }
+  .auth-page {
+    padding: var(--jf-space-4);
+  }
 }
 </style>

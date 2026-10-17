@@ -271,8 +271,8 @@ watch(() => route.hash, scrollToHash)
 .detail {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-top: 16px;
+  gap: var(--jf-space-4);
+  padding-top: var(--jf-space-4);
 }
 .flags {
   display: flex;
@@ -280,21 +280,21 @@ watch(() => route.hash, scrollToHash)
   margin-bottom: 6px;
 }
 .post-title {
-  margin: 0 0 8px;
-  font-size: 22px;
+  margin: 0 0 var(--jf-space-2);
+  font-size: var(--jf-font-title-lg);
 }
 .post-meta {
   display: flex;
   gap: 6px;
-  color: #909399;
-  font-size: 13px;
+  color: var(--jf-color-text-3);
+  font-size: var(--jf-font-meta);
   align-items: center;
   flex-wrap: wrap;
 }
 .mod-actions {
   margin-top: 10px;
   display: flex;
-  gap: 8px;
+  gap: var(--jf-space-2);
 }
 .post-content {
   white-space: pre-wrap;
@@ -309,10 +309,10 @@ watch(() => route.hash, scrollToHash)
 .post-actions {
   margin-top: 18px;
   display: flex;
-  gap: 12px;
+  gap: var(--jf-space-3);
 }
 .comments-card {
-  margin-bottom: 24px;
+  margin-bottom: var(--jf-space-5);
 }
 .reply-alert {
   margin-bottom: 10px;
@@ -321,24 +321,26 @@ watch(() => route.hash, scrollToHash)
   margin-bottom: 20px;
 }
 .send {
-  margin-top: 8px;
+  margin-top: var(--jf-space-2);
 }
 .comment {
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: var(--jf-space-3) 0;
+  border-bottom: 1px solid var(--jf-color-border);
 }
 .comment-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--jf-space-2);
 }
 .comment-author {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--jf-font-body);
 }
+/* #c0c4cc：占位/失效态浅灰，tokens.css 未提供对应令牌，保留字面量。
+   若将来补令牌，应与 NotificationsView.vue:142 的同类用法一并替换。 */
 .comment-time {
   color: #c0c4cc;
-  font-size: 12px;
+  font-size: var(--jf-font-small);
 }
 .comment-content {
   margin-top: 6px;
@@ -350,22 +352,38 @@ watch(() => route.hash, scrollToHash)
   font-style: italic;
 }
 .comment-actions {
-  margin-top: 4px;
+  margin-top: var(--jf-space-1);
 }
 .replies {
   margin-top: 10px;
-  padding-left: 32px;
-  border-left: 2px solid #f0f0f0;
+  padding-left: var(--jf-space-6);
+  border-left: 2px solid var(--jf-color-border);
 }
 .reply {
-  padding: 8px 0;
+  padding: var(--jf-space-2) 0;
 }
 .pager {
-  margin-top: 16px;
+  margin-top: var(--jf-space-4);
   justify-content: center;
 }
+/* #fff8e6：锚点高亮的暖黄底，是一次性语义色，tokens.css 无对应令牌。
+   已用 --jf-color-bg-hover(#f8f9fb) 等现有令牌替代会让高亮几乎不可见，
+   故保留字面量并在此说明，避免后续「去字面量」清扫误换。 */
 .anchor-highlight {
   background: #fff8e6;
   transition: background 0.4s ease;
+}
+
+/* 窄屏：评论缩进收窄，操作按钮允许换行并提高点按高度 */
+@media (max-width: 768px) {
+  .replies {
+    padding-left: var(--jf-space-4);
+  }
+  .post-actions {
+    flex-wrap: wrap;
+  }
+  .post-actions :deep(.el-button) {
+    min-height: 36px;
+  }
 }
 </style>

@@ -129,19 +129,19 @@ onMounted(() => {
 
 <style scoped>
 .profile-card {
-  margin: 16px auto;
+  margin: var(--jf-space-4) auto;
   max-width: 860px;
 }
 .row-item {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px 4px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: var(--jf-space-3) var(--jf-space-1);
+  border-bottom: 1px solid var(--jf-color-border);
   cursor: pointer;
 }
 .row-item:hover {
-  background: #f8f9fb;
+  background: var(--jf-color-bg-hover);
 }
 .row-item:last-of-type {
   border-bottom: none;
@@ -151,12 +151,12 @@ onMounted(() => {
   font-size: 15px;
 }
 .row-meta {
-  color: #909399;
-  font-size: 13px;
+  color: var(--jf-color-text-3);
+  font-size: var(--jf-font-meta);
   flex-shrink: 0;
 }
 .pager {
-  margin-top: 16px;
+  margin-top: var(--jf-space-4);
   justify-content: center;
 }
 </style>
