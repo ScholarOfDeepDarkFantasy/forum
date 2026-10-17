@@ -44,4 +44,11 @@ public class NotificationController {
         notificationService.markAllRead(SecurityUtils.currentUserId());
         return Result.ok(null, "已全部标记为已读");
     }
+
+    /** 单条标记已读（仅限本人的通知） */
+    @PostMapping("/{id}/read")
+    public Result<Void> markRead(@PathVariable Long id) {
+        notificationService.markRead(id, SecurityUtils.currentUserId());
+        return Result.ok(null, "已标记为已读");
+    }
 }

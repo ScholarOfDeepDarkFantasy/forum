@@ -22,4 +22,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.recipient.id = :recipientId AND n.isRead = false")
     void markAllRead(@Param("recipientId") Long recipientId);
+
+    /** 单条已读：带 recipientId 条件，防止越权改他人通知 */
+    @Modifying
+    @Query("""
+            UPDATE Notification n SET n.isRead = true
+            WHERE n.id = :id AND n.recipient.id = :recipientId AND n.isRead = false
+            """)
+    int markRead(@Param("id") Long id, @Param("recipientId") Long recipientId);
 }

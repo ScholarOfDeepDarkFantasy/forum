@@ -236,4 +236,52 @@ class CommentFlowIntegrationTest {
                 url("/api/posts/" + postId + "/comments"), new HttpEntity<>(Map.of("content", "匿名")), String.class);
         assertThat(anon.getStatusCode().value()).isEqualTo(401);
     }
+
+    @Test
+    @Order(5)
+    void stage5_markSingleNotificationRead() {
+        // 复用 stage3 中 ap_user 收到的 REPLY 通知，此时仍为未读
+        ResponseEntity<Result<PageResponse<Map<String, Object>>>> list = rest.exchange(
+                url("/api/notifications?page=0&size=10"), HttpMethod.GET,
+                new HttpEntity<>(bearer(apToken)),
+                new ParameterizedTypeReference<Result<PageResponse<Map<String, Object>>>>() {});
+        Map<String, Object> target = list.getBody().getData().content().get(0);
+        long notifId = ((Number) target.get("id")).longValue();
+        assertThat(target.get("isRead")).isEqualTo(false);
+
+        // 单条已读
+        ResponseEntity<Result<Void>> markResp = rest.exchange(
+                url("/api/notifications/" + notifId + "/read"), HttpMethod.POST,
+                new HttpEntity<>(bearer(apToken)), new ParameterizedTypeReference<Result<Void>>() {});
+        assertThat(markResp.getStatusCode().is2xxSuccessful()).isTrue();
+
+        // 未读数归零，列表里该条变为已读
+        ResponseEntity<Result<Map<String, Object>>> count = rest.exchange(
+                url("/api/notifications/unread-count"), HttpMethod.GET,
+                new HttpEntity<>(bearer(apToken)),
+                new ParameterizedTypeReference<Result<Map<String, Object>>>() {});
+        assertThat(((Number) count.getBody().getData().get("count")).intValue()).isZero();
+
+        ResponseEntity<Result<PageResponse<Map<String, Object>>>> after = rest.exchange(
+                url("/api/notifications?page=0&size=10"), HttpMethod.GET,
+                new HttpEntity<>(bearer(apToken)),
+                new ParameterizedTypeReference<Result<PageResponse<Map<String, Object>>>>() {});
+        assertThat(after.getBody().getData().content().get(0).get("isRead")).isEqualTo(true);
+    }
+
+    @Test
+    @Order(6)
+    void stage6_cannotMarkOthersNotificationRead() {
+        // 用另一个用户去标记 ap_user 的通知：必须 404，且不泄露该 id 是否存在
+        ResponseEntity<Result<PageResponse<Map<String, Object>>>> mine = rest.exchange(
+                url("/api/notifications?page=0&size=10"), HttpMethod.GET,
+                new HttpEntity<>(bearer(apToken)),
+                new ParameterizedTypeReference<Result<PageResponse<Map<String, Object>>>>() {});
+        long someoneElses = ((Number) mine.getBody().getData().content().get(0).get("id")).longValue();
+
+        ResponseEntity<Result> stolen = rest.exchange(
+                url("/api/notifications/" + someoneElses + "/read"), HttpMethod.POST,
+                new HttpEntity<>(bearer(opToken)), new ParameterizedTypeReference<Result>() {});
+        assertThat(stolen.getStatusCode().value()).isEqualTo(404);
+    }
 }
