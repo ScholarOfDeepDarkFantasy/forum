@@ -106,7 +106,7 @@ onMounted(() => {
         :total="notifications.list.totalElements"
         :page-size="PAGE_SIZE"
         :current-page="notifications.listPage + 1"
-        class="pager"
+        class="jf-pager"
         @current-change="(p) => load(p - 1)"
       />
     </template>
@@ -159,10 +159,7 @@ onMounted(() => {
   font-size: var(--jf-font-small);
   flex-shrink: 0;
 }
-.pager {
-  margin-top: var(--jf-space-4);
-  justify-content: center;
-}
+
 
 /* 窄屏：一行要容纳类型标签、正文、时间、帖子标题标签、未读标签。
    .notif-time 设了 flex-shrink:0，不会缩；el-tag 内部是 nowrap，

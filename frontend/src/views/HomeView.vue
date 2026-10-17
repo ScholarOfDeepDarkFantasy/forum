@@ -178,7 +178,7 @@ loadPosts()
         :total="pageData.totalElements"
         :page-size="query.size"
         :current-page="query.page + 1"
-        class="pager"
+        class="jf-pager"
         @current-change="changePage"
       />
     </el-card>
@@ -281,10 +281,7 @@ loadPosts()
   border-color: var(--jf-color-primary);
   color: var(--jf-color-primary);
 }
-.pager {
-  margin-top: var(--jf-space-4);
-  justify-content: center;
-}
+
 
 /* 窄屏：板块标签横滑、工具栏堆叠，避免标题被挤压换行 */
 @media (max-width: 768px) {

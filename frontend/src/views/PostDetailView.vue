@@ -295,7 +295,7 @@ onMounted(async () => {
           :total="commentTotal"
           :page-size="10"
           :current-page="commentPage + 1"
-          class="pager"
+          class="jf-pager"
           @current-change="(p) => loadComments(p - 1)"
         />
       </template>
@@ -398,10 +398,6 @@ onMounted(async () => {
 }
 .reply {
   padding: var(--jf-space-2) 0;
-}
-.pager {
-  margin-top: var(--jf-space-4);
-  justify-content: center;
 }
 /* #fff8e6：锚点高亮的暖黄底，是一次性语义色，tokens.css 无对应令牌。
    已用 --jf-color-bg-hover(#f8f9fb) 等现有令牌替代会让高亮几乎不可见，

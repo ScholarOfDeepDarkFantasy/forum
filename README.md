@@ -139,13 +139,28 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 11 个 spec、75 个用例，覆盖：
+当前为 14 个 spec、102 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
 - 点赞/收藏共享状态（`src/composables/usePostActions.js`）：失败回滚、同步服务端 `liked`/`favorited` 标志且不覆盖本地已操作状态
 - 响应式判定与断点一致性（`src/composables/useResponsive.js`、`src/styles/breakpoint.spec.js`）：媒体查询断点数量必须恰为 5、字面量必须逐字写成 `768px`、数值须与 `MOBILE_BREAKPOINT` 一致，且禁止出现 `min-width` 查询
-- 接口层（`src/api/index.spec.js`）：401 时凭据类接口（登录/注册）原样展示后端消息且不清除登录态，其余接口清 token 并跳登录页（版块与列表加载、点赞交互与游客跳转、行点击跳详情）、`PostDetailView`（互动字段实时读共享状态：列表点的赞在详情页同步生效、置顶整体替换 `post` 后互动字段不被返回体带偏）、`AdminView`（桌面表格 / 窄屏卡片、空状态、视口切换与监听清理）与 `ProfileView`（收藏分页渲染、空状态）
+- 分页样式收敛（`src/styles/common.spec.js`）：`.jf-pager` 规则完整、`common.css` 在 `tokens.css` 之后引入、没有视图重新定义 `.pager`、每个 `el-pagination` 都带 `jf-pager` 且数量精确相等
+- 时间格式化（`src/utils/format.spec.js`）：ISO 串截到分钟、空值返回空串、相对时间的刚刚/分钟/小时/回退日期四档，以及未来时间不产生负数
+- 后台卡片组件（`src/components/cards.spec.js`）：字段与空值占位渲染、`formatTime`/`statusTag` 透传、ADMIN 账号的操作按钮禁用、事件 payload
+- 接口层（`src/api/index.spec.js`）：401 时凭据类接口（登录/注册）原样展示后端消息且不清除登录态，其余接口清 token 并跳登录页（版块与列表加载、点赞交互与游客跳转、行点击跳详情）、`PostDetailView`（互动字段实时读共享状态：列表点的赞在详情页同步生效、置顶整体替换 `post` 后互动字段不被返回体带偏）、`AdminView`（桌面表格 / 窄屏卡片、空状态、视口切换与监听清理、卡片事件接线）与 `ProfileView`（收藏分页渲染、空状态）
+
+## 优化记录（第二轮）
+
+| 主题 | 改动 |
+| --- | --- |
+| 性能 | 帖子与收藏列表改两步查询，消除 `HHH90003004` 集合分页全表加载；收藏列表补齐 tags 批量抓取 |
+| 安全 | 数据库密码与 JWT 密钥改为环境变量；`application.yml` 不再含凭据 |
+| 运维 | 拆分 `dev` / `prod` profile，生产默认关闭 SQL 日志 |
+| 功能 | 通知支持单条标记已读，点击通知即消除未读 |
+| 可维护性 | 时间格式化收敛为 `utils/format.js`；后台卡片抽为 `components/UserCard.vue`、`BoardCard.vue`；分页样式收敛为 `.jf-pager` |
+
+详细的任务拆分与验收步骤见 `docs/superpowers/plans/2026-10-17-optimization-round2.md`。
 
 ## 样式与设计令牌
 
@@ -162,11 +177,12 @@ pnpm build       # 生产构建
 ```
 frontend/src/
 ├── api/           # Axios 实例与接口封装
+├── components/    # 可复用组件（UserCard、BoardCard）
 ├── composables/   # 组合式函数（useResponsive、usePostActions）
 ├── router/        # 路由表与登录/管理员守卫
 ├── stores/        # Pinia store（auth、notifications）
-├── styles/        # tokens.css 设计令牌
-├── utils/         # 纯函数（通知跳转映射）
+├── styles/        # tokens.css 设计令牌、common.css 跨视图共用类
+├── utils/         # 纯函数（通知跳转映射、时间格式化）
 └── views/         # 页面组件
 
 src/main/java/org/song/forum/

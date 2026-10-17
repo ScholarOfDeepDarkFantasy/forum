@@ -1322,7 +1322,7 @@ git commit -m "refactor: 抽取后台用户与板块卡片组件降低模板重�
 - Modify: `README.md`
 - Modify: `docs/superpowers/specs/2026-10-16-experience-iteration-design.md`
 
-- [ ] **Step 1: 创建共用样式**
+- [x] **Step 1: 创建共用样式**
 
 创建 `frontend/src/styles/common.css`：
 
@@ -1350,7 +1350,7 @@ git commit -m "refactor: 抽取后台用户与板块卡片组件降低模板重�
 }
 ```
 
-- [ ] **Step 2: 引入**
+- [x] **Step 2: 引入**
 
 修改 `frontend/src/main.js`，在 `import './style.css'` 之后加一行：
 
@@ -1358,7 +1358,7 @@ git commit -m "refactor: 抽取后台用户与板块卡片组件降低模板重�
 import './styles/common.css'
 ```
 
-- [ ] **Step 3: 四个视图改用 .jf-pager**
+- [x] **Step 3: 四个视图改用 .jf-pager**
 
 在每个视图的模板中，给 `<el-pagination>` 的 `class` 加上 `jf-pager`（保留原有的 `class="pager"` 或直接替换）。以 `HomeView.vue` 为例：
 
@@ -1376,17 +1376,17 @@ import './styles/common.css'
 
 然后在各视图的 `<style scoped>` 中删除 `.pager { margin-top: ...; justify-content: center; }` 规则。注意：scoped 样式无法作用于子组件根元素的 class 以外的内部结构，但 `el-pagination` 的根元素会带上传入的 class，所以公共规则可以生效。
 
-- [ ] **Step 4: 验证没有残留的 .pager 定义**
+- [x] **Step 4: 验证没有残留的 .pager 定义**
 
 Run: `Select-String -Path frontend/src/views/*.vue -Pattern '^\s*\.pager\s*\{'`
 Expected: 无输出
 
-- [ ] **Step 5: 全量测试与构建**
+- [x] **Step 5: 全量测试与构建**
 
 Run: `cd frontend && pnpm test && pnpm build`
 Expected: 全部通过；`grep` 确认 `dist/assets/*.css` 里有 `.jf-pager`
 
-- [ ] **Step 6: 更新 README**
+- [x] **Step 6: 更新 README**
 
 在 `README.md` 的「测试」章节之后新增：
 
@@ -1402,7 +1402,7 @@ Expected: 全部通过；`grep` 确认 `dist/assets/*.css` 里有 `.jf-pager`
 | 可维护性 | 时间格式化收敛为 `utils/format.js`；后台卡片抽为 `components/UserCard.vue`、`BoardCard.vue`；分页样式收敛为 `.jf-pager` |
 ```
 
-- [ ] **Step 7: 记录到设计文档**
+- [x] **Step 7: 记录到设计文档**
 
 在 `docs/superpowers/specs/2026-10-16-experience-iteration-design.md` 末尾追加：
 
@@ -1417,7 +1417,7 @@ Expected: 全部通过；`grep` 确认 `dist/assets/*.css` 里有 `.jf-pager`
 - **重复代码**：时间格式化 4 处、`.pager` 样式 4 处、后台卡片模板 2 组。分别收敛到 `utils/format.js`、`.jf-pager`、`components/UserCard.vue` 与 `BoardCard.vue`。
 ```
 
-- [ ] **Step 8: 提交**
+- [x] **Step 8: 提交**
 
 ```bash
 git add frontend/src/styles/common.css frontend/src/main.js \
@@ -1428,6 +1428,13 @@ git commit -m "refactor: 收敛共用分页样式并记录第二轮优化"
 ```
 
 ---
+
+**状态：已完成。** 实际改动与计划的差异：
+
+- `.pager` 定义实际为 5 处（计划写 4 处），`el-pagination` 实际为 6 个（`ProfileView.vue` 有「我的帖子」「我的收藏」两个）。
+- `common.css` 的引入位置定在 `tokens.css` **之后**、`style.css` 之前（计划写「在 style.css 之后」）：`.jf-pager` 用了 `var(--jf-space-4)`，必须晚于令牌定义，而 `style.css` 与它无依赖关系。
+- 额外新增 `frontend/src/styles/common.spec.js`（5 个守卫用例），因为这三类收敛（时间格式化、卡片、分页样式）都属「删掉重复后没人会立刻发现」的改动，需要代码层面的断言兜住回归。变异验证 5 项全部被捕获。
+- 顺手修正 README 中已过时的测试计数（前端 11 个 spec/75 用例 → 14 个 spec/102 用例），并补上 `frontend/src/components/`、`common.css`、`utils/format.js` 的目录说明。
 
 ## 自审记录
 
@@ -1440,9 +1447,9 @@ git commit -m "refactor: 收敛共用分页样式并记录第二轮优化"
 | 数据库密码明文入库 | Task 2 Step 1-5 |
 | 生产日志打印全部 SQL | Task 2 Step 2-3 |
 | 通知无法单条已读 | Task 3 + Task 4 |
-| 时间格式化重复 4 处 | Task 5 |
-| 后台卡片模板重复 | Task 6 |
-| `.pager` 样式重复 4 处 | Task 7 |
+| 时间格式化重复 5 处（计划误记为 4） | Task 5 |
+| 后台卡片模板重复（AdminView 297 行） | Task 6 |
+| `.pager` 样式重复 5 处（计划误记为 4） | Task 7 |
 
 **类型一致性检查**
 

@@ -145,3 +145,39 @@ frontend/src/
 1. **评论级锚点需要后端补 `commentId`**（见 3.3），是本轮唯一可能的后端改动，需先确认是否接受。
 2. Element Plus 变量覆盖可能影响既有组件外观，需要逐页目视回归。
 3. 后台表格改卡片式是结构级改动，需同时保留桌面端表格行为。
+
+## 9. 第二轮调整（优化）
+
+第一轮完成后，对运行日志与代码做了针对性审计（审计对象是真实日志与真实文件，而非设想），发现并修复了以下问题。
+
+### 9.1 性能
+
+- **列表分页退化为全表加载**：`PostRepository.search` 在 `tags` 集合上用 `@EntityGraph` 同时分页，Hibernate 打印 `HHH90003004: firstResult/maxResults specified with collection fetch; applying in memory`，把全部匹配行读进内存后再切页。改为「先分页取实体（只 fetch 单值关联 `board`/`author`）、再按 id 批量取 `tags`」的两步查询；`IN` 查询不保证顺序，故用第一步的 `Page` 逐项映射回填以保住「置顶优先 + 时间倒序」。
+- **「我的帖子」同类问题**：`findByAuthorIdAndDeletedFalse` 同样在 `tags` 集合上分页，一并改为两步。
+- **收藏列表 tags N+1**：`FavoriteRepository` 的 `@EntityGraph` 覆盖了 `post.board`/`post.author` 但漏了 `post.tags`，每行触发一次查询。改为对当页 `postId` 批量补 tags。
+- 守卫测试用 logback `ListAppender` 挂在 `org.hibernate.orm.query` 上断言 `HHH90003004` 不出现——该告警是纯日志，不回传异常，`StatementInspector` 拿不到文本。已做变异验证（把新方法临时转发回旧查询，测试报 `Failures: 1` 并打出该告警）。
+
+### 9.2 安全与运维
+
+- **凭据入库**：`application.yml` 曾含明文数据库密码且已被 git 跟踪。改为 `DB_PASSWORD` / `JWT_SECRET` 环境变量且**故意不设默认值**（缺了就启动失败，避免误用弱默认值上线）；`.env.example` 提供样板，`.env` 已在 `.gitignore`。
+- **生产日志**：原配置在生产也打印全部 SQL，实测单条查询日志超 38KB。拆分 `dev` / `prod` profile：`dev` 保留 SQL 与绑定参数（配合 DevTools），`prod` 降到 `warn`。**`org.hibernate.orm.query` 在 prod 仍保持 `warn`**——`HHH90003004` 在这个级别下才可见，删掉等于关掉性能告警。
+- **Actuator**：仅暴露 `health` 且 `show-details: never`，并在 `SecurityConfig` 中以 `ADMIN_ONLY = {"/actuator/**"}` 限制为管理员。该规则必须排在 `GET permitAll()` 之前，否则会被匿名放行。
+- 测试配置改用 `application-test.yml` + `@ActiveProfiles("test")`：测试 classpath 下的 `application.yml` 是**覆盖**而非合并主配置，直接放同名文件会丢掉 `jwt.expiration-ms` 等键。
+
+### 9.3 功能
+
+- **通知单条已读**：原先只有 `read-all`，用户点进通知后那条仍是未读，角标与视觉状态不一致。新增 `POST /api/notifications/{id}/read`。
+- 服务层先 `findById` 判断存在性与归属，再执行更新：更新语句影响 0 行无法区分「不存在 / 不属于你 / 本就已读」，直接返回会让越权请求看起来像成功。归属不符与不存在统一抛 `NoSuchElementException`（对外 404），不泄露 id 有效性；已读时提前返回，不重复发 `UPDATE`。
+- 前端点击未读通知时先请求后改本地状态（失败不留假状态），不 `await`、失败不阻断跳转；未读数用 `Math.max(0, ...)` 钳住。
+
+### 9.4 可维护性
+
+- **时间格式化**：`fmt`/`fmtTime` 在 5 个视图中重复（计划漏算了 `ProfileView`）。收敛为 `utils/format.js` 的 `formatDateTime` 与 `formatRelative`。不使用 `Intl`：后端返回的是无时区 `LocalDateTime` 串，按本地时区补偏移会漂移。`formatRelative` 对未来时间返回「刚刚」而非负数。
+- **后台卡片**：`AdminView.vue` 用户与板块各有一套「表格 + 窄屏卡片」实现，加字段要改 4 处。抽为 `components/UserCard.vue`、`BoardCard.vue`，视图从 297 行降到 235 行。组件不 import api、不读 store，可脱离 pinia 独立挂载；删除前的二次确认留在视图，组件只发事件。
+- **分页样式**：`.pager` 规则在 5 个视图中重复（6 个 `el-pagination`）。收敛为 `styles/common.css` 的 `.jf-pager`，并在 `main.js` 中于 `tokens.css` **之后**引入（规则里用了 `var(--jf-space-4)`）。
+- 三处收敛都配了守卫测试：`format.spec.js`、`cards.spec.js`、`common.spec.js`。其中 `common.spec.js` 会扫描 `src/**/*.vue`，断言没有视图重新定义 `.pager`、每个 `el-pagination` 都带 `jf-pager`、且 `jf-pager` 出现次数与 `el-pagination` 数量**精确相等**（多出来的 class 会把 `margin-top`/`justify-content` 套到非分页元素上）。五项变异均被捕获。
+
+### 9.5 遗留
+
+- 数据库密码仍存在于 git 历史（自 `6eecbdc` 起）。彻底处理需 `git filter-repo` 改写历史**并轮换该密码**——只改历史不够，密码已泄露。
+- 计划中「`.pager` 重复 4 处」「时间格式化重复 4 处」的计数偏低，实际均为 5 处。

@@ -1,0 +1,28 @@
+/* 跨视图复用的样式类。
+ *
+ * 约定：只有 ≥3 处使用的规则才放进这里，一次性布局值留在各自组件的
+ * <style scoped> 里。放进这里的类必须能作用于子组件根元素 —— Vue 的
+ * scoped 样式不会穿透到子组件内部，但父模板写在子组件标签上的 class
+ * 会落在子组件根元素上，因此 .jf-pager 能作用到 el-pagination 的根 div。
+ */
+
+/* 列表底部的分页器：居中并留出上间距 */
+.jf-pager {
+  margin-top: var(--jf-space-4);
+  justify-content: center;
+}
+
+/* 窄屏下通用的横向滚动条（板块导航等）。
+ * scrollbar-width: none 与 ::-webkit-scrollbar 两条都需要：
+ * 前者 Firefox，后者 Chromium/Safari。 */
+.jf-hscroll {
+  display: flex;
+  gap: var(--jf-space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.jf-hscroll::-webkit-scrollbar {
+  display: none;
+}

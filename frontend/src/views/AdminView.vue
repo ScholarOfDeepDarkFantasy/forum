@@ -182,7 +182,7 @@ onMounted(() => {
           :total="users.totalElements"
           :page-size="10"
           :current-page="userPage + 1"
-          class="pager"
+          class="jf-pager"
           @current-change="(p) => loadUsers(p - 1)"
         />
       </el-tab-pane>
@@ -239,10 +239,6 @@ onMounted(() => {
 }
 .role-tag {
   margin-right: var(--jf-space-1);
-}
-.pager {
-  margin-top: var(--jf-space-4);
-  justify-content: center;
 }
 
 /* 窄屏卡片容器：卡片本身与字段样式在 components/UserCard.vue、BoardCard.vue 里 */

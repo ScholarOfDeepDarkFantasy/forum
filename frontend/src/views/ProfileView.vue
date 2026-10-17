@@ -108,7 +108,7 @@ onMounted(() => {
             :total="myPosts.totalElements"
             :page-size="10"
             :current-page="myPostPage + 1"
-            class="pager"
+            class="jf-pager"
             @current-change="(p) => loadMyPosts(p - 1)"
           />
         </template>
@@ -128,7 +128,7 @@ onMounted(() => {
             :total="myFavorites.totalElements"
             :page-size="10"
             :current-page="myFavoritePage + 1"
-            class="pager"
+            class="jf-pager"
             @current-change="(p) => loadFavorites(p - 1)"
           />
         </template>
@@ -165,9 +165,5 @@ onMounted(() => {
   color: var(--jf-color-text-3);
   font-size: var(--jf-font-meta);
   flex-shrink: 0;
-}
-.pager {
-  margin-top: var(--jf-space-4);
-  justify-content: center;
 }
 </style>
