@@ -53,9 +53,13 @@ const stubs = {
   'el-card': { template: '<div class="stub-card"><slot /></div>' },
   'el-tabs': { template: '<div><slot /></div>' },
   'el-tab-pane': { template: '<div class="stub-pane"><slot /></div>' },
-  'el-table': { template: '<table class="stub-table" />' },
+  'el-table': {
+    props: ['data'],
+    template: '<table class="stub-table"><tr v-for="(row, i) in data" :key="i" class="stub-row"><slot /></tr></table>'
+  },
   'el-table-column': { template: '<div />' },
   'el-tag': { template: '<span class="stub-tag"><slot /></span>' },
+  'el-empty': { props: ['description'], template: '<div class="stub-empty">{{ description }}</div>' },
   'el-button': {
     props: ['disabled'],
     template: '<button :disabled="disabled"><slot /></button>'
@@ -126,10 +130,14 @@ describe('AdminView 响应式渲染', () => {
       mm = installMatchMedia(false)
     })
 
-    it('渲染表格而非卡片，且表格带着真实数据', async () => {
+    it('渲染表格而非卡片，且表格收到的是列表接口返回的真实数据', async () => {
       const wrapper = await mountReady()
 
-      expect(wrapper.findAll('.stub-table')).toHaveLength(2)
+      const tables = wrapper.findAll('.stub-table')
+      expect(tables).toHaveLength(2)
+      // 桩把 :data 渲染成行数，桌面分支的数据流才被真正断言（原先桩吞掉了 data）
+      expect(tables[0].findAll('.stub-row')).toHaveLength(BOARDS.length)
+      expect(tables[1].findAll('.stub-row')).toHaveLength(USERS.content.length)
       expect(wrapper.find('.board-cards').exists()).toBe(false)
       expect(wrapper.find('.user-cards').exists()).toBe(false)
     })
@@ -177,6 +185,32 @@ describe('AdminView 响应式渲染', () => {
       const boardCard = wrapper.findAll('.board-card')[0]
       const labels = boardCard.findAll('button').map((b) => b.text())
       expect(labels).toEqual(['编辑', '删除'])
+    })
+
+    it('列表为空时卡片分支渲染空状态而非一片空白', async () => {
+      boardApi.list.mockResolvedValue([])
+      adminApi.users.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0 })
+      const wrapper = await mountReady()
+
+      const empties = wrapper.findAll('.stub-empty')
+      expect(empties).toHaveLength(2)
+      // 桩把 description 渲染成文本，空状态确实带上了文案
+      expect(empties[0].text()).toBe('暂无板块')
+      expect(empties[1].text()).toBe('暂无用户')
+
+      // 空列表下不应残留任何卡片
+      expect(wrapper.findAll('.board-card')).toHaveLength(0)
+      expect(wrapper.findAll('.user-card')).toHaveLength(0)
+      // 卡片容器仍在（空状态渲染在容器内），窄屏分支结构不变
+      expect(wrapper.find('.board-cards').exists()).toBe(true)
+      expect(wrapper.find('.user-cards').exists()).toBe(true)
+    })
+
+    it('列表非空时不渲染空状态', async () => {
+      const wrapper = await mountReady()
+
+      expect(wrapper.findAll('.board-card')).toHaveLength(BOARDS.length)
+      expect(wrapper.findAll('.stub-empty')).toHaveLength(0)
     })
   })
 

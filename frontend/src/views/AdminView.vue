@@ -110,17 +110,20 @@ onMounted(() => {
       <el-tab-pane label="板块管理" name="boards">
         <el-button type="primary" class="mb" @click="openBoardCreate">新建板块</el-button>
         <div v-if="isMobile" class="board-cards">
-          <div v-for="b in boards" :key="b.id" class="board-card">
-            <div class="card-row"><span class="card-label">名称</span><span>{{ b.name }}</span></div>
-            <div class="card-row">
-              <span class="card-label">描述</span><span>{{ b.description || '-' }}</span>
+          <el-empty v-if="!boards.length" description="暂无板块" />
+          <template v-else>
+            <div v-for="b in boards" :key="b.id" class="board-card">
+              <div class="card-row"><span class="card-label">名称</span><span>{{ b.name }}</span></div>
+              <div class="card-row">
+                <span class="card-label">描述</span><span>{{ b.description || '-' }}</span>
+              </div>
+              <div class="card-row"><span class="card-label">帖子数</span><span>{{ b.postCount }}</span></div>
+              <div class="card-actions">
+                <el-button size="small" @click="openBoardEdit(b)">编辑</el-button>
+                <el-button size="small" type="danger" plain @click="removeBoard(b)">删除</el-button>
+              </div>
             </div>
-            <div class="card-row"><span class="card-label">帖子数</span><span>{{ b.postCount }}</span></div>
-            <div class="card-actions">
-              <el-button size="small" @click="openBoardEdit(b)">编辑</el-button>
-              <el-button size="small" type="danger" plain @click="removeBoard(b)">删除</el-button>
-            </div>
-          </div>
+          </template>
         </div>
         <el-table v-else :data="boards" stripe>
           <el-table-column prop="id" label="ID" width="70" />
@@ -140,30 +143,33 @@ onMounted(() => {
       <!-- 用户管理 -->
       <el-tab-pane label="用户管理" name="users">
         <div v-if="isMobile" class="user-cards">
-          <div v-for="u in users.content" :key="u.id" class="user-card">
-            <div class="card-row"><span class="card-label">用户名</span><span>{{ u.username }}</span></div>
-            <div class="card-row"><span class="card-label">昵称</span><span>{{ u.nickname || '-' }}</span></div>
-            <div class="card-row"><span class="card-label">邮箱</span><span>{{ u.email }}</span></div>
-            <div class="card-row">
-              <span class="card-label">状态</span>
-              <el-tag :type="statusTag(u.status)">{{ u.status }}</el-tag>
+          <el-empty v-if="!users.content.length" description="暂无用户" />
+          <template v-else>
+            <div v-for="u in users.content" :key="u.id" class="user-card">
+              <div class="card-row"><span class="card-label">用户名</span><span>{{ u.username }}</span></div>
+              <div class="card-row"><span class="card-label">昵称</span><span>{{ u.nickname || '-' }}</span></div>
+              <div class="card-row"><span class="card-label">邮箱</span><span>{{ u.email }}</span></div>
+              <div class="card-row">
+                <span class="card-label">状态</span>
+                <el-tag :type="statusTag(u.status)">{{ u.status }}</el-tag>
+              </div>
+              <div class="card-row">
+                <span class="card-label">禁言至</span>
+                <span>{{ u.mutedUntil ? fmt(u.mutedUntil) : '-' }}</span>
+              </div>
+              <div class="card-row">
+                <span class="card-label">角色</span>
+                <span>
+                  <el-tag v-for="r in u.roles" :key="r" size="small" type="info" class="role-tag">{{ r }}</el-tag>
+                </span>
+              </div>
+              <div class="card-actions">
+                <el-button size="small" type="warning" plain :disabled="u.roles?.includes('ADMIN')" @click="openStatus(u)">
+                  状态管理
+                </el-button>
+              </div>
             </div>
-            <div class="card-row">
-              <span class="card-label">禁言至</span>
-              <span>{{ u.mutedUntil ? fmt(u.mutedUntil) : '-' }}</span>
-            </div>
-            <div class="card-row">
-              <span class="card-label">角色</span>
-              <span>
-                <el-tag v-for="r in u.roles" :key="r" size="small" type="info" class="role-tag">{{ r }}</el-tag>
-              </span>
-            </div>
-            <div class="card-actions">
-              <el-button size="small" type="warning" plain :disabled="u.roles?.includes('ADMIN')" @click="openStatus(u)">
-                状态管理
-              </el-button>
-            </div>
-          </div>
+          </template>
         </div>
         <el-table v-else :data="users.content" stripe>
           <el-table-column prop="id" label="ID" width="70" />
@@ -290,7 +296,5 @@ onMounted(() => {
   display: flex;
   gap: var(--jf-space-2);
   margin-top: var(--jf-space-1);
-  /* 两个按钮之间的模板换行会渲染成空白文本节点，flex 布局下与 gap 叠加成双倍间距 */
-  font-size: 0;
 }
 </style>
