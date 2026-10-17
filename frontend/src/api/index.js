@@ -107,7 +107,8 @@ export const commentApi = {
 export const notificationApi = {
   mine: (params) => api.get('/notifications', { params }),
   unreadCount: () => api.get('/notifications/unread-count'),
-  markAllRead: () => api.post('/notifications/read-all')
+  markAllRead: () => api.post('/notifications/read-all'),
+  markRead: (id) => api.post(`/notifications/${id}/read`)
 }
 
 // ========== 管理 ==========

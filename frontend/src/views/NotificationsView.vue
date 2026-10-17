@@ -39,9 +39,21 @@ async function markAll() {
   }
 }
 
+/**
+ * 打开一条通知。
+ *
+ * 先标记已读再跳转，但**不等待**它完成：网络往返期间界面不该卡住，
+ * 跳转本身也不该依赖这个请求。失败时吞掉异常——axios 拦截器已统一提示，
+ * 而这里如果再抛会把 router.push 一起带走，用户点了没反应。
+ *
+ * 只对未读的通知发请求：已读的再标记是浪费，也会让角标多减一次。
+ */
 function openNotification(n) {
   const target = targetOf(n)
   if (!target) return
+  if (!n.isRead) {
+    notifications.markRead(n.id).catch(() => {})
+  }
   router.push(target)
 }
 

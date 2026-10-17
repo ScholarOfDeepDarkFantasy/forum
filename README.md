@@ -139,10 +139,10 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 10 个 spec、67 个用例，覆盖：
+当前为 11 个 spec、75 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
-- 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、列表分页
+- 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
 - 点赞/收藏共享状态（`src/composables/usePostActions.js`）：失败回滚、同步服务端 `liked`/`favorited` 标志且不覆盖本地已操作状态
 - 响应式判定与断点一致性（`src/composables/useResponsive.js`、`src/styles/breakpoint.spec.js`）：媒体查询断点数量必须恰为 5、字面量必须逐字写成 `768px`、数值须与 `MOBILE_BREAKPOINT` 一致，且禁止出现 `min-width` 查询
 - 接口层（`src/api/index.spec.js`）：401 时凭据类接口（登录/注册）原样展示后端消息且不清除登录态，其余接口清 token 并跳登录页（版块与列表加载、点赞交互与游客跳转、行点击跳详情）、`PostDetailView`（互动字段实时读共享状态：列表点的赞在详情页同步生效、置顶整体替换 `post` 后互动字段不被返回体带偏）、`AdminView`（桌面表格 / 窄屏卡片、空状态、视口切换与监听清理）与 `ProfileView`（收藏分页渲染、空状态）

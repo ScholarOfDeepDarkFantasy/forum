@@ -42,6 +42,23 @@ export const useNotificationStore = defineStore('notifications', {
       await notificationApi.markAllRead()
       this.unreadCount = 0
       await this.loadList(this.listPage)
+    },
+
+    /**
+     * 标记单条已读。就地更新列表项而不是重新拉列表——用户点进去的那一刻那条
+     * 通知就该变灰，多一次请求只会让界面闪一下。
+     *
+     * 顺序是先请求后改本地状态：请求失败时不能把界面改灰，否则重进页面又变回
+     * 未读，用户会以为是 bug。失败直接抛出，由调用方决定是否吞掉。
+     */
+    async markRead(id) {
+      const item = this.list.content.find((n) => n.id === id)
+      // 已读的通知不必再请求；未读数也无需再减
+      if (item && item.isRead) return
+      await notificationApi.markRead(id)
+      if (item) item.isRead = true
+      // 角标靠轮询刷新，可能落后于列表；钳在 0 避免出现 -1
+      this.unreadCount = Math.max(0, this.unreadCount - 1)
     }
   }
 })
