@@ -20,6 +20,17 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+/**
+ * 登录/注册这类「凭据接口」返回 401 时，含义是「这次输入的用户名或密码不对」，
+ * 不是「当前会话失效」。必须原样展示后端消息，且不能清登录态、不能跳转登录页，
+ * 否则用户会看到「请先登录」这种与操作无关的提示，还被莫名甩回登录页。
+ */
+const CREDENTIAL_ENDPOINTS = ['/auth/login', '/auth/register']
+
+function isCredentialEndpoint(url = '') {
+  return CREDENTIAL_ENDPOINTS.some((path) => url.startsWith(path))
+}
+
 api.interceptors.response.use(
   (response) => {
     const res = response.data
@@ -36,7 +47,8 @@ api.interceptors.response.use(
   (error) => {
     const status = error.response?.status
     const message = error.response?.data?.message || error.message || '网络错误'
-    if (status === 401) {
+    const url = error.config?.url || ''
+    if (status === 401 && !isCredentialEndpoint(url)) {
       localStorage.removeItem('jf_token')
       localStorage.removeItem('jf_user')
       ElMessage.error('请先登录')
@@ -44,6 +56,7 @@ api.interceptors.response.use(
         location.href = '/login'
       }
     } else {
+      // 凭据接口的 401 也走这里：显示后端原文（如「用户名或密码错误」），不动登录态
       ElMessage.error(message)
     }
     return Promise.reject(error)
@@ -80,7 +93,7 @@ export const postApi = {
   exquisite: (id, exquisite) => api.put(`/posts/${id}/exquisite`, null, { params: { exquisite } }),
   like: (id) => api.post(`/posts/${id}/like`),
   favorite: (id) => api.post(`/posts/${id}/favorite`),
-  myFavorites: () => api.get('/posts/favorites/mine')
+  myFavorites: (params) => api.get('/posts/favorites/mine', { params })
 }
 
 // ========== 评论 ==========

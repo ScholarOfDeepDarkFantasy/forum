@@ -89,11 +89,23 @@ class AuthFlowIntegrationTest {
         ResponseEntity<String> anonResp = rest.getForEntity(url("/api/auth/me"), String.class);
         assertThat(anonResp.getStatusCode().value()).isEqualTo(401);
 
-        // 6. 错误密码 → 401
+        // 6. 错误密码 → 401，且消息必须是「用户名或密码错误」而不是「未登录或登录已过期」：
+        //    BadCredentialsException 是 AuthenticationException 的子类，处理器若只认父类，
+        //    登录失败会被误报成会话过期，前端就只能弹出与操作无关的提示。
         LoginRequest bad = new LoginRequest();
         bad.setUsername("charlie");
         bad.setPassword("wrong-password");
-        ResponseEntity<String> badResp = rest.postForEntity(url("/api/auth/login"), bad, String.class);
+        ResponseEntity<Result> badResp = rest.postForEntity(url("/api/auth/login"), bad, Result.class);
         assertThat(badResp.getStatusCode().value()).isEqualTo(401);
+        assertThat(badResp.getBody().isSuccess()).isFalse();
+        assertThat(badResp.getBody().getMessage()).isEqualTo("用户名或密码错误");
+
+        // 7. 不存在的用户名 → 同样 401，且不得泄露「用户不存在」（避免用户名枚举）
+        LoginRequest ghost = new LoginRequest();
+        ghost.setUsername("no_such_user_here");
+        ghost.setPassword("whatever");
+        ResponseEntity<Result> ghostResp = rest.postForEntity(url("/api/auth/login"), ghost, Result.class);
+        assertThat(ghostResp.getStatusCode().value()).isEqualTo(401);
+        assertThat(ghostResp.getBody().getMessage()).isEqualTo("用户名或密码错误");
     }
 }

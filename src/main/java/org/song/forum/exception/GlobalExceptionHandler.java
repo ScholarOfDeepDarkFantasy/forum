@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -38,7 +39,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Result.fail("参数校验失败", errors));
     }
 
-    /** 未认证 → 401 */
+    /**
+     * 登录凭据错误 → 401，但必须保留具体原因。
+     * <p>BadCredentialsException 是 AuthenticationException 的子类，若只保留父类处理器，
+     * 会把「用户名或密码错误」覆盖成「未登录或登录已过期」，前端只能提示得含糊其辞。</p>
+     */
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Result<Void>> handleBadCredentials(BadCredentialsException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.fail(e.getMessage()));
+    }
+
+    /** 未认证 / 会话过期 → 401 */
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<Result<Void>> handleAuth(AuthenticationException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.fail("未登录或登录已过期"));

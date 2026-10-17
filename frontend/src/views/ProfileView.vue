@@ -18,7 +18,11 @@ const savingProfile = ref(false)
 
 const myPosts = ref({ content: [], totalElements: 0, totalPages: 0 })
 const myPostPage = ref(0)
-const myFavorites = ref([])
+// 后端返回的是分页对象 { content, totalElements, totalPages }，不是数组。
+// 早先这里声明成 ref([]) 并把整个分页对象赋进去，模板读 myFavorites.length 恒为 undefined，
+// 于是收藏成功后永远显示「还没有收藏」。
+const myFavorites = ref({ content: [], totalElements: 0, totalPages: 0 })
+const myFavoritePage = ref(0)
 
 async function loadProfile() {
   profileForm.nickname = auth.user?.nickname || ''
@@ -45,11 +49,12 @@ async function loadMyPosts(page = 0) {
   myPostPage.value = page
 }
 
-async function loadFavorites() {
+async function loadFavorites(page = 0) {
   try {
-    myFavorites.value = await postApi.myFavorites()
+    myFavorites.value = await postApi.myFavorites({ page, size: 10 })
+    myFavoritePage.value = page
   } catch {
-    myFavorites.value = []
+    myFavorites.value = { content: [], totalElements: 0, totalPages: 0 }
   }
 }
 
@@ -115,11 +120,20 @@ onMounted(() => {
 
       <!-- 我的收藏 -->
       <el-tab-pane label="我的收藏" name="favorites">
-        <template v-if="myFavorites.length">
-          <div v-for="p in myFavorites" :key="p.id" class="row-item" @click="router.push(`/posts/${p.id}`)">
+        <template v-if="myFavorites.content.length">
+          <div v-for="p in myFavorites.content" :key="p.id" class="row-item" @click="router.push(`/posts/${p.id}`)">
             <span class="row-title">{{ p.title }}</span>
             <span class="row-meta">{{ p.boardName }} · {{ fmt(p.createTime) }}</span>
           </div>
+          <el-pagination
+            v-if="myFavorites.totalPages > 1"
+            layout="prev, pager, next"
+            :total="myFavorites.totalElements"
+            :page-size="10"
+            :current-page="myFavoritePage + 1"
+            class="pager"
+            @current-change="(p) => loadFavorites(p - 1)"
+          />
         </template>
         <el-empty v-else description="还没有收藏" />
       </el-tab-pane>
