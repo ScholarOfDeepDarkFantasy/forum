@@ -25,7 +25,9 @@ import org.song.forum.util.PageResponse;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 点赞/收藏服务：切换式点赞收藏（已赞再点取消），联动 posts 冗余计数，
@@ -107,10 +109,19 @@ public class LikeService {
                 PageRequest.of(page, Math.min(size, 50), Sort.by(Sort.Direction.DESC, "createTime")));
         // favorited 定义上恒为 true；liked 仍需按真实点赞记录计算，用一条批量查询取回本页已赞帖子 ID
         List<Long> postIds = favorites.getContent().stream().map(f -> f.getPost().getId()).toList();
-        Set<Long> likedIds = postIds.isEmpty()
-                ? Set.of()
-                : new HashSet<>(likeRepository.findLikedPostIds(userId, postIds));
-        return PageResponse.of(favorites.map(f -> toSummary(f.getPost(), likedIds.contains(f.getPost().getId()))));
+        if (postIds.isEmpty()) {
+            return PageResponse.of(favorites.map(f -> toSummary(f.getPost(), false)));
+        }
+        // FavoriteRepository 的 EntityGraph 只覆盖 post/post.board/post.author，不含 post.tags，
+        // 直接用会在渲染标签时每行触发一次 select ... from post_tags where post_id=?。
+        // 按 id 批量补齐一次，顺带把 to-one 关联也一次性抓回来。
+        Map<Long, Post> byId = postRepository.findWithAssociations(postIds).stream()
+                .collect(Collectors.toMap(Post::getId, p -> p));
+        Set<Long> likedIds = new HashSet<>(likeRepository.findLikedPostIds(userId, postIds));
+        return PageResponse.of(favorites.map(f -> {
+            Post hydrated = byId.getOrDefault(f.getPost().getId(), f.getPost());
+            return toSummary(hydrated, likedIds.contains(hydrated.getId()));
+        }));
     }
 
     // ---------- 内部方法 ----------

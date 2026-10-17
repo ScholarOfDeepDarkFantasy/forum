@@ -28,7 +28,9 @@ import org.song.forum.util.PageResponse;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 帖子服务：发帖/编辑/删除（作者本人）、分页搜索、详情+浏览量
@@ -126,16 +128,21 @@ public class PostService {
         // 注意：keyword 不能传 null——pgJDBC 会把无类型 null 绑定为 bytea，
         // PostgreSQL 报 "function lower(bytea) does not exist"（SQLState 42883）。
         // 空串有确定类型（varchar），JPQL 端用 = '' 表示"无关键字"。
-        Page<Post> posts = postRepository.search(boardId, blankToEmpty(keyword), pageable);
-        return PageResponse.of(mapSummaries(posts));
+        //
+        // 分两步查：先在 SQL 层正确分页拿到骨架，再按 id 批量抓 tags 集合。
+        // 若直接在 tags 集合上 EntityGraph + Pageable，Hibernate 会打印 HHH90003004
+        // 并把全部匹配行读进内存再截取，数据量一大就是性能事故。
+        String kw = blankToEmpty(keyword);
+        Page<Post> skeletons = postRepository.searchIds(boardId, kw, pageable);
+        return PageResponse.of(mapSummaries(hydrate(skeletons)));
     }
 
     /** 我的帖子 */
     @Transactional(readOnly = true)
     public PageResponse<PostSummaryResponse> myPosts(Long authorId, int page, int size) {
-        Page<Post> posts = postRepository.findByAuthorIdAndDeletedFalse(authorId,
+        Page<Post> skeletons = postRepository.findIdsByAuthorIdAndDeletedFalse(authorId,
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createTime")));
-        return PageResponse.of(mapSummaries(posts));
+        return PageResponse.of(mapSummaries(hydrate(skeletons)));
     }
 
     /** 帖子详情：浏览量原子 +1 后返回 */
@@ -261,6 +268,20 @@ public class PostService {
         d.setFavoriteCount(p.getFavoriteCount());
         d.setUpdateTime(p.getUpdateTime());
         return d;
+    }
+
+    /**
+     * 两步查询的第二步：按 id 批量抓取 board/author/tags，并按第一步的顺序重建 {@link Page}。
+     * IN 查询不保证顺序，直接返回会让列表顺序变成数据库返回顺序，分页排序就失效了。
+     */
+    private Page<Post> hydrate(Page<Post> skeletons) {
+        List<Long> ids = skeletons.getContent().stream().map(Post::getId).toList();
+        if (ids.isEmpty()) {
+            return skeletons;
+        }
+        Map<Long, Post> byId = postRepository.findWithAssociations(ids).stream()
+                .collect(Collectors.toMap(Post::getId, p -> p));
+        return skeletons.map(p -> byId.getOrDefault(p.getId(), p));
     }
 
     /**

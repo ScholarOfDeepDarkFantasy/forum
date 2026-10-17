@@ -9,13 +9,19 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.song.forum.entity.Post;
 
+import java.util.Collection;
+import java.util.List;
+
 public interface PostRepository extends JpaRepository<Post, Long> {
 
     /**
-     * 帖子分页：boardId 为 null 查全部；只取未删除；置顶优先（由 Service 排序或排序参数控制）。
-     * EntityGraph 抓取 board/author，避免 N+1。
+     * 分页第一步：只取帖子骨架，不 join {@code tags} 集合。
+     * <p>to-one 关联（board/author）可以安全 join——它们不会让结果行数膨胀，
+     * 因此能在 SQL 层正确分页。集合关联若与分页同用，Hibernate 会打印
+     * {@code HHH90003004} 并把全部匹配行读进内存再截取。</p>
+     * <p>boardId 为 null 查全部；keyword 传空串表示无关键字（不能传 null，
+     * 见 {@code PostService.list} 里关于 pgJDBC 的注释）。</p>
      */
-    @EntityGraph(attributePaths = {"board", "author", "tags"})
     @Query("""
             SELECT p FROM Post p
             WHERE p.deleted = false
@@ -23,13 +29,22 @@ public interface PostRepository extends JpaRepository<Post, Long> {
               AND (:keyword = '' OR LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
                                  OR LOWER(p.content) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """)
-    Page<Post> search(@Param("boardId") Long boardId,
-                      @Param("keyword") String keyword,
-                      Pageable pageable);
+    @EntityGraph(attributePaths = {"board", "author"})
+    Page<Post> searchIds(@Param("boardId") Long boardId,
+                         @Param("keyword") String keyword,
+                         Pageable pageable);
 
-    /** 我的帖子 */
+    /**
+     * 分页第二步：按 id 批量抓取帖子及全部所需关联（含 tags 集合）。
+     * IN 查询不保证顺序，调用方必须用第一步的结果重建顺序。
+     */
+    @Query("SELECT p FROM Post p WHERE p.id IN :ids")
     @EntityGraph(attributePaths = {"board", "author", "tags"})
-    Page<Post> findByAuthorIdAndDeletedFalse(Long authorId, Pageable pageable);
+    List<Post> findWithAssociations(@Param("ids") Collection<Long> ids);
+
+    /** "我的帖子"分页第一步：同 {@link #searchIds}，只取骨架不 join tags。 */
+    @EntityGraph(attributePaths = {"board", "author"})
+    Page<Post> findIdsByAuthorIdAndDeletedFalse(Long authorId, Pageable pageable);
 
     /** 详情抓取，避免 N+1 */
     @EntityGraph(attributePaths = {"board", "author", "tags"})
