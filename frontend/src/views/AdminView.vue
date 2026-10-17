@@ -4,6 +4,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { boardApi, adminApi } from '@/api'
 import { useResponsive } from '@/composables/useResponsive'
 import { formatDateTime } from '@/utils/format'
+import UserCard from '@/components/UserCard.vue'
+import BoardCard from '@/components/BoardCard.vue'
 
 // 表格与卡片的 DOM 结构不同，媒体查询无法切换模板，只能由 JS 判定
 const { isMobile } = useResponsive()
@@ -109,17 +111,13 @@ onMounted(() => {
         <div v-if="isMobile" class="board-cards">
           <el-empty v-if="!boards.length" description="暂无板块" />
           <template v-else>
-            <div v-for="b in boards" :key="b.id" class="board-card">
-              <div class="card-row"><span class="card-label">名称</span><span>{{ b.name }}</span></div>
-              <div class="card-row">
-                <span class="card-label">描述</span><span>{{ b.description || '-' }}</span>
-              </div>
-              <div class="card-row"><span class="card-label">帖子数</span><span>{{ b.postCount }}</span></div>
-              <div class="card-actions">
-                <el-button size="small" @click="openBoardEdit(b)">编辑</el-button>
-                <el-button size="small" type="danger" plain @click="removeBoard(b)">删除</el-button>
-              </div>
-            </div>
+            <BoardCard
+              v-for="b in boards"
+              :key="b.id"
+              :board="b"
+              @edit="openBoardEdit"
+              @remove="removeBoard"
+            />
           </template>
         </div>
         <el-table v-else :data="boards" stripe>
@@ -142,30 +140,14 @@ onMounted(() => {
         <div v-if="isMobile" class="user-cards">
           <el-empty v-if="!users.content.length" description="暂无用户" />
           <template v-else>
-            <div v-for="u in users.content" :key="u.id" class="user-card">
-              <div class="card-row"><span class="card-label">用户名</span><span>{{ u.username }}</span></div>
-              <div class="card-row"><span class="card-label">昵称</span><span>{{ u.nickname || '-' }}</span></div>
-              <div class="card-row"><span class="card-label">邮箱</span><span>{{ u.email }}</span></div>
-              <div class="card-row">
-                <span class="card-label">状态</span>
-                <el-tag :type="statusTag(u.status)">{{ u.status }}</el-tag>
-              </div>
-              <div class="card-row">
-                <span class="card-label">禁言至</span>
-                <span>{{ u.mutedUntil ? formatDateTime(u.mutedUntil) : '-' }}</span>
-              </div>
-              <div class="card-row">
-                <span class="card-label">角色</span>
-                <span>
-                  <el-tag v-for="r in u.roles" :key="r" size="small" type="info" class="role-tag">{{ r }}</el-tag>
-                </span>
-              </div>
-              <div class="card-actions">
-                <el-button size="small" type="warning" plain :disabled="u.roles?.includes('ADMIN')" @click="openStatus(u)">
-                  状态管理
-                </el-button>
-              </div>
-            </div>
+            <UserCard
+              v-for="u in users.content"
+              :key="u.id"
+              :user="u"
+              :status-tag="statusTag"
+              :format-time="formatDateTime"
+              @status="openStatus"
+            />
           </template>
         </div>
         <el-table v-else :data="users.content" stripe>
@@ -263,35 +245,11 @@ onMounted(() => {
   justify-content: center;
 }
 
-/* 窄屏卡片：与表格并列的另一套渲染，字段一一对应 */
+/* 窄屏卡片容器：卡片本身与字段样式在 components/UserCard.vue、BoardCard.vue 里 */
 .user-cards,
 .board-cards {
   display: flex;
   flex-direction: column;
   gap: var(--jf-space-3);
-}
-.user-card,
-.board-card {
-  border: 1px solid var(--jf-color-border);
-  border-radius: var(--jf-radius-md);
-  padding: var(--jf-space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--jf-space-2);
-}
-.card-row {
-  display: flex;
-  gap: var(--jf-space-2);
-  font-size: var(--jf-font-body);
-}
-.card-label {
-  color: var(--jf-color-text-3);
-  min-width: 64px;
-  flex-shrink: 0;
-}
-.card-actions {
-  display: flex;
-  gap: var(--jf-space-2);
-  margin-top: var(--jf-space-1);
 }
 </style>

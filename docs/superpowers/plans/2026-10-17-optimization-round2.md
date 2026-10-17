@@ -995,9 +995,11 @@ git commit -m "refactor: 抽取共用时间格式化工具替换四处重复实�
 - Modify: `frontend/src/views/AdminView.vue`
 - Modify: `frontend/src/views/AdminView.spec.js`
 
+**状态：已完成。** 实际 AdminView.vue 297 → 235 行，新增 UserCard.vue（85 行）与 BoardCard.vue（54 行）；cards.spec.js 10 个用例，AdminView.spec.js 由 8 增至 11 个（新增 3 个跨组件事件接线用例，已用变异测试验证有效）。
+
 **背景：** `AdminView.vue` 已到 296 行，用户与板块各有一套"桌面表格 + 窄屏卡片"。加一个字段要在 4 处同步改，漏一处就是数据不一致。把卡片抽成两个只负责展示的小组件，AdminView 只保留编排。
 
-- [ ] **Step 1: 写失败的组件测试**
+- [x] **Step 1: 写失败的组件测试**
 
 创建 `frontend/src/components/cards.spec.js`：
 
@@ -1089,12 +1091,12 @@ describe('BoardCard', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `cd frontend && pnpm test -- src/components/cards.spec.js`
 Expected: FAIL，`Failed to resolve import "./UserCard.vue"`
 
-- [ ] **Step 3: 创建 UserCard**
+- [x] **Step 3: 创建 UserCard**
 
 创建 `frontend/src/components/UserCard.vue`：
 
@@ -1169,7 +1171,7 @@ const isAdminUser = (user) => user.roles?.includes('ADMIN') ?? false
 </style>
 ```
 
-- [ ] **Step 4: 创建 BoardCard**
+- [x] **Step 4: 创建 BoardCard**
 
 创建 `frontend/src/components/BoardCard.vue`：
 
@@ -1224,12 +1226,12 @@ const emit = defineEmits(['edit', 'remove'])
 </style>
 ```
 
-- [ ] **Step 5: 运行测试确认通过**
+- [x] **Step 5: 运行测试确认通过**
 
 Run: `cd frontend && pnpm test -- src/components/cards.spec.js`
-Expected: `Tests 6 passed`
+Expected: `Tests 10 passed`（实际多写了昵称空值、formatTime、statusTag、roles 缺失 4 个用例）
 
-- [ ] **Step 6: AdminView 改用卡片组件**
+- [x] **Step 6: AdminView 改用卡片组件**
 
 在 `frontend/src/views/AdminView.vue` 的 import 区加入：
 
@@ -1276,7 +1278,7 @@ import { formatDateTime } from '@/utils/format'
 
 在 `<style scoped>` 中删除已经移入组件的规则：`.user-card`、`.board-card`、`.card-row`、`.card-label`、`.card-actions`。保留 `.user-cards` 与 `.board-cards`（它们是列表容器）。
 
-- [ ] **Step 7: 更新 AdminView 的测试断言**
+- [x] **Step 7: 更新 AdminView 的测试断言**
 
 `frontend/src/views/AdminView.spec.js` 里对卡片内容的断言需要能穿透子组件。在 mount 的 `global.stubs` 里为两个卡片组件加轻量桩：
 
@@ -1290,17 +1292,17 @@ import { formatDateTime } from '@/utils/format'
 
 把原本断言 `.user-card` / `.board-card` 存在的地方改为断言 `.stub-user-card` / `.stub-board-card`。
 
-- [ ] **Step 8: 全量测试与构建**
+- [x] **Step 8: 全量测试与构建**
 
 Run: `cd frontend && pnpm test && pnpm build`
-Expected: `Test Files 12 passed`，`Tests 83 passed`；构建成功
+Expected: `Test Files 13 passed`，`Tests 97 passed`；构建成功
 
-- [ ] **Step 9: 确认 AdminView 行数下降**
+- [x] **Step 9: 确认 AdminView 行数下降**
 
 Run: `(Get-Content frontend/src/views/AdminView.vue | Measure-Object -Line).Lines`
-Expected: 小于 260（改造前约 296）
+Expected: 小于 260（实际 235，改造前 297）
 
-- [ ] **Step 10: 提交**
+- [x] **Step 10: 提交**
 
 ```bash
 git add frontend/src/components/UserCard.vue frontend/src/components/BoardCard.vue \

@@ -10,6 +10,16 @@ vi.mock('@/api', () => ({
   adminApi: { users: vi.fn(), changeStatus: vi.fn() }
 }))
 
+// 只替换 ElMessageBox：删板块会弹真实确认框并等一个永不 resolve 的 Promise，
+// 测试里必须拦掉。ElMessage 保留原实现（不会渲染 DOM，只 push 通知）。
+vi.mock('element-plus', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    ElMessageBox: { confirm: vi.fn(() => Promise.resolve()) }
+  }
+})
+
 // 必须写全 .vue 后缀：同目录下的 AdminView.spec.js 会与 AdminView.vue 争抢
 // 无扩展名的 "./AdminView" 解析，Vite 不会自动补 .vue。
 import AdminView from './AdminView.vue'
@@ -65,7 +75,14 @@ const stubs = {
     template: '<button :disabled="disabled"><slot /></button>'
   },
   'el-pagination': { template: '<div />' },
-  'el-dialog': { template: '<div><slot /></div>' }
+  // 必须尊重 modelValue：否则弹窗关闭时内容也在 DOM 里，
+  // 「点击卡片后弹窗才打开」这类断言会永远为真、失去意义。
+  // title 也渲染出来，才能验证弹窗拿到的是哪个目标。
+  'el-dialog': {
+    props: ['modelValue', 'title'],
+    template:
+      '<div v-if="modelValue" class="stub-dialog"><div class="stub-dialog-title">{{ title }}</div><slot /></div>'
+  }
 }
 
 /** 两个对话框里的表单控件：同样打桩，否则 Vue 会刷「Failed to resolve component」告警 */
@@ -211,6 +228,41 @@ describe('AdminView 响应式渲染', () => {
 
       expect(wrapper.findAll('.board-card')).toHaveLength(BOARDS.length)
       expect(wrapper.findAll('.stub-empty')).toHaveLength(0)
+    })
+
+    // 卡片抽成子组件后，事件要跨组件边界传回父组件的处理函数。
+    // 若 @edit / @remove / @status 的监听名与子组件 emit 名不一致，按钮会静默失效
+    // —— 结构断言（按钮存在、文案正确）发现不了这种坏，必须点下去看副作用。
+    it('点击板块卡片的编辑按钮打开编辑弹窗', async () => {
+      const wrapper = await mountReady()
+
+      const boardCard = wrapper.findAll('.board-card')[0]
+      await boardCard.findAll('button')[0].trigger('click')
+      await flush()
+
+      expect(wrapper.find('.stub-dialog-title').text()).toBe('编辑板块')
+    })
+
+    it('点击板块卡片的删除按钮调用删除接口', async () => {
+      const wrapper = await mountReady()
+      boardApi.remove.mockResolvedValue({})
+
+      const boardCard = wrapper.findAll('.board-card')[0]
+      await boardCard.findAll('button')[1].trigger('click')
+      await flush()
+
+      expect(boardApi.remove).toHaveBeenCalledWith(BOARDS[0].id)
+    })
+
+    it('点击用户卡片的状态管理按钮打开状态弹窗并带上目标用户', async () => {
+      const wrapper = await mountReady()
+
+      const userCard = wrapper.findAll('.user-card')[0]
+      await userCard.find('button').trigger('click')
+      await flush()
+
+      // 弹窗标题模板里插了 statusTarget.username，能直接证明事件把 user 传上来了
+      expect(wrapper.find('.stub-dialog-title').text()).toBe('管理用户：alice')
     })
   })
 
