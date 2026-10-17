@@ -55,11 +55,12 @@ function collectMediaBreakpoints() {
 describe('断点一致性', () => {
   // 本用例刻意扫描整个 src，而不是只扫当前已知的几处：断点字面量目前散落在
   // tokens.css 的 --jf-breakpoint-mobile、useResponsive.js 的 MOBILE_BREAKPOINT
-  // 以及后续 Task 10/12 新增的 @media 块里，靠人肉同步必然漂移。
+  // 以及 HomeView / PostDetailView / LoginView / RegisterView / NotificationsView
+  // 五个视图里的 @media (max-width: 768px) 块，靠人肉同步必然漂移。
   //
-  // 注意：当前 src 下 @media (max-width: Npx) 的数量为 0（只有容器 max-width，
-  // 形如 `max-width: 1100px` 的普通声明，不是媒体查询）。所以本用例现在通过是
-  // 预期结果，不是空转——它从此刻起保护 Task 10/12 新增的 @media 块。
+  // 注意：当前 src 下 @media (max-width: Npx) 的数量为 5（全部是 768px）。容器宽度
+  // 形如 `max-width: 1100px` 的普通声明不是媒体查询，不参与计数。所以本用例现在通过
+  // 是预期结果，不是空转——它保护这五处 @media 块与 MOBILE_BREAKPOINT 不漂移。
   it('所有 max-width 媒体查询断点与 MOBILE_BREAKPOINT 一致', () => {
     const breakpoints = collectMediaBreakpoints()
     const offenders = breakpoints
@@ -85,8 +86,8 @@ describe('断点一致性', () => {
     expect(files.some((f) => f.endsWith('src/composables/useResponsive.js'))).toBe(false)
   })
 
-  // 当前 src 下真实媒体查询数量为 0，上一用例于是「无输入通过」。为使该用例的
-  // 判别力本身可被验证（而不是等 Task 10/12 落地后才发现正则写错），此处对
+  // 当前 src 下真实媒体查询数量为 5，上一用例已有真实输入。但为了不依赖「此刻正好
+  // 有 @media」这一事实（某次改动把它们全删掉后，正则写错也照样假绿），此处仍对
   // 扫描逻辑喂入固定样本：命中、容器宽度不误报、注释不误报。
   it('扫描逻辑本身能识别断点、且不误报容器宽度与注释', () => {
     const sample = `
