@@ -3,13 +3,15 @@ spring:
     name: JavaForum
 
   # ---- 数据源：PostgreSQL ----
+  # 密码与 JWT 密钥故意不设默认值：缺失时启动直接失败，
+  # 而不是静默用弱默认值跑起来。参考 .env.example 设置环境变量。
   datasource:
-    url: jdbc:postgresql://raspi:5432/javaforum
-    username: forum
-    password: 4*2j+#bVkNDP7:3EWcF9        # 改成你的本地密码，或用环境变量 DB_PASSWORD 覆盖
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/javaforum}
+    username: ${DB_USERNAME:forum}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
+      maximum-pool-size: ${DB_POOL_MAX:10}
       minimum-idle: 2
 
   # ---- JPA / Hibernate ----
@@ -28,34 +30,27 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: false
 
-  # ---- DevTools ----
-  devtools:
-    restart:
-      enabled: true
-    livereload:
-      enabled: true
-
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
   servlet:
     encoding:
       charset: UTF-8
       force: true
 
-# ---- JWT 配置（第 3 阶段 Security 时读取）----
+# ---- JWT 配置 ----
 jwt:
-  # 生产环境务必通过环境变量 JWT_SECRET 覆盖；至少 32 字节
-  secret: ${JWT_SECRET:change-me-in-production-please-use-a-256bit-random-key}
+  # 生产环境必须通过环境变量 JWT_SECRET 提供；HS256 要求至少 32 字节
+  secret: ${JWT_SECRET}
   # Token 有效期（毫秒）：24 小时
-  expiration-ms: 86400000
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   # 响应头名称
   header: Authorization
   # Token 前缀
   prefix: "Bearer "
 
-# ---- 日志 ----
+# ---- 公共日志基线：只保留应用自身的业务日志，SQL 明细交给 profile ----
 logging:
   level:
-    org.song.forum: debug
-    org.hibernate.SQL: debug
+    root: info
+    org.song.forum: info
     org.springframework.security: info

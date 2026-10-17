@@ -1,0 +1,21 @@
+# 开发环境（默认 profile）
+#
+# 通过 -Dspring-boot.run.profiles=dev 或 SPRING_PROFILES_ACTIVE=dev 激活。
+# 只覆盖开发时的便利配置，凭据仍从环境变量读取（见 .env.example）。
+
+spring:
+  # DevTools 只在 dev 打开：热重启与 LiveReload。
+  # 打包后的 jar 里 spring-boot-devtools 默认不生效，但显式关掉更省心（见 application-prod.yml）。
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+
+# 开发时看全量 SQL 与绑定参数，便于排查 N+1、分页是否下推到数据库。
+# 这些日志在真实数据量下体积很大（单条查询可超 30KB），绝不能带到生产。
+logging:
+  level:
+    org.song.forum: debug
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace

@@ -38,6 +38,17 @@ public class SecurityConfig {
             "/swagger-ui.html"
     };
 
+    /**
+     * 管理员专属路径：显式写在访问规则最前面。
+     * <p>为什么必须单列：下面的 {@code requestMatchers(HttpMethod.GET).permitAll()} 会放行
+     * 任意 GET 请求，actuator 端点（{@code /actuator/health}、{@code /actuator/info} ...）
+     * 正好都是 GET，不加这条规则就会被匿名访问。宁可显式拒绝，也不要依赖"当前只暴露了 health"
+     * 这种运行时配置——配置改了，权限就会悄悄松开。</p>
+     */
+    private static final String[] ADMIN_ONLY = {
+            "/actuator/**"
+    };
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -47,6 +58,8 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // 必须最先声明：否则下面 GET 全放行会把 /actuator 一并放开
+                        .requestMatchers(ADMIN_ONLY).hasRole("ADMIN")
                         .requestMatchers(PUBLIC_GET).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         // 必须先于下面的 GET 放行规则声明，否则匿名请求会直达 Controller 抛 500

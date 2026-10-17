@@ -30,19 +30,79 @@ CREATE DATABASE javaforum WITH ENCODING 'UTF8';
 
 ## 运行（后端）
 
-```bash
-# 方式一：修改 application.yml 中的数据库密码后直接运行
-mvn spring-boot:run
+数据库密码与 JWT 密钥**不写进仓库**，从环境变量读取。`application.yml` 对 `DB_PASSWORD` 与 `JWT_SECRET` 刻意不设默认值：缺失时应用启动即失败并报 `Could not resolve placeholder`，而不是用弱密钥悄悄跑起来。
 
-# 方式二：通过环境变量覆盖
-# Windows (PowerShell)
-$env:DB_PASSWORD="你的密码"; mvn spring-boot:run
+### 1. 准备环境变量
+
+复制 `.env.example` 为 `.env`（已被 `.gitignore` 忽略）并填入真实值，然后在启动前加载进当前 shell。
+
+PowerShell：
+
+```powershell
+Get-Content .env | ForEach-Object {
+  if ($_ -match '^\s*([A-Z_]+)\s*=\s*(.*)$') {
+    [Environment]::SetEnvironmentVariable($matches[1], $matches[2])
+  }
+}
 ```
 
-启动后：
+也可以临时逐个设置：
+
+```powershell
+$env:DB_PASSWORD = "你的数据库密码"
+$env:JWT_SECRET = "至少32字节的随机密钥"
+```
+
+`JWT_SECRET` 用 HS256，长度不足 32 字节会在构造密钥时抛异常。生成一条：`openssl rand -hex 32`。
+
+### 2. 启动
+
+```bash
+mvn spring-boot:run
+```
+
+`pom.xml` 里 `<spring-boot.run.profiles>` 默认为 `dev`，所以本地启动会自动进入开发配置，无需额外参数。
+
+### 3. Profile 说明
+
+| 配置项 | `dev`（本地默认） | `prod` |
+|---|---|---|
+| DevTools 热重启 | 开 | 关 |
+| SQL 明细（`org.hibernate.SQL`） | `debug` | `warn` |
+| SQL 绑定参数（`jdbc.bind`） | `trace` | 不打印 |
+| 连接池上限 | 10 | 20 |
+| Actuator 暴露 | 仅 `health` | 仅 `health`，`show-details: never` |
+| 文件日志 | 无（只输出到控制台） | `logs/javaforum.log` |
+
+指定 profile：
+
+```bash
+# 生产
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+# 或打包运行
+java -jar target/forum-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
+```
+
+`prod` 下 `org.hibernate.orm.query` 保持 `warn`——`HHH90003004`（集合关联与分页同用导致分页退化为全表加载）就是在这个级别输出，保留它才能在真实流量下发现性能退化。
+
+### 4. 显式配置项
+
+除 `DB_PASSWORD`、`JWT_SECRET` 两个必填项外，其余都有默认值，可按需覆盖：
+
+| 变量 | 默认值 |
+|---|---|
+| `DB_URL` | `jdbc:postgresql://localhost:5432/javaforum` |
+| `DB_USERNAME` | `forum` |
+| `DB_POOL_MAX` | `dev` 为 10，`prod` 为 20 |
+| `SERVER_PORT` | `8080` |
+| `JWT_EXPIRATION_MS` | `86400000`（24 小时） |
+| `LOG_FILE` | `logs/javaforum.log`（仅 `prod`） |
+
+### 5. 验证启动
 
 - 健康检查：http://localhost:8080/api/health
 - Swagger 文档：http://localhost:8080/swagger-ui.html
+- Actuator 健康（需 ADMIN 身份，匿名会得到 401）：http://localhost:8080/actuator/health
 
 首次启动会由 `src/main/java/org/song/forum/config/DataInitializer.java` 幂等创建默认管理员账号（已存在则跳过）：
 
@@ -69,7 +129,7 @@ pnpm dev
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL。当前为 7 个测试类、20 个用例。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 7 个测试类、24 个用例。
 
 ### 前端测试
 
@@ -79,13 +139,13 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 8 个 spec、54 个用例，覆盖：
+当前为 10 个 spec、67 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、列表分页
 - 点赞/收藏共享状态（`src/composables/usePostActions.js`）：失败回滚、同步服务端 `liked`/`favorited` 标志且不覆盖本地已操作状态
 - 响应式判定与断点一致性（`src/composables/useResponsive.js`、`src/styles/breakpoint.spec.js`）：媒体查询断点数量必须恰为 5、字面量必须逐字写成 `768px`、数值须与 `MOBILE_BREAKPOINT` 一致，且禁止出现 `min-width` 查询
-- 组件测试：`HomeView`（版块与列表加载、点赞交互与游客跳转、行点击跳详情）、`PostDetailView`（互动字段实时读共享状态：列表点的赞在详情页同步生效、置顶整体替换 `post` 后互动字段不被返回体带偏）与 `AdminView`（桌面表格 / 窄屏卡片、空状态、视口切换与监听清理）
+- 接口层（`src/api/index.spec.js`）：401 时凭据类接口（登录/注册）原样展示后端消息且不清除登录态，其余接口清 token 并跳登录页（版块与列表加载、点赞交互与游客跳转、行点击跳详情）、`PostDetailView`（互动字段实时读共享状态：列表点的赞在详情页同步生效、置顶整体替换 `post` 后互动字段不被返回体带偏）、`AdminView`（桌面表格 / 窄屏卡片、空状态、视口切换与监听清理）与 `ProfileView`（收藏分页渲染、空状态）
 
 ## 样式与设计令牌
 

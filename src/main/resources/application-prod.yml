@@ -1,0 +1,43 @@
+# 生产环境
+#
+# 通过 SPRING_PROFILES_ACTIVE=prod 激活。
+# 与 dev 的差异：关闭 DevTools、SQL 明细只留告警、连接池放大、
+# actuator 只暴露 health 且不显示细节（否则会泄露数据库连通性与磁盘信息）。
+
+spring:
+  devtools:
+    restart:
+      enabled: false
+    livereload:
+      enabled: false
+
+  datasource:
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: 5
+
+  jpa:
+    properties:
+      hibernate:
+        # 生产不格式化 SQL：避免把每条语句的换行与缩进写进日志
+        format_sql: false
+
+# HHH90003004 这类 Hibernate 告警（集合与分页同用）在 warn 级别可见，
+# 保留它才能在生产日志里发现"分页退化为全表加载"。
+logging:
+  level:
+    root: info
+    org.song.forum: info
+    org.hibernate.SQL: warn
+    org.hibernate.orm.query: warn
+  file:
+    name: ${LOG_FILE:logs/javaforum.log}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

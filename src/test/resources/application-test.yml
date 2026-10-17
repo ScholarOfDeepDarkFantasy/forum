@@ -1,0 +1,22 @@
+# 测试 profile：叠加在 src/main/resources/application.yml 之上，只补它缺的凭据
+#
+# 为什么用 profile 文件而不是 src/test/resources/application.yml：
+# 同名文件在测试 classpath 上会「覆盖」主配置而不是合并，导致 jwt.expiration-ms
+# 之类的公共配置整个丢失（曾实测：先是缺 JWT_SECRET，补上后又变成缺 jwt.expiration-ms）。
+# application-test.yml 走 profile 叠加，主配置里的公共项照常生效。
+#
+# 激活方式：各测试类上的 @ActiveProfiles("test")。
+#
+# 主配置里 DB_PASSWORD 与 JWT_SECRET 刻意没有默认值（缺失即启动失败，避免生产用弱密钥）。
+# 测试不连真实数据库、密钥也无安全意义，因此在这里给出固定值，保证 mvn test 不依赖本机环境变量。
+
+spring:
+  datasource:
+    # 兜底值：万一某个测试类没覆盖数据源，也绝不会去连真实 PostgreSQL
+    url: jdbc:h2:mem:default-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+jwt:
+  secret: test-only-secret-key-must-be-at-least-32-bytes-long-0123456789
