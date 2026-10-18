@@ -68,6 +68,7 @@ cd frontend && pnpm test --run
 | JWT | jjwt 0.13.0（HS256，`JWT_SECRET` 至少 32 字节） |
 | API 文档 | springdoc-openapi 2.8.13（`/swagger-ui.html`、`/v3/api-docs`） |
 | 其他 | Lombok、Validation、DevTools（仅 dev profile） |
+| 容器化 | `Dockerfile`（多阶段：Maven 构建 → Spring Boot 分层提取 → `eclipse-temurin:17-jre-alpine`）+ `docker-compose.yml`（后端 + `postgres:15-alpine`） |
 
 **前端**（`frontend/` 子目录）
 
@@ -231,6 +232,22 @@ cd frontend && pnpm test --run
 | --- | --- |
 | `53ac4b9` | 修正登录失败提示（`BadCredentialsException` 被父类处理器吞掉 + 前端拦截器把登录失败当会话过期）与「我的收藏」列表渲染（PageResponse 对象塞进 `ref([])` 导致 `length` 恒为 undefined） |
 
+### 4.5 工程化：后端容器化（2026-10-18）
+
+新增三个文件，均为部署用，不改变任何业务代码：
+
+| 文件 | 要点 |
+| --- | --- |
+| `Dockerfile` | 两阶段：`maven:3.9-eclipse-temurin-17` 编译 → `java -Djarmode=tools ... extract --layers --launcher` 分层 → `eclipse-temurin:17-jre-alpine` 运行。先单独 `COPY pom.xml` 再 `dependency:go-offline` 以复用依赖缓存；非 root 用户 `app`(1001)；`HEALTHCHECK` 探测 `/api/health`；`ENTRYPOINT` 用 `sh -c "exec java $JAVA_OPTS ..."` 让 java 成为 PID 1 以便优雅停机 |
+| `.dockerignore` | 排除 `target/`、`frontend/`、`node_modules/`、`.env`、`docs/`。**特别是排除 `target/`**：本机曾出现 `BaseEntity.class` 被写坏，若把本地 target 带进构建会把损坏产物复制进镜像 |
+| `docker-compose.yml` | `db`（`postgres:15-alpine`）+ `backend`；`depends_on: condition: service_healthy` 保证库就绪后 Flyway 才连；只在容器网络内暴露 5432；日志挂 `backend-logs` 卷 |
+
+三个刻意设计：
+
+1. **探针用 `/api/health` 而不是 `/actuator/health`**——后者在本项目被 `hasRole('ADMIN')` 保护，匿名探测必然 401，会让容器永远 unhealthy。
+2. **镜像内不含凭据**：`DB_PASSWORD`/`JWT_SECRET` 在 compose 里用 `${VAR:?}` 强制必填，缺失时 compose 直接报错退出，而不是把空值传进容器。
+3. **容器 profile 用独立变量 `APP_PROFILE`（默认 `prod`）**，不复用 `SPRING_PROFILES_ACTIVE`——本地 `.env` 里写的是 `dev`，复用会让容器也打印全量 SQL。
+
 ---
 
 ## 5. 待办与后续计划
@@ -247,6 +264,8 @@ cd frontend && pnpm test --run
 | T6 | **REPLY 通知锚点只覆盖第一页评论** | 低 | 详见 §6 |
 | T7 | **数据库连接串硬编码 `raspi`** | 低 | `application.yml` 的 `DB_URL` 默认值是 `localhost`，但实际部署在 `raspi`。建议在 `.env.example` 里写明真实部署形态 |
 | T8 | **残留的冒烟测试数据** | 低 | 真实库中存在 `smoke_user`、`t4_op`、`t4_ap`、板块「冒烟测试板块」等手工测试数据，交付演示前应清理 |
+| T9 | **Docker 镜像未经实际构建验证** | 中 | 编写时本机未安装 Docker，`docker build` / `docker compose up` 均未跑过。已验证的部分：分层提取命令、`COPY` 后的目录布局与 `JarLauncher` 在本地按镜像布局能正常引导 Spring；`docker-compose.yml` 的 YAML 结构与关键配置已机械校验。**未验证**：基础镜像 tag 是否可拉取、`apk add` 是否成功、`HEALTHCHECK` 在 alpine 中行为。首次在有 Docker 的机器上构建时需重点确认这三点 |
+| T10 | **前端未容器化** | 低 | 本次只做了后端镜像。前端若要一起部署，需补 nginx 镜像 + `pnpm build` 产物 + `/api` 反代配置 |
 
 ### 5.2 候选功能（第三轮可选，均未开始）
 
@@ -305,6 +324,7 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-10-18 | feat | 后端容器化：新增 `Dockerfile`（多阶段 + 分层 + 非 root + 健康检查）、`.dockerignore`、`docker-compose.yml`，并在 README 增加「运行（Docker）」章节 | 本次提交 |
 | 2026-10-18 | docs | 补充变更日志的自引用说明与提交数同步规则 | 本次提交 |
 | 2026-10-18 | docs | 补全变更日志至覆盖全部提交（原漏记 16 条） | `ddfb4e0` |
 | 2026-10-18 | docs | 回填开发记录文档的提交哈希 | `8b30458` |

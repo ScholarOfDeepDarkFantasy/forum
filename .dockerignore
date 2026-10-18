@@ -1,0 +1,41 @@
+# Docker 构建上下文排除规则
+#
+# 目的：
+#   1. 缩小上下文体积（target/ 62MB+、node_modules/ 数百 MB）
+#   2. 防止本地密钥进入镜像（.env 内含数据库密码与 JWT 密钥）
+#   3. 避免把本地编译产物带进构建：镜像内必须从源码开始编译，
+#      否则可能把本机被写坏的 .class 复制进去（本项目实际遇到过
+#      BaseEntity.class 损坏导致 ClassFormatError 的情况）。
+
+# ---- 构建产物 ----
+target/
+build/
+out/
+
+# ---- 本地密钥与个人配置 ----
+.env
+.env.local
+.env.*
+!.env.example
+
+# ---- 版本控制与 IDE ----
+.git/
+.gitignore
+.idea/
+.vscode/
+.xcodemap/
+.superpowers/
+*.iml
+
+# ---- 日志 ----
+logs/
+*.log
+
+# ---- 前端：后端镜像不需要 ----
+frontend/
+node_modules/
+
+# ---- 文档与说明 ----
+docs/
+*.md
+LICENSE

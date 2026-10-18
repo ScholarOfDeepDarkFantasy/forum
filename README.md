@@ -113,6 +113,82 @@ java -jar target/forum-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 
 该账号用于访问后台的用户管理与板块管理页面。
 
+## 运行（Docker）
+
+用 `Dockerfile` 把后端打成镜像，或用 `docker-compose.yml` 连同 PostgreSQL 一起起。镜像内**不含任何密码或密钥**，全部运行时注入。
+
+相关文件：
+
+| 文件 | 作用 |
+|---|---|
+| `Dockerfile` | 多阶段构建：Maven 编译 → 提取 Spring Boot 分层 → JRE 运行；非 root 用户，内置健康检查 |
+| `.dockerignore` | 排除 `target/`、`frontend/`、`.env`、`docs/`，避免把本地密钥与编译产物带进构建 |
+| `docker-compose.yml` | 后端 + PostgreSQL 15，数据库健康后才启动后端 |
+
+### 1. 准备环境变量
+
+```bash
+cp .env.example .env
+# 至少填好 DB_PASSWORD 与 JWT_SECRET
+```
+
+Compose 会读取 `.env`。与本地开发不同，容器内数据库地址由 compose 注入（`jdbc:postgresql://db:5432/javaforum`），**不要**把 `.env` 里的 `DB_URL` 改成 `localhost`。
+
+> **密码含特殊字符时要加引号**：`.env` 里的值若包含 `#`、`$`、空格等，需用单引号包裹，否则可能被当成注释或变量展开。
+> 例如 `DB_PASSWORD='4*2j+#bVkNDP7:3EWcF9'`。
+
+### 2. 一键启动
+
+```bash
+docker compose up -d --build
+```
+
+首次启动会自动完成：Flyway 建表（V1/V2）→ 创建默认管理员 `admin` / `admin123456`。
+
+只想要镜像、不要 compose 时：
+
+```bash
+docker build -t javaforum-backend:latest .
+docker run --rm -p 8080:8080 \
+  -e DB_URL='jdbc:postgresql://你的数据库:5432/javaforum' \
+  -e DB_USERNAME=forum \
+  -e DB_PASSWORD='数据库密码' \
+  -e JWT_SECRET='至少32字节的随机密钥' \
+  javaforum-backend:latest
+```
+
+### 3. 验证
+
+```bash
+curl http://localhost:8080/api/health
+docker compose ps          # backend 应为 healthy（内置 HEALTHCHECK 每 30s 探一次）
+```
+
+- 健康检查：http://localhost:8080/api/health
+- Swagger：http://localhost:8080/swagger-ui.html
+
+### 4. 常用命令
+
+```bash
+docker compose logs -f backend     # 跟随后端日志
+docker compose down                # 停止并删除容器，保留数据卷
+docker compose down -v             # 同时删除数据库数据（不可恢复）
+docker compose up -d --build       # 改代码后重建
+```
+
+### 5. 与本地运行方式的差异
+
+| 项 | 本地 `mvn spring-boot:run` | Docker |
+|---|---|---|
+| Profile | `dev`（打印 SQL） | `prod`（SQL 只留告警） |
+| 时区 | 宿主机时区 | 由 `TZ` 控制，默认 `Asia/Shanghai` |
+| 端口 | `SERVER_PORT` 或 8080 | 容器内固定 8080，宿主机端口由 `HOST_PORT` 映射 |
+| 日志 | 控制台 | 文件写入 `logs/javaforum.log`，挂在 `backend-logs` 卷上 |
+
+可用变量：`HOST_PORT`（宿主机端口，默认 8080）、`APP_PROFILE`（默认 `prod`）、`TZ`（默认 `Asia/Shanghai`）、`POSTGRES_DB`（默认 `javaforum`）。
+
+> **注意**：`APP_PROFILE` 刻意不复用 `SPRING_PROFILES_ACTIVE`——本地 `.env` 里通常写着 `dev`，直接复用会让容器也跑 dev 配置（打印全量 SQL）。
+
 ## 运行（前端）
 
 ```bash
@@ -177,6 +253,12 @@ pnpm build       # 生产构建
 ## 目录结构
 
 ```
+# 部署相关
+Dockerfile           # 后端镜像：Maven 构建 → 分层提取 → JRE 运行
+.dockerignore        # 排除 target/、frontend/、.env、docs/ 等
+docker-compose.yml   # 后端 + PostgreSQL 一键启动
+.env.example         # 环境变量模板（复制为 .env，后者不入库）
+
 frontend/src/
 ├── api/           # Axios 实例与接口封装
 ├── components/    # 可复用组件（UserCard、BoardCard）
