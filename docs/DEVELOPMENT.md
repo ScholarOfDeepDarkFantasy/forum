@@ -346,7 +346,7 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-18 | fix | 修复 `base` 非法值（Vite 静默降级为 `/`）：改为 `VITE_BASE_PATH` 可控，路由与 axios 前缀统一由 `BASE_URL` 派生，新增 `viteConfig.spec.js` 6 个守卫 | 本次提交 |
+| 2026-10-18 | fix | 修复 `base` 非法值（Vite 静默降级为 `/`）：改为 `VITE_BASE_PATH` 可控，路由与 axios 前缀统一由 `BASE_URL` 派生，新增 `viteConfig.spec.js` 6 个守卫 | `8c687ac` |
 | 2026-10-18 | feat | 后端容器化：新增 `Dockerfile`（多阶段 + 分层 + 非 root + 健康检查）、`.dockerignore`、`docker-compose.yml`，并在 README 增加「运行（Docker）」章节 | `830651e` |
 | 2026-10-18 | docs | 补充变更日志的自引用说明与提交数同步规则 | 本次提交 |
 | 2026-10-18 | docs | 补全变更日志至覆盖全部提交（原漏记 16 条） | `ddfb4e0` |
