@@ -2,6 +2,8 @@
 
 基于 Spring Boot 3 + Vue3 的论坛网站 MVP。
 
+> **开发记录：** 开发进度、已完成工作、待办与技术债、后续计划、关键决策记录见 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)。该文档在每次开发后更新。
+
 ## 技术栈
 
 - 后端：Java 17 / Maven / Spring Boot 3.5 / Spring Security 6（JWT 无状态认证）/ Spring Data JPA / PostgreSQL / Flyway / springdoc-openapi
