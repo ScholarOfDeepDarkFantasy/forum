@@ -293,7 +293,7 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-18 | docs | 新增本开发记录文档，作为项目进度的单一事实来源 | 待提交 |
+| 2026-10-18 | docs | 新增本开发记录文档，作为项目进度的单一事实来源 | `6587de6` |
 | 2026-10-17 | refactor | 第二轮 Task 7：分页样式收敛为 `.jf-pager`，补 5 个守卫用例，更新 README 与设计文档 | `92e548a` |
 | 2026-10-17 | refactor | 第二轮 Task 6：后台用户与板块卡片抽为 `UserCard.vue`/`BoardCard.vue` | `4398bc8` |
 | 2026-10-17 | refactor | 第二轮 Task 5：时间格式化收敛为 `utils/format.js`，替换 5 处重复 | `48e078d` |
