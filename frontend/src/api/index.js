@@ -6,9 +6,15 @@ import { ElMessage } from 'element-plus'
  * - 请求拦截器自动附带 Bearer token
  * - 响应拦截器解包 Result<T>，业务失败时弹出错误并 reject
  * - 401 时清除登录态并跳转登录页
+ *
+ * 接口前缀与登录页路径都从 BASE_URL 派生（它由 vite.config.js 的 base 决定，且总以 '/' 结尾）：
+ * 根路径下是 /api 与 /login，部署到 /forum/ 子路径时自动变成 /forum/api 与 /forum/login。
  */
+const BASE_URL = import.meta.env.BASE_URL
+const LOGIN_PATH = `${BASE_URL}login`
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: `${BASE_URL}api`,
   timeout: 15000
 })
 
@@ -52,8 +58,8 @@ api.interceptors.response.use(
       localStorage.removeItem('jf_token')
       localStorage.removeItem('jf_user')
       ElMessage.error('请先登录')
-      if (!location.pathname.startsWith('/login')) {
-        location.href = '/login'
+      if (!location.pathname.startsWith(LOGIN_PATH)) {
+        location.href = LOGIN_PATH
       }
     } else {
       // 凭据接口的 401 也走这里：显示后端原文（如「用户名或密码错误」），不动登录态

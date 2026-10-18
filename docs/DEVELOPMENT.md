@@ -127,8 +127,8 @@ cd frontend && pnpm test --run
 | --- | --- | --- |
 | 后端主代码（`src/main/java`） | 66 | 2772 |
 | 后端测试（`src/test/java`） | 8 | 1210 |
-| 前端产品代码（`frontend/src`，不含 spec） | 23 | 2389 |
-| 前端测试（`*.spec.js`） | 14 | 1637 |
+| 前端产品代码（`frontend/src`，不含 spec） | 23 | 2396 |
+| 前端测试（`*.spec.js`） | 15 | 1693 |
 
 后端分层（文件数）：`entity/` 12、`dto/` 16、`repository/` 9、`controller/` 7、`service/` 7、`security/` 5、`config/` 4、`util/` 3、`exception/` 2。
 
@@ -139,12 +139,12 @@ cd frontend && pnpm test --run
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
 | 后端 | **30** 个用例 / 8 个测试类 | 全绿 |
-| 前端 | **102** 个用例 / 14 个 spec | 全绿 |
+| 前端 | **108** 个用例 / 15 个 spec | 全绿 |
 | 构建 | `pnpm build` | 通过 |
 
 后端测试类分布：`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1、`PostFlowIntegrationTest` 4、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`RepositoryTests` 6、`JwtTokenProviderTest` 2、`NotificationServiceTest` 4。
 
-前端 spec 分布：`usePostActions` 13、`AdminView` 11、`cards` 10、`notifications` 9、`format` 9、`HomeView` 8、`index`（api）7、`breakpoint` 7、`notificationLink` 7、`ProfileView` 6、`common` 5、`NotificationsView` 4、`useResponsive` 3、`PostDetailView` 3。
+前端 spec 分布：`usePostActions` 13、`AdminView` 11、`cards` 10、`notifications` 9、`format` 9、`HomeView` 8、`index`（api）7、`breakpoint` 7、`notificationLink` 7、`ProfileView` 6、`viteConfig` 6、`common` 5、`NotificationsView` 4、`useResponsive` 3、`PostDetailView` 3。
 
 ### 3.3 数据库
 
@@ -248,6 +248,28 @@ cd frontend && pnpm test --run
 2. **镜像内不含凭据**：`DB_PASSWORD`/`JWT_SECRET` 在 compose 里用 `${VAR:?}` 强制必填，缺失时 compose 直接报错退出，而不是把空值传进容器。
 3. **容器 profile 用独立变量 `APP_PROFILE`（默认 `prod`）**，不复用 `SPRING_PROFILES_ACTIVE`——本地 `.env` 里写的是 `dev`，复用会让容器也打印全量 SQL。
 
+### 4.6 部署路径：修复非法 base 并打通子路径联动
+
+起因：`frontend/vite.config.js` 被改成 `base: './forum'`（注释写「设置基础路径为 /forum」）。**该值是非法值**：Vite 对 `base` 只接受绝对 URL、`'./'` 或空串，非法值不报错退出，只在构建日志留一条
+
+```
+(!) invalid "base" option: "./forum". The value can only be an absolute URL, "./", or an empty string.
+```
+
+然后**静默按 `/` 处理**——产物里仍是 `/assets/...`，上线到 `/forum/` 必然整站 404。属于「构建成功但部署失败」的静默降级。
+
+修复分三处（只改一处，子路径下仍会坏）：
+
+| 位置 | 改动 | 不这样改的后果 |
+| --- | --- | --- |
+| `frontend/vite.config.js` | `base: process.env.VITE_BASE_PATH \|\| '/'`；开发代理键改为按 base 计算的 `apiPrefix`（根路径 `/api`，子路径 `/forum/api`） | base 非法 → 产物路径错；代理写死 `/api` → 子路径下开发代理失效 |
+| `frontend/src/router/index.js` | `createWebHistory(import.meta.env.BASE_URL)` | 路由按根路径解析，子路径下点导航跑出应用外 |
+| `frontend/src/api/index.js` | `baseURL: ${BASE_URL}api`；401 跳转用 `${BASE_URL}login` | 接口打到根路径 `/api` 而非 `/forum/api`；跳登录页跳丢子路径 |
+
+新增 `frontend/src/viteConfig.spec.js`（6 个守卫用例）：禁止 `base: './xxx'` 写法、要求 base 由 `VITE_BASE_PATH` 决定且默认 `/`、代理必须用 `apiPrefix`、路由必须用 `BASE_URL`、axios 前缀必须由 `BASE_URL` 派生、登录跳转不得写死 `/login`。5 个变异全部被捕获。
+
+默认 `base` 仍是 `/`，**开发与既有部署行为零变化**（已实测 dev server 200、`/api/health` 经代理返回 502 证明代理生效）。
+
 ---
 
 ## 5. 待办与后续计划
@@ -324,6 +346,7 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-10-18 | fix | 修复 `base` 非法值（Vite 静默降级为 `/`）：改为 `VITE_BASE_PATH` 可控，路由与 axios 前缀统一由 `BASE_URL` 派生，新增 `viteConfig.spec.js` 6 个守卫 | 本次提交 |
 | 2026-10-18 | feat | 后端容器化：新增 `Dockerfile`（多阶段 + 分层 + 非 root + 健康检查）、`.dockerignore`、`docker-compose.yml`，并在 README 增加「运行（Docker）」章节 | `830651e` |
 | 2026-10-18 | docs | 补充变更日志的自引用说明与提交数同步规则 | 本次提交 |
 | 2026-10-18 | docs | 补全变更日志至覆盖全部提交（原漏记 16 条） | `ddfb4e0` |

@@ -39,7 +39,9 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  // 用 BASE_URL 而不是写死 '/'：部署在子路径（如 /forum/）时路由才能跟着走，
+  // BASE_URL 由 vite.config.js 的 base 决定，两者必须一致。
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 

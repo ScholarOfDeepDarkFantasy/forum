@@ -199,6 +199,35 @@ pnpm dev
 
 开发服务器默认 http://localhost:5173，并把 `/api` 代理到 `http://localhost:8080`（见 `frontend/vite.config.js`），前端统一使用相对路径 `/api`，本地开发无需处理 CORS。
 
+### 部署到子路径（如 `/forum/`）
+
+默认部署在根路径。若需部署到 `http://example.com/forum/`，构建时指定 `VITE_BASE_PATH`：
+
+```bash
+VITE_BASE_PATH=/forum/ pnpm build
+```
+
+构建产物里资源路径会变成 `/forum/assets/...`，同时：
+
+- 路由 `createWebHistory(import.meta.env.BASE_URL)` 自动带上 `/forum/`
+- axios 的 `baseURL` 变成 `/forum/api`，登录失败跳转变成 `/forum/login`
+
+服务器需要把 `/forum/` 指向 `dist/`，并把 `/forum/api/` 反代到后端 `/api/`。nginx 示例：
+
+```nginx
+location /forum/ {
+    alias /usr/share/nginx/html/forum/;
+    try_files $uri $uri/ /forum/index.html;
+}
+location /forum/api/ {
+    proxy_pass http://backend:8080/api/;
+    proxy_set_header Host $host;
+}
+```
+
+> **注意**：`vite.config.js` 的 `base` 只接受绝对 URL、`'./'` 或空串。写成 `'./forum'` 这类值**不会让构建失败**，只在日志里留一条 `(!) invalid "base" option` 警告然后按 `/` 处理，产物仍是 `/assets/...`，上线后整站 404。`src/viteConfig.spec.js` 会守住这条以及 base / 路由 / 接口前缀三处联动。
+
+
 ## 测试
 
 ### 后端测试
