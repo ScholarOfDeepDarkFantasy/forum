@@ -715,13 +715,9 @@ const previewHtml = computed(() => renderMarkdown(form.content))
   color: var(--jf-color-text-3);
   font-size: var(--jf-font-meta);
 }
-
-@media (max-width: 768px) {
-  .editor-grid {
-    grid-template-columns: 1fr;
-  }
-}
 ```
+
+> 偏差说明（2026-10-19 实施时同步）：原计划在此追加 `@media (max-width: 768px) { .editor-grid { grid-template-columns: 1fr } }`。实施时确认该规则不可达：模板已用 `v-if="!isMobile"`（与 `breakpoint.spec.js` 同一 768px 断点）在分栏与 tab 之间切换，窄屏下 `.editor-grid` 根本不会渲染；同时 `breakpoint.spec.js` 把 `frontend/src` 的断点字面量精确锁定为 5 处，新增第 6 处须同步 tokens.css / README 的人工闸门。故省略该媒体查询，源码中以注释记录原因。
 
 - [x] **Step 4: 运行确认通过**
 
