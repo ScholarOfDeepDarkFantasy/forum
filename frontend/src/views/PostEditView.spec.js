@@ -19,6 +19,7 @@ vi.mock('element-plus', () => ({
 }))
 
 import PostEditView from './PostEditView.vue'
+import { postApi } from '@/api'
 
 // 组件用 useAuthStore()（setup 里），必须装上 pinia
 let pinia
@@ -57,9 +58,7 @@ function mountEditor() {
   return mount(PostEditView, {
     global: {
       plugins: [pinia],
-      stubs,
-      directives: { loading: () => {} },
-      provide: {}
+      stubs
     }
   })
 }
@@ -74,6 +73,8 @@ describe('PostEditView Markdown 预览', () => {
     localStorage.clear()
     pinia = createPinia()
     setActivePinia(pinia)
+    // 编辑态由个别用例自己设置，这里清掉避免泄漏（route 是模块级共享对象）
+    delete route.params.id
     window.matchMedia = vi.fn().mockImplementation((query) => ({
       matches: false,
       media: query,
@@ -87,7 +88,12 @@ describe('PostEditView Markdown 预览', () => {
     await flush()
 
     expect(wrapper.find('.editor-grid').exists()).toBe(true)
+    // 空正文不能只留一个有边框的空面板：spec §4.3 要求占位提示
+    expect(wrapper.find('.preview').classes()).toContain('preview-empty')
+    expect(wrapper.find('.preview').text()).toContain('预览将实时显示在这里')
+
     await wrapper.find('textarea').setValue('## 预览标题')
+    expect(wrapper.find('.preview').classes()).not.toContain('preview-empty')
     expect(wrapper.find('.preview').html()).toContain('<h2>预览标题</h2>')
   })
 
@@ -103,5 +109,20 @@ describe('PostEditView Markdown 预览', () => {
 
     expect(wrapper.find('.editor-grid').exists()).toBe(false)
     expect(wrapper.find('.tabs').exists()).toBe(true)
+
+    // tab 预览与编辑框共享同一份 form.content，输入后不应还停在占位态
+    await wrapper.find('textarea').setValue('## 窄屏')
+    expect(wrapper.find('.tabs .preview').html()).toContain('<h2>窄屏</h2>')
+  })
+
+  it('编辑模式回填旧正文并渲染预览', async () => {
+    route.params.id = '1'
+    // authorId 与未登录的 auth.user?.id 同为 undefined，作者校验放行
+    postApi.detail.mockResolvedValue({ title: 't', content: '# 旧正文', authorId: undefined, tags: [] })
+    const wrapper = mountEditor()
+    await flush()
+
+    expect(wrapper.find('.preview').html()).toContain('<h1>旧正文</h1>')
+    delete route.params.id
   })
 })

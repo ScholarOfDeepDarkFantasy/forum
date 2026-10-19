@@ -54,7 +54,13 @@ onMounted(async () => {
 })
 
 async function submit() {
-  await formRef.value.validate()
+  try {
+    await formRef.value.validate()
+  } catch (e) {
+    // 窄屏校验失败时若正停在预览 tab，报错会落在看不见的编辑页：切回去让提示与正文同屏
+    if (isMobile.value) mobileTab.value = 'edit'
+    throw e
+  }
   loading.value = true
   try {
     const payload = {
@@ -98,15 +104,19 @@ async function submit() {
             :rows="18"
             placeholder="正文内容…支持 Markdown：标题、列表、代码块、表格、链接、图片"
           />
-          <div class="preview markdown-body" v-html="previewHtml"></div>
+          <!-- v-html 只接收 renderMarkdown 输出；空预览的占位文案走文本插值 -->
+          <div v-if="previewHtml" class="preview markdown-body" v-html="previewHtml"></div>
+          <div v-else class="preview preview-empty">预览将实时显示在这里</div>
         </div>
         <template v-else>
           <el-tabs v-model="mobileTab" class="tabs">
             <el-tab-pane label="编辑" name="edit">
               <el-input v-model="form.content" type="textarea" :rows="14" placeholder="正文内容…支持 Markdown" />
             </el-tab-pane>
-            <el-tab-pane label="预览" name="preview">
-              <div class="preview markdown-body" v-html="previewHtml"></div>
+            <!-- lazy：未切到预览 tab 前不跑 markdown/hljs -->
+            <el-tab-pane label="预览" name="preview" lazy>
+              <div v-if="previewHtml" class="preview markdown-body" v-html="previewHtml"></div>
+              <div v-else class="preview preview-empty">预览将实时显示在这里</div>
             </el-tab-pane>
           </el-tabs>
         </template>
@@ -165,6 +175,13 @@ async function submit() {
   margin-top: 6px;
   color: var(--jf-color-text-3);
   font-size: var(--jf-font-meta);
+}
+/* 空预览占位：沿用 .preview 的边框与 min-height，仅置灰居中提示 */
+.preview-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--jf-color-text-3);
 }
 
 /* 窄屏单列不在这里写 @media：模板已用 v-if="!isMobile" 在同一个 768px 断点把

@@ -722,6 +722,8 @@ const previewHtml = computed(() => renderMarkdown(form.content))
 ```
 
 > 偏差说明（2026-10-19 实施时同步）：原计划在此追加 `@media (max-width: 768px) { .editor-grid { grid-template-columns: 1fr } }`。实施时确认该规则不可达：模板已用 `v-if="!isMobile"`（与 `breakpoint.spec.js` 同一 768px 断点）在分栏与 tab 之间切换，窄屏下 `.editor-grid` 根本不会渲染；同时 `breakpoint.spec.js` 把 `frontend/src` 的断点字面量精确锁定为 5 处，新增第 6 处须同步 tokens.css / README 的人工闸门。故省略该媒体查询，源码中以注释记录原因。
+>
+> 补充（2026-10-19 复审修正）：上面的模板与样式片段漏掉了 spec §4.3 编辑页要求的空预览占位「预览将实时显示在这里」。`.preview` 自带 `min-height: 200px` 与边框，正文为空时会渲染出一个有边框的空面板；现补为 `previewHtml` 非空时才渲染原 `.preview.markdown-body` 并绑 `v-html`，为空时渲染 `<div class="preview preview-empty">预览将实时显示在这里</div>`。占位文案走文本插值、不经过 `v-html`（不变量：`v-html` 只接收 `renderMarkdown` 输出），`.preview-empty` 只复用既有 token（`color: var(--jf-color-text-3)` + flex 居中），未引入新 token 或 `@media`。同时用 `lazy` 让窄屏预览 tab 首次展示前不跑 markdown/hljs。
 
 - [x] **Step 4: 运行确认通过**
 
