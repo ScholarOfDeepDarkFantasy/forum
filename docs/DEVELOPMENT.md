@@ -116,10 +116,10 @@ cd frontend && pnpm test --run
 | --- | --- | --- | --- | --- |
 | 第一轮 | 体验迭代：视觉层级 + 响应式 + 通知闭环 | 13 | ✅ 已完成 | 2026-10-17 |
 | 第二轮 | 优化：性能 + 安全 + 可维护性 | 7 | ✅ 已完成 | 2026-10-17 |
-| 第三轮 | Markdown 渲染 + 标签检索 | 7 | 🚧 验证/上线中 | — |
+| 第三轮 | Markdown 渲染 + 标签检索 | 7 | ✅ 已完成 | 2026-10-19 |
 | 部署工程化 | raspi：Jenkins + rootless podman + nginx 自动化部署（见 §4.7） | — | ✅ 已完成 | 2026-10-19 |
 
-**当前进度：MVP 100% ｜ 已完成 2 轮迭代，第三轮验证/上线中。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 3 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
@@ -362,6 +362,7 @@ cd frontend && pnpm test --run
 - 后端 `mvn -B test`：9 个测试类、39 个用例全绿。新增 `TagFlowIntegrationTest` 8 例（按帖子数降序、关键词过滤、分页与标签携带、未知标签空页且 `size` 钳制、置顶优先、总览分页边界与溢出、缺参/非法参数 400）与 `RepositoryTests.tagAggregationCountsOnlyUndeletedPosts`。
 - 前端 `pnpm test`：20 个 spec、143 个用例全绿。新增 `markdown.spec.js` 14 例、`TagsView.spec.js` 5 例、`TagPostsView.spec.js` 5 例、`PostListItem.spec.js` 4 例、`PostEditView.spec.js` 3 例；`api/index.spec.js` 增 `tagApi` 路径断言（7→9 例）；`PostDetailView.spec.js` 由 3 例增至 5 例（Markdown 渲染）。
 - 构建：`VITE_BASE_PATH=/forum/ pnpm build` 通过（第三轮 Task 5 验证，子路径产物引用 `/forum/assets/`）。
+- 上线验收（2026-10-19）：推送 `97a00b6` 后 Jenkins Build #4 **SUCCESS**（镜像 `localhost/forum-backend:4`）；`forum-backend` Up (healthy) 仅监听 `127.0.0.1:8086`；`/forum/api/health` 返回 UP；`/forum/api/tags` 返回真实标签（`smoke`，postCount=1）；`/forum/api/tags/posts?name=smoke` 返回对应帖子；未知标签 `name=java` 返回 200 空页；`/forum/` 首页引用 `/forum/assets/` 且 `markdown-*.js` 懒加载块 200；`admin` 登录返回 JWT。
 
 已知限制：
 
@@ -452,7 +453,7 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-19 | feat | 第三轮功能：Markdown 渲染 + 标签检索（提交哈希待回填） | 本次提交 |
+| 2026-10-19 | feat | 第三轮功能：Markdown 渲染 + 标签检索（`7e0f9ab` 工具与样式、`3089446` 详情页、`936347e` 编辑页预览、`1bbd026` 标签接口、`aacc70e` 标签页与公共帖子行） | `7e0f9ab`/`3089446`/`936347e`/`1bbd026`/`aacc70e` |
 | 2026-10-19 | docs | 部署验收记录（Build #2 成功与实测结果）与变更日志回填 | 本次提交 |
 | 2026-10-19 | fix | 适配 raspi 无内存 cgroup：去掉 compose `mem_limit`，`JAVA_OPTS` 改显式 `-Xmx512m`，`deploy.sh` 启动后立校验容器状态 | `771990d` |
 | 2026-10-19 | feat | 部署环境化：raspi Jenkins + rootless podman + nginx 自动化部署（运行时单阶段 Dockerfile、podman-compose 兼容 compose、Jenkinsfile + deploy.sh + nginx snippet、复用主机 Postgres、子路径 `/forum/` 发布） | `1554869` |

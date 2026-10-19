@@ -1889,24 +1889,24 @@ git commit -m "docs: 记录第三轮 Markdown 渲染与标签检索功能"
 
 ## Task 7: 全量验证与上线
 
-- [ ] **Step 1: 后端全量测试**
+- [x] **Step 1: 后端全量测试**
 
 Run: `cd /e/JavaSpace/forum && mvn -B test`
 Expected: BUILD SUCCESS，0 failures。
 
-- [ ] **Step 2: 前端全量测试与构建**
+- [x] **Step 2: 前端全量测试与构建**
 
 Run: `cd frontend && pnpm test && VITE_BASE_PATH=/forum/ pnpm build`
 Expected: 测试全绿，构建成功。
 
-- [ ] **Step 3: 提交并推送（触发 Jenkins 自动部署）**
+- [x] **Step 3: 提交并推送（触发 Jenkins 自动部署）**
 
 ```bash
 git status --porcelain   # 应为空
 git push origin master
 ```
 
-- [ ] **Step 4: 等待 Jenkins 构建成功**
+- [x] **Step 4: 等待 Jenkins 构建成功**
 
 在 raspi 上查看（本机有 SSH 别名 `raspi`，pi 可 sudo）：
 
@@ -1916,7 +1916,7 @@ ssh raspi "sudo -n tail -n 5 /var/lib/jenkins/jobs/javaforum/builds/\\$(ls -1t /
 
 Expected: `Finished: SUCCESS`；若失败，按日志修复后重复 Task 7（每次修复都是一次提交）。
 
-- [ ] **Step 5: 冒烟验证（在 raspi 上执行，nginx 只认 Host: raspi）**
+- [x] **Step 5: 冒烟验证（在 raspi 上执行，nginx 只认 Host: raspi）**
 
 ```bash
 ssh raspi "curl -s -H 'Host: raspi' http://127.0.0.1/forum/ | head -c 200; echo; \
@@ -1927,7 +1927,7 @@ curl -s -H 'Host: raspi' 'http://127.0.0.1/forum/api/posts/1' | head -c 200"
 
 Expected：`/forum/` 返回 index.html（含 `/forum/assets/`）；`/api/tags` 返回 `success:true` 与标签数组；`/api/tags/posts?name=java` 返回帖子分页；详情接口正常。
 
-- [ ] **Step 6: 回填变更日志哈希**
+- [x] **Step 6: 回填变更日志哈希**
 
 ```bash
 git add docs/DEVELOPMENT.md
