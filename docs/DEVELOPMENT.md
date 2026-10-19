@@ -3,7 +3,7 @@
 > 本文件是项目的**单一事实来源（single source of truth）**：记录开发情况、当前进度、已知问题与后续计划。
 > **每次开发（新功能、修复、优化、重构）结束前都必须更新本文件**，约定见 §0。
 >
-> 最近更新：2026-10-18 ｜ 文档版本：v1.1
+> 最近更新：2026-10-19 ｜ 文档版本：v1.2
 
 ---
 
@@ -114,12 +114,13 @@ cd frontend && pnpm test --run
 | 第一轮 | 体验迭代：视觉层级 + 响应式 + 通知闭环 | 13 | ✅ 已完成 | 2026-10-17 |
 | 第二轮 | 优化：性能 + 安全 + 可维护性 | 7 | ✅ 已完成 | 2026-10-17 |
 | 第三轮 | 待规划（候选见 §5.2） | — | ⬜ 未开始 | — |
+| 部署工程化 | raspi：Jenkins + rootless podman + nginx 自动化部署（见 §4.7） | — | ✅ 已完成 | 2026-10-19 |
 
 **当前进度：MVP 100% ｜ 已完成 2 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
-## 3. 当前状态快照（2026-10-18）
+## 3. 当前状态快照（2026-10-19）
 
 ### 3.1 代码规模
 
@@ -248,6 +249,8 @@ cd frontend && pnpm test --run
 2. **镜像内不含凭据**：`DB_PASSWORD`/`JWT_SECRET` 在 compose 里用 `${VAR:?}` 强制必填，缺失时 compose 直接报错退出，而不是把空值传进容器。
 3. **容器 profile 用独立变量 `APP_PROFILE`（默认 `prod`）**，不复用 `SPRING_PROFILES_ACTIVE`——本地 `.env` 里写的是 `dev`，复用会让容器也打印全量 SQL。
 
+> **2026-10-19 更新**：为适配 raspi（podman，主机无 maven 镜像），`Dockerfile` 已重写为「运行时单阶段 + 预构建 jar」，`docker-compose.yml` 改为只跑 backend 并复用主机已有 PostgreSQL。上面这套多阶段方案作为历史记录保留，最新形态见 §4.7。
+
 ### 4.6 部署路径：修复非法 base 并打通子路径联动
 
 起因：`frontend/vite.config.js` 被改成 `base: './forum'`（注释写「设置基础路径为 /forum」）。**该值是非法值**：Vite 对 `base` 只接受绝对 URL、`'./'` 或空串，非法值不报错退出，只在构建日志留一条
@@ -270,6 +273,32 @@ cd frontend && pnpm test --run
 
 默认 `base` 仍是 `/`，**开发与既有部署行为零变化**（已实测 dev server 200、`/api/health` 经代理返回 502 证明代理生效）。
 
+### 4.7 部署环境化：raspi + Jenkins + podman + nginx（2026-10-19）
+
+需求：应用部署到 Linux 主机（SSH 别名 `raspi`）；新增 Jenkins 文件，由主机上的 Jenkins 自动化部署；主机用 podman，按已有镜像调整 Docker 文件；前端不进容器，直接由 nginx 托管。
+
+目标形态（入口 `http://raspi/forum/`）：nginx（80，系统服务）直出 `/pd/Program/forum/frontend/`（Vue dist），`/forum/api/` 反代 `127.0.0.1:8086`（`forum-backend` 容器）；数据库复用主机已有 rootless `postgresql` 容器里的 `javaforum` 库（数据保留），容器内经 `host.containers.internal:5432` 访问。
+
+| 文件 | 要点 |
+| --- | --- |
+| `Dockerfile` | 改为**运行时单阶段**：`eclipse-temurin:17-jre-jammy`（主机已有 arm64 镜像）+ 预构建 jar；数字 UID 1001（不依赖 `useradd`）；`HEALTHCHECK` 用 bash `/dev/tcp`（jammy 无 curl），需 `--format docker` 构建才会保留 |
+| `docker-compose.yml` | 只保留 `backend`（podman-compose 1.0.3 兼容：无顶层 `name:`、无 `depends_on.condition`、无 volume `:U`）；绑定 `127.0.0.1:${HOST_PORT:-8086}`；`mem_limit 768m` |
+| `Jenkinsfile` | 工作区固定 `/pd/jenkins-workspace/forum`；`tools { jdk 'Java17'; maven 'M3' }`；pnpm 绝对路径 + npmmirror；`podman build --format docker`；部署用 `sudo -u pi` |
+| `deploy/deploy.sh` | compose 同步 → `podman-compose -p forum down/up` → 轮询 `/api/health`（120s）→ rsync dist → nginx `cp/-t/reload` → 4 项冒烟 → 只清旧数字 tag（保留 2 个） |
+| `deploy/nginx/forum.conf` | `/forum/` alias + SPA 回退（`try_files`）；`/forum/api/` 反代 8086；`/forum/assets/` 长缓存 |
+| `docs/deployment/README.md` | 一次性引导、日常发布、回滚、排障手册 |
+
+关键取舍：
+
+- **不在主机拉取新基础镜像**：主机已有 `eclipse-temurin:17-jre-jammy`，因此把 jar 构建上移到 Jenkins（Maven `M3` 3.8.7 + `Java17` 工具），Dockerfile 只做运行时组装；主机没有 maven 镜像，无需联网拉取。
+- **复用已有数据库**：`javaforum` 库与 12 张表来自早前真实部署，数据保留；部署前用 CRC32 复算 Flyway 历史 checksum 与 V1/V2 迁移一致，启动 `validate` 不会失败；`DataInitializer` 幂等。
+- **前端不进容器**（需求 4）：nginx 直接 `alias` dist，发布即 `rsync --delete`，比前端镜像更简单；子路径联动沿用 §4.6 的 `VITE_BASE_PATH=/forum/`。
+- **用 8086 而非 8080**：主机 8080 被 Jenkins 占用；后端只绑回环，不暴露到局域网。
+- **密钥只落在部署机**：`/pd/Program/forum/deploy/.env`（0600）；旧密码曾出现在 git 历史（见 T1），引导时已重置 `forum` 角色密码。
+- **触发靠 SCM 轮询**：主机没有公网入口，GitHub webhook 进不来，用 `SCMTrigger H/5` + 手动 Build。
+
+验收：首次构建由 Jenkins 轮询触发（见 `docs/deployment/README.md` §5 冒烟清单），构建与部署结果记录在本节下方。
+
 ---
 
 ## 5. 待办与后续计划
@@ -278,16 +307,16 @@ cd frontend && pnpm test --run
 
 | # | 事项 | 严重度 | 说明 |
 | --- | --- | --- | --- |
-| T1 | **数据库密码仍在 git 历史中** | 高 | 自 `6eecbdc` 起 `application.yml` 含明文密码。彻底处理需 `git filter-repo` 改写历史**并轮换该密码**——只改历史不够，密码已泄露。属不可逆操作，需明确授权后执行 |
-| T2 | **无 CI 流水线** | 中 | 目前靠本地 `mvn clean test` / `pnpm test` 手工把关。建议加 GitHub Actions：后端（JDK 17 + H2）+ 前端（pnpm test + build） |
+| T1 | **数据库密码仍在 git 历史中** | 高 | 自 `6eecbdc` 起 `application.yml` 含明文密码。2026-10-19 部署引导时已把 raspi 上 `forum` 角色密码重置为随机值（历史里那份仅对旧环境有效），但明文字符串仍在历史中。彻底处理需 `git filter-repo` 改写历史，属不可逆操作，需明确授权后执行 |
+| T2 | **无 PR 级 CI** | 低 | 主分支的构建/部署已由 raspi Jenkins 承担（2026-10-19，见 §4.7）。主机没有公网入口，无法做 GitHub PR 触发，PR 级校验仍需 GitHub Actions（后端 JDK 17 + H2；前端 pnpm test + build） |
 | T3 | **无前端 E2E 测试** | 中 | 真实浏览器验证目前靠一次性 Playwright 脚本（在 `C:\Temp\jf-pw`，未入库）。建议把关键路径（登录→发帖→评论→通知跳转）固化为仓库内 E2E |
 | T4 | **JWT 无法主动失效** | 中 | 无 refresh token、无黑名单。封禁用户后其已签发的 token 在 24 小时内仍可用（权限校验不查库）。修法：过滤器里查用户状态，或引入短期 token + refresh |
 | T5 | **登录接口无速率限制** | 中 | 可被暴力破解。建议加基于 IP 的限流（如 Bucket4j）或失败次数锁定 |
 | T6 | **REPLY 通知锚点只覆盖第一页评论** | 低 | 详见 §6 |
-| T7 | **数据库连接串硬编码 `raspi`** | 低 | `application.yml` 的 `DB_URL` 默认值是 `localhost`，但实际部署在 `raspi`。建议在 `.env.example` 里写明真实部署形态 |
+| T7 | **数据库连接串硬编码 `raspi`** | 低 | `application.yml` 默认值仍是 `localhost`（面向本地开发）；实际部署形态已写入 `.env.example` 与 `docs/deployment/README.md`（容器内 `host.containers.internal:5432`）。代码内默认值没有改成 `raspi`，避免本地开发被污染 |
 | T8 | **残留的冒烟测试数据** | 低 | 真实库中存在 `smoke_user`、`t4_op`、`t4_ap`、板块「冒烟测试板块」等手工测试数据，交付演示前应清理 |
-| T9 | **Docker 镜像未经实际构建验证** | 中 | 编写时本机未安装 Docker，`docker build` / `docker compose up` 均未跑过。已验证的部分：分层提取命令、`COPY` 后的目录布局与 `JarLauncher` 在本地按镜像布局能正常引导 Spring；`docker-compose.yml` 的 YAML 结构与关键配置已机械校验。**未验证**：基础镜像 tag 是否可拉取、`apk add` 是否成功、`HEALTHCHECK` 在 alpine 中行为。首次在有 Docker 的机器上构建时需重点确认这三点 |
-| T10 | **前端未容器化** | 低 | 本次只做了后端镜像。前端若要一起部署，需补 nginx 镜像 + `pnpm build` 产物 + `/api` 反代配置 |
+| T9 | ~~Docker 镜像未经实际构建验证~~ | 已关闭 | 2026-10-19 起在 raspi 上由 Jenkins 用 podman 实际构建并部署（`--format docker` 保留 HEALTHCHECK），见 §4.7 |
+| T10 | ~~前端未容器化~~ | 已关闭 | 需求明确前端不进容器：由主机 nginx 直接托管 dist（见 §4.7），不再作为技术债 |
 
 ### 5.2 候选功能（第三轮可选，均未开始）
 
@@ -332,6 +361,11 @@ cd frontend && pnpm test --run
 | 密码与密钥 | 环境变量且**故意不设默认值** | 缺了就启动失败，好过用弱默认值悄悄上线 |
 | 配置分 profile | `application.yml` 只放公共配置，`dev`/`prod` 各自覆盖 | 生产不应打印全量 SQL（实测单条查询日志曾超 38KB） |
 | 样式收敛 | 设计令牌 + 少量共用类（`.jf-pager`、`.jf-hscroll`） | 只有 ≥3 处使用的规则才进 `common.css`，一次性布局值留在组件内 |
+| 部署目标 | **raspi（Debian 12/aarch64）+ Jenkins + rootless podman + 系统 nginx** | 主机是既有环境：Jenkins 占着 8080，已有容器/镜像/数据库；复用比新建省内存与磁盘，也符合「按已有镜像调整」的要求 |
+| 前端托管 | **nginx 直出 dist，不做前端镜像** | 需求 4 明确；静态发布用 `rsync --delete` 比镜像更新简单，且不额外占内存 |
+| 数据库 | **复用主机已有 `javaforum` 库** | 数据保留、迁移成本最低；Flyway checksum 与当前迁移一致、`DataInitializer` 幂等；代价是依赖已有 postgres 容器生命周期（已写入已知限制） |
+| CI 触发 | **SCM 轮询 H/5 + 手动**，不用 webhook | 主机没有公网入口，GitHub webhook 无法送达；轮询最长延迟约 5 分钟，可接受 |
+| 镜像构建策略 | jar 在 Jenkins 构建，Dockerfile 只组装运行时 | 主机没有 maven 镜像；`--format docker` 保留 HEALTHCHECK；小内存机不采用分层提取 |
 
 ---
 
@@ -346,6 +380,7 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-10-19 | feat | 部署环境化：raspi Jenkins + rootless podman + nginx 自动化部署（运行时单阶段 Dockerfile、podman-compose 兼容 compose、Jenkinsfile + deploy.sh + nginx snippet、复用主机 Postgres、子路径 `/forum/` 发布） | 本次提交 |
 | 2026-10-18 | fix | 修复 `base` 非法值（Vite 静默降级为 `/`）：改为 `VITE_BASE_PATH` 可控，路由与 axios 前缀统一由 `BASE_URL` 派生，新增 `viteConfig.spec.js` 6 个守卫 | `8c687ac` |
 | 2026-10-18 | feat | 后端容器化：新增 `Dockerfile`（多阶段 + 分层 + 非 root + 健康检查）、`.dockerignore`、`docker-compose.yml`，并在 README 增加「运行（Docker）」章节 | `830651e` |
 | 2026-10-18 | docs | 补充变更日志的自引用说明与提交数同步规则 | 本次提交 |

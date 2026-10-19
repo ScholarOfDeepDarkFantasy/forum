@@ -113,81 +113,56 @@ java -jar target/forum-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 
 该账号用于访问后台的用户管理与板块管理页面。
 
-## 运行（Docker）
+## 部署（Linux + podman + nginx）
 
-用 `Dockerfile` 把后端打成镜像，或用 `docker-compose.yml` 连同 PostgreSQL 一起起。镜像内**不含任何密码或密钥**，全部运行时注入。
+正式环境是 SSH 别名 `raspi` 的 Debian 12 主机：Jenkins 构建后端 jar 与前端 dist，podman 跑后端容器，nginx 直接托管前端并反代 API。完整操作手册（一次性引导、回滚、排障）见 [`docs/deployment/README.md`](docs/deployment/README.md)，方案取舍见 [`docs/deployment/raspi-jenkins-podman-analysis.md`](docs/deployment/raspi-jenkins-podman-analysis.md)。
+
+```
+http://raspi/forum/            nginx :80
+  ├─ /forum/                   /pd/Program/forum/frontend/（Vue dist，不进容器）
+  └─ /forum/api/               127.0.0.1:8086（forum-backend 容器）
+                                 └─ host.containers.internal:5432 → 主机已有 postgresql 容器（库 javaforum）
+```
 
 相关文件：
 
 | 文件 | 作用 |
 |---|---|
-| `Dockerfile` | 多阶段构建：Maven 编译 → 提取 Spring Boot 分层 → JRE 运行；非 root 用户，内置健康检查 |
-| `.dockerignore` | 排除 `target/`、`frontend/`、`.env`、`docs/`，避免把本地密钥与编译产物带进构建 |
-| `docker-compose.yml` | 后端 + PostgreSQL 15，数据库健康后才启动后端 |
+| `Dockerfile` | 运行时单阶段镜像：`eclipse-temurin:17-jre-jammy`（raspi 已有镜像）+ 预构建 jar；非 root（UID 1001），bash `/dev/tcp` 健康检查 |
+| `.dockerignore` | 只放行 `target/forum-0.0.1-SNAPSHOT.jar`，排除前端、文档、`.env`、日志 |
+| `docker-compose.yml` | 只定义 `backend`（podman-compose 1.0.3 兼容）；数据库复用主机已有实例，不新建 db 容器 |
+| `Jenkinsfile` | Checkout → (Tests) → Build Jar → Build Frontend → Build Image → Deploy |
+| `deploy/deploy.sh` | 部署脚本：compose 同步、镜像切换、健康检查、前端 rsync、nginx reload、冒烟、旧镜像清理 |
+| `deploy/nginx/forum.conf` | nginx snippet：`/forum/` 静态 + SPA 回退、`/forum/api/` 反代 |
 
-### 1. 准备环境变量
+### 1. 本地构建镜像（可选）
 
-```bash
-cp .env.example .env
-# 至少填好 DB_PASSWORD 与 JWT_SECRET
-```
-
-Compose 会读取 `.env`。与本地开发不同，容器内数据库地址由 compose 注入（`jdbc:postgresql://db:5432/javaforum`），**不要**把 `.env` 里的 `DB_URL` 改成 `localhost`。
-
-> **密码含特殊字符时要加引号**：`.env` 里的值若包含 `#`、`$`、空格等，需用单引号包裹，否则可能被当成注释或变量展开。
-> 例如 `DB_PASSWORD='4*2j+#bVkNDP7:3EWcF9'`。
-
-### 2. 一键启动
+部署主机上没有 maven 镜像，jar 由 Jenkins 的 M3 + JDK17 构建。手工验证镜像：
 
 ```bash
-docker compose up -d --build
+mvn -B -DskipTests clean package
+podman build --format docker -t localhost/forum-backend:local .
 ```
 
-首次启动会自动完成：Flyway 建表（V1/V2）→ 创建默认管理员 `admin` / `admin123456`。
+> 必须带 `--format docker`，否则 OCI 格式会丢弃 `HEALTHCHECK`。
 
-只想要镜像、不要 compose 时：
+### 2. 部署到 raspi
 
-```bash
-docker build -t javaforum-backend:latest .
-docker run --rm -p 8080:8080 \
-  -e DB_URL='jdbc:postgresql://你的数据库:5432/javaforum' \
-  -e DB_USERNAME=forum \
-  -e DB_PASSWORD='数据库密码' \
-  -e JWT_SECRET='至少32字节的随机密钥' \
-  javaforum-backend:latest
-```
+1. 一次性引导见 [`docs/deployment/README.md`](docs/deployment/README.md) §2；
+2. `git push` 到 `master`，Jenkins 每 5 分钟轮询并自动构建部署（也可在 Jenkins UI 手动 Build）；
+3. 验证：`curl http://raspi/forum/`、`curl http://127.0.0.1:8086/api/health`。
 
-### 3. 验证
+### 3. 与本地运行的差异
 
-```bash
-curl http://localhost:8080/api/health
-docker compose ps          # backend 应为 healthy（内置 HEALTHCHECK 每 30s 探一次）
-```
-
-- 健康检查：http://localhost:8080/api/health
-- Swagger：http://localhost:8080/swagger-ui.html
-
-### 4. 常用命令
-
-```bash
-docker compose logs -f backend     # 跟随后端日志
-docker compose down                # 停止并删除容器，保留数据卷
-docker compose down -v             # 同时删除数据库数据（不可恢复）
-docker compose up -d --build       # 改代码后重建
-```
-
-### 5. 与本地运行方式的差异
-
-| 项 | 本地 `mvn spring-boot:run` | Docker |
+| 项 | 本地 `mvn spring-boot:run` | raspi 容器 |
 |---|---|---|
 | Profile | `dev`（打印 SQL） | `prod`（SQL 只留告警） |
-| 时区 | 宿主机时区 | 由 `TZ` 控制，默认 `Asia/Shanghai` |
-| 端口 | `SERVER_PORT` 或 8080 | 容器内固定 8080，宿主机端口由 `HOST_PORT` 映射 |
-| 日志 | 控制台 | 文件写入 `logs/javaforum.log`，挂在 `backend-logs` 卷上 |
+| 时区 | 宿主机时区 | `TZ`，默认 `Asia/Shanghai` |
+| 端口 | `SERVER_PORT` 或 8080 | 容器内 8080，宿主只绑 `127.0.0.1:${HOST_PORT:-8086}` |
+| 日志 | 控制台 | 容器内 `/app/logs/javaforum.log`（`podman logs` 同时可看） |
+| 数据库 | 本机 PostgreSQL | 主机已有 `postgresql` 容器；容器内经 `host.containers.internal:5432` 访问 |
 
-可用变量：`HOST_PORT`（宿主机端口，默认 8080）、`APP_PROFILE`（默认 `prod`）、`TZ`（默认 `Asia/Shanghai`）、`POSTGRES_DB`（默认 `javaforum`）。
-
-> **注意**：`APP_PROFILE` 刻意不复用 `SPRING_PROFILES_ACTIVE`——本地 `.env` 里通常写着 `dev`，直接复用会让容器也跑 dev 配置（打印全量 SQL）。
+`.env` 里的 `DB_URL` 在部署机是 `jdbc:postgresql://host.containers.internal:5432/javaforum`，本地开发仍是 `localhost`，`.env.example` 已分两段写。密钥只存在于部署机 `deploy/.env`（0600），仓库不含真实值。
 
 ## 运行（前端）
 
@@ -283,9 +258,11 @@ pnpm build       # 生产构建
 
 ```
 # 部署相关
-Dockerfile           # 后端镜像：Maven 构建 → 分层提取 → JRE 运行
-.dockerignore        # 排除 target/、frontend/、.env、docs/ 等
-docker-compose.yml   # 后端 + PostgreSQL 一键启动
+Dockerfile           # 运行时镜像：预构建 jar + eclipse-temurin:17-jre-jammy
+.dockerignore        # 只放行预构建 jar，排除前端/文档/.env
+docker-compose.yml   # 部署用：仅 backend（复用主机已有 PostgreSQL）
+Jenkinsfile          # CI/CD：构建 jar、前端、镜像并部署
+deploy/              # deploy.sh + nginx snippet + 部署手册
 .env.example         # 环境变量模板（复制为 .env，后者不入库）
 
 frontend/src/

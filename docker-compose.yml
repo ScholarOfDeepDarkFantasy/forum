@@ -1,70 +1,38 @@
-# JavaForum 一键启动（后端 + PostgreSQL）
+# JavaForum 部署用 compose（podman-compose 1.0.3 兼容）
 #
-# 用法：
-#   1. 复制 .env.example 为 .env，至少填好 DB_PASSWORD 与 JWT_SECRET
-#   2. docker compose up -d --build
-#   3. 打开 http://localhost:8080/api/health      应返回 {"success":true,...}
-#      Swagger: http://localhost:8080/swagger-ui.html
+# 部署形态：
+#   - 后端跑在 podman 容器里（rootless，以 pi 身份运行）
+#   - 数据库复用主机上已有的 rootless postgresql 容器（库 javaforum，数据保留），
+#     容器内经 host.containers.internal:5432 访问宿主机；不再在 compose 里起 db
+#   - 前端不在容器里：由 nginx 直接托管 /pd/Program/forum/frontend（见 deploy/nginx/forum.conf）
 #
-# 说明：
-#   - 镜像构建走 Dockerfile 多阶段构建，容器内不含任何密码或密钥
-#   - 表结构由 Flyway 在后端启动时自动建（V1/V2），无需手工建表
-#   - 首次启动会自动创建管理员 admin / admin123456（DataInitializer），上线前请改密码
-#   - 只暴露后端端口；数据库默认不映射到宿主机，避免与本机已有 PostgreSQL 冲突
-
-name: javaforum
+# 本地开发不用本文件：本地是 `mvn spring-boot:run` + 本机 PostgreSQL（见 README）。
+#
+# 用法（部署机）：
+#   cp .env.example .env      # 按 docs/deployment/README.md 填 DB_URL / DB_PASSWORD / JWT_SECRET
+#   podman-compose -p forum up -d
+#
+# 注意 1.0.3 的限制：不支持顶层 name:、depends_on.condition、profiles；
+# 镜像自带 HEALTHCHECK（需 --format docker 构建才会保留），
+# 部署脚本用 curl 轮询 /api/health 判断就绪，不依赖 compose 的 healthcheck。
 
 services:
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-javaforum}
-      POSTGRES_USER: ${DB_USERNAME:-forum}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?请先在 .env 中设置 DB_PASSWORD}
-      TZ: ${TZ:-Asia/Shanghai}
-      PGTZ: ${TZ:-Asia/Shanghai}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      # 等到数据库真正可接受连接，后端才启动，避免 Flyway 首次连接失败
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-forum} -d ${POSTGRES_DB:-javaforum}"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-    restart: unless-stopped
-    # 需要用本机客户端（psql / GoNavi 等）连库时再取消注释
-    # ports:
-    #   - "5432:5432"
-
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: javaforum-backend:latest
+    image: localhost/forum-backend:${IMAGE_TAG:-latest}
+    container_name: forum-backend
     environment:
-      # 用 APP_PROFILE 而不是直接读 SPRING_PROFILES_ACTIVE：
-      # 本地 .env 里通常写着 dev，直接复用会让镜像跑起 dev profile（打印全量 SQL）。
-      SPRING_PROFILES_ACTIVE: ${APP_PROFILE:-prod}
-      # 容器内用服务名 db 访问数据库，容器内固定 8080 端口
-      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-javaforum}
-      DB_USERNAME: ${DB_USERNAME:-forum}
-      DB_PASSWORD: ${DB_PASSWORD:?请先在 .env 中设置 DB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET:?请先在 .env 中设置 JWT_SECRET}
-      DB_POOL_MAX: ${DB_POOL_MAX:-20}
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      SERVER_PORT: "8080"
+      LOG_FILE: /app/logs/javaforum.log
       TZ: ${TZ:-Asia/Shanghai}
-      LOG_FILE: logs/javaforum.log
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError}
     ports:
-      # 只改宿主机端口，容器内始终 8080（与 HEALTHCHECK、EXPOSE 保持一致）
-      - "${HOST_PORT:-8080}:8080"
-    volumes:
-      # 把文件日志挂出来，否则容器重建后日志丢失
-      - backend-logs:/app/logs
-    depends_on:
-      db:
-        condition: service_healthy
+      # 只绑本机回环：由 nginx 反代，局域网不直接暴露后端
+      - "127.0.0.1:${HOST_PORT:-8086}:8080"
     restart: unless-stopped
-
-volumes:
-  pgdata:
-  backend-logs:
+    # 小内存主机（3.7G）上必须限制，避免 JVM 吃满
+    mem_limit: 768m

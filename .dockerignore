@@ -1,14 +1,11 @@
-# Docker 构建上下文排除规则
+# Docker/podman 构建上下文排除规则
 #
-# 目的：
-#   1. 缩小上下文体积（target/ 62MB+、node_modules/ 数百 MB）
-#   2. 防止本地密钥进入镜像（.env 内含数据库密码与 JWT 密钥）
-#   3. 避免把本地编译产物带进构建：镜像内必须从源码开始编译，
-#      否则可能把本机被写坏的 .class 复制进去（本项目实际遇到过
-#      BaseEntity.class 损坏导致 ClassFormatError 的情况）。
+# CI（Jenkins）会把 Dockerfile 与已构建好的 jar 拷到 /tmp/forum-image 的干净目录再 build，
+# 这里的规则主要保证本地 `podman build .` / `docker build .` 也能用，且不夹带无关文件。
 
-# ---- 构建产物 ----
-target/
+# ---- 构建产物：只放行已构建的 fat jar ----
+target/*
+!target/forum-0.0.1-SNAPSHOT.jar
 build/
 out/
 
