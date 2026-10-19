@@ -10,6 +10,17 @@
 - 前端：Vue3 + Vite + Pinia + Vue Router + Axios + Element Plus（`frontend/` 子目录）
 - 测试：JUnit 5 + Spring Boot Test + H2（后端）；Vitest + @vue/test-utils + jsdom（前端）
 
+## 功能
+
+- 用户：注册 / 登录 / 个人资料与密码修改，JWT 无状态会话
+- 帖子：板块内发帖、编辑、删除（软删除），分页列表与关键词搜索，浏览量统计
+- 互动：点赞、收藏与「我的收藏」；评论支持楼中楼，删除后保留占位
+- 权限：管理员 / 版主 / 普通用户三级角色，支持置顶、加精、禁言、封禁
+- 通知：点赞、收藏、评论、回复四类通知，未读角标与单条已读，点击跳转到帖子或具体评论
+- **Markdown 渲染**：帖子正文按 GFM 渲染（标题、列表、表格、代码块高亮、链接、图片），编辑页提供实时预览；渲染结果经 DOMPurify 白名单过滤、外链补 `target`/`rel`、图片懒加载后才插入 DOM，服务端仍只存纯文本
+- **标签检索**：帖子可带多个标签，`/tags` 展示标签云（按帖子数降序，支持关键词检索与分页），点击标签进入 `/tags/:name` 查看该标签下的帖子
+- 部署：前端由 nginx 托管、后端容器化运行，Jenkins 自动构建发布（见 `docs/deployment/README.md`）
+
 ## 环境要求
 
 - JDK 17+
@@ -211,7 +222,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 8 个测试类、30 个用例。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 9 个测试类、39 个用例。
 
 ### 前端测试
 
@@ -221,7 +232,7 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 14 个 spec、102 个用例，覆盖：
+当前为 20 个 spec、143 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
@@ -230,7 +241,10 @@ pnpm build       # 生产构建
 - 分页样式收敛（`src/styles/common.spec.js`）：`.jf-pager` 规则完整、`common.css` 在 `tokens.css` 之后引入、没有视图重新定义 `.pager`、每个 `el-pagination` 都带 `jf-pager` 且数量精确相等
 - 时间格式化（`src/utils/format.spec.js`）：ISO 串截到分钟、空值返回空串、相对时间的刚刚/分钟/小时/回退日期四档，以及未来时间不产生负数
 - 后台卡片组件（`src/components/cards.spec.js`）：字段与空值占位渲染、`formatTime`/`statusTag` 透传、ADMIN 账号的操作按钮禁用、事件 payload
-- 接口层（`src/api/index.spec.js`）：401 时凭据类接口（登录/注册）原样展示后端消息且不清除登录态，其余接口清 token 并跳登录页（版块与列表加载、点赞交互与游客跳转、行点击跳详情）、`PostDetailView`（互动字段实时读共享状态：列表点的赞在详情页同步生效、置顶整体替换 `post` 后互动字段不被返回体带偏）、`AdminView`（桌面表格 / 窄屏卡片、空状态、视口切换与监听清理、卡片事件接线）与 `ProfileView`（收藏分页渲染、空状态）
+- 接口层（`src/api/index.spec.js`）：401 时凭据类接口（登录/注册）原样展示后端消息且不清除登录态，其余接口清 token 并跳登录页（版块与列表加载、点赞交互与游客跳转、行点击跳详情）、`tagApi` 的请求路径与参数（`/tags` 携带 `keyword` 与分页参数、`/tags/posts` 携带 `name` 与分页参数）、`PostDetailView`（互动字段实时读共享状态：列表点的赞在详情页同步生效、置顶整体替换 `post` 后互动字段不被返回体带偏；正文按 Markdown 渲染后不得直接输出原始内容、无正文时显示占位）、`AdminView`（桌面表格 / 窄屏卡片、空状态、视口切换与监听清理、卡片事件接线）与 `ProfileView`（收藏分页渲染、空状态）
+- Markdown 渲染（`src/utils/markdown.js`）：GFM 标题/列表/表格与代码块高亮、单换行转 `<br>`、外链补 `target`/`rel`、图片补 `loading=lazy`、原始 HTML 与事件属性被过滤、`javascript:` 链接不可点击、未注册语言降级为纯文本、裸链接自动识别、站内/锚点/邮件链接不加 `target`、表格包在横向滚动容器内、空输入与渲染异常兜底
+- 标签页（`src/views/TagsView.spec.js`、`src/views/TagPostsView.spec.js`、`src/components/PostListItem.spec.js`）：标签云渲染与点击跳转、关键词检索重置到第一页、分页切换、空态与失败重试、路由标签名变化时重置分页并重新加载、公共帖子行渲染置顶/精华标记与互动计数、点击标签按 URL 规则编码且不触发行跳转、点赞走共享计数
+- 编辑页 Markdown 预览（`src/views/PostEditView.spec.js`）：桌面左右分栏且输入正文时预览实时渲染、窄屏显示编辑/预览 tab 而不是分栏、编辑模式回填旧正文并渲染预览
 
 ## 优化记录（第二轮）
 
@@ -252,6 +266,7 @@ pnpm build       # 生产构建
 
 ## 已知限制
 
+- **历史纯文本帖子中的 Markdown 语法会被解释**：Markdown 渲染上线后，正文里恰好长得像 Markdown 的写法（`# 标题`、`*斜体*`、`[文字](链接)`、`| 表格 |` 等）会按语法渲染，而不是原样显示。本轮不按帖子版本区分渲染：单换行会转成 `<br>` 以尽量保留纯文本帖子的换行观感，需要原样展示的符号可用反斜杠转义或放进代码块。
 - **REPLY 通知的评论锚点只覆盖第一页评论**：帖子详情页每页加载 10 条根评论（后端按 `createTime` 升序只返回根评论，子回复随父评论平铺渲染）。若通知指向的根评论排在第 11 条之后，页面里不存在对应元素。此时不再静默失败：当该帖评论数大于 10 时会提示「目标评论可能在后面的评论分页里，可翻页查看」，需手动翻页定位。评论已删除也会命中同一条提示（该提示无法区分两种情况），这是本轮接受的误报。彻底修法是按 `commentId` 逐页回溯后再选中目标页——其代价（每次通知跳转最多多出若干次请求，且仍受页数上限约束）见 `docs/superpowers/specs/2026-10-16-experience-iteration-design.md` §5。
 
 ## 目录结构

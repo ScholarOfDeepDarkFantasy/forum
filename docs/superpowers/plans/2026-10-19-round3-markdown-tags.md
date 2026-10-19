@@ -1854,7 +1854,7 @@ git commit -m "feat: 新增标签总览页与标签帖子页，抽取公共帖�
 - Modify: `README.md`
 - Modify: `docs/DEVELOPMENT.md`
 
-- [ ] **Step 1: 更新 README**
+- [x] **Step 1: 更新 README**
 
 在功能列表（含板块/帖子/评论/通知等）中补两项：
 
@@ -1869,7 +1869,7 @@ git commit -m "feat: 新增标签总览页与标签帖子页，抽取公共帖�
 - 帖子正文按 Markdown 渲染。历史纯文本帖子中，以 `#`、`1.`、`-`、`>` 开头的行会被解释为 Markdown 语法（预期行为）。
 ```
 
-- [ ] **Step 2: 更新 docs/DEVELOPMENT.md**
+- [x] **Step 2: 更新 docs/DEVELOPMENT.md**
 
 - 头部版本 `1.2` → `1.3`，日期改 `2026-10-19`。
 - §3.2 基线：按 Task 4/5 实际执行结果填写（后端类数/用例数、前端文件数/用例数；不要沿用旧数字）。
@@ -1878,7 +1878,7 @@ git commit -m "feat: 新增标签总览页与标签帖子页，抽取公共帖�
 - §8 变更日志顶部加一行 `2026-10-19 feat 第三轮功能（提交哈希待回填）`。
 - 接口总数从 31 更新为 33（§3.4 或对应小节）。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add README.md docs/DEVELOPMENT.md

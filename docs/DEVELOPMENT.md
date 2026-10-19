@@ -3,7 +3,7 @@
 > 本文件是项目的**单一事实来源（single source of truth）**：记录开发情况、当前进度、已知问题与后续计划。
 > **每次开发（新功能、修复、优化、重构）结束前都必须更新本文件**，约定见 §0。
 >
-> 最近更新：2026-10-19 ｜ 文档版本：v1.2
+> 最近更新：2026-10-19 ｜ 文档版本：v1.3
 
 ---
 
@@ -113,10 +113,10 @@ cd frontend && pnpm test --run
 | --- | --- | --- | --- | --- |
 | 第一轮 | 体验迭代：视觉层级 + 响应式 + 通知闭环 | 13 | ✅ 已完成 | 2026-10-17 |
 | 第二轮 | 优化：性能 + 安全 + 可维护性 | 7 | ✅ 已完成 | 2026-10-17 |
-| 第三轮 | 待规划（候选见 §5.2） | — | ⬜ 未开始 | — |
+| 第三轮 | Markdown 渲染 + 标签检索 | 7 | ✅ 已完成 | 2026-10-19 |
 | 部署工程化 | raspi：Jenkins + rootless podman + nginx 自动化部署（见 §4.7） | — | ✅ 已完成 | 2026-10-19 |
 
-**当前进度：MVP 100% ｜ 已完成 2 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 3 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
@@ -126,26 +126,26 @@ cd frontend && pnpm test --run
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 66 | 2772 |
-| 后端测试（`src/test/java`） | 8 | 1210 |
-| 前端产品代码（`frontend/src`，不含 spec） | 23 | 2396 |
-| 前端测试（`*.spec.js`） | 15 | 1693 |
+| 后端主代码（`src/main/java`） | 69 | 3390 |
+| 后端测试（`src/test/java`） | 9 | 1653 |
+| 前端产品代码（`frontend/src`，不含 spec） | 28 | 3230 |
+| 前端测试（`*.spec.js`） | 20 | 2709 |
 
-后端分层（文件数）：`entity/` 12、`dto/` 16、`repository/` 9、`controller/` 7、`service/` 7、`security/` 5、`config/` 4、`util/` 3、`exception/` 2。
+后端分层（文件数）：`entity/` 12、`dto/` 17、`repository/` 9、`controller/` 8、`service/` 8、`security/` 5、`config/` 4、`util/` 3、`exception/` 2。
 
-前端目录（文件数）：`views/` 13（8 个页面 + 5 个 spec）、`composables/` 4、`styles/` 4、`utils/` 4、`components/` 3、`stores/` 3、`api/` 2、`router/` 1。
+前端目录（文件数）：`views/` 18（10 个页面 + 8 个 spec）、`composables/` 4、`styles/` 5、`utils/` 6、`components/` 5、`stores/` 3、`api/` 2、`router/` 1。
 
 ### 3.2 测试基线
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **30** 个用例 / 8 个测试类 | 全绿 |
-| 前端 | **108** 个用例 / 15 个 spec | 全绿 |
+| 后端 | **39** 个用例 / 9 个测试类 | 全绿 |
+| 前端 | **143** 个用例 / 20 个 spec | 全绿 |
 | 构建 | `pnpm build` | 通过 |
 
-后端测试类分布：`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1、`PostFlowIntegrationTest` 4、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`RepositoryTests` 6、`JwtTokenProviderTest` 2、`NotificationServiceTest` 4。
+后端测试类分布：`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1、`PostFlowIntegrationTest` 4、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`TagFlowIntegrationTest` 8、`RepositoryTests` 7、`JwtTokenProviderTest` 2、`NotificationServiceTest` 4。
 
-前端 spec 分布：`usePostActions` 13、`AdminView` 11、`cards` 10、`notifications` 9、`format` 9、`HomeView` 8、`index`（api）7、`breakpoint` 7、`notificationLink` 7、`ProfileView` 6、`viteConfig` 6、`common` 5、`NotificationsView` 4、`useResponsive` 3、`PostDetailView` 3。
+前端 spec 分布：`markdown` 14、`usePostActions` 13、`AdminView` 11、`cards` 10、`notifications` 9、`format` 9、`index`（api）9、`HomeView` 8、`breakpoint` 7、`notificationLink` 7、`ProfileView` 6、`viteConfig` 6、`common` 5、`TagsView` 5、`TagPostsView` 5、`PostDetailView` 5、`NotificationsView` 4、`PostListItem` 4、`PostEditView` 3、`useResponsive` 3。
 
 ### 3.3 数据库
 
@@ -157,7 +157,7 @@ cd frontend && pnpm test --run
 | 软删除 | `posts.deleted`、`comments.deleted` |
 | 默认管理员 | `admin` / `admin123456`（由 `DataInitializer` 幂等创建，角色 ADMIN+MODERATOR+USER） |
 
-### 3.4 接口清单（31 个端点）
+### 3.4 接口清单（33 个端点）
 
 | 控制器 | 端点 |
 | --- | --- |
@@ -165,10 +165,18 @@ cd frontend && pnpm test --run
 | `AuthController` | `POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`PUT /api/auth/profile`、`GET /api/auth/users/{id}` |
 | `BoardController` | `GET /api/boards`、`GET /api/boards/{id}`、`POST /api/boards`、`PUT /api/boards/{id}`、`DELETE /api/boards/{id}` |
 | `PostController` | `GET /api/posts`、`GET /api/posts/{id}`、`GET /api/posts/mine`、`POST /api/posts`、`PUT /api/posts/{id}`、`DELETE /api/posts/{id}`、`GET /api/posts/favorites/mine`、`POST /api/posts/{id}/like`、`POST /api/posts/{id}/favorite`、`PUT /api/posts/{id}/pin`、`PUT /api/posts/{id}/exquisite` |
+| `TagController` | `GET /api/tags`、`GET /api/tags/posts` |
 | `CommentController` | `GET /api/posts/{postId}/comments`、`POST /api/posts/{postId}/comments`、`DELETE /api/posts/{postId}/comments/{id}` |
 | `NotificationController` | `GET /api/notifications`、`GET /api/notifications/unread-count`、`POST /api/notifications/read-all`、`POST /api/notifications/{id}/read` |
 | `AdminUserController` | `GET /api/admin/users`、`PUT /api/admin/users/{id}/status` |
 | Actuator | `GET /actuator/health`（仅 ADMIN，仅暴露 health） |
+
+两个标签端点均为公开 GET（`SecurityConfig` 的 `PUBLIC_GET` 含 `/api/tags/**`），响应统一包在 `Result<T>` 里：
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `GET /api/tags` | `keyword`（可选，标签名忽略大小写模糊匹配）、`page`（默认 0）、`size`（默认 30，钳制到 1~100） | `PageResponse<TagResponse>`；`TagResponse` 为 `id`/`name`/`postCount`，按 `postCount` 降序、同数按 `name` 升序，只统计未删除帖子 |
+| `GET /api/tags/posts` | `name`（必填，标签名，可含 `/`）、`page`（默认 0）、`size`（默认 10，钳制到 1~50） | `PageResponse<PostSummaryResponse>`；未知标签返回空页（200），缺 `name` 或 `page`/`size` 非数字返回 400 |
 
 ### 3.5 前端页面
 
@@ -180,6 +188,8 @@ cd frontend && pnpm test --run
 | `/posts/new`、`/posts/:id/edit` | `PostEditView` | 发帖 / 编辑 |
 | `/profile` | `ProfileView` | 资料 / 我的帖子 / 我的收藏（三个 tab） |
 | `/notifications` | `NotificationsView` | 通知列表 + 单条已读 + 点击跳转 |
+| `/tags` | `TagsView` | 标签云（按帖子数降序）+ 关键词检索 + 分页 |
+| `/tags/:name` | `TagPostsView` | 某标签下的帖子列表（复用 `PostListItem` + 分页） |
 | `/admin` | `AdminView` | 板块 CRUD + 用户禁言封禁（桌面表格 / 窄屏卡片双渲染） |
 
 ---
@@ -299,6 +309,63 @@ cd frontend && pnpm test --run
 
 验收（2026-10-19）：Build #1 红在部署（raspi 内核 `cgroup_disable=memory`，`mem_limit` 触发 crun 写 `memory.max` 失败）；修正后 Build #2 **SUCCESS**：Maven 打包、前端 `VITE_BASE_PATH=/forum/` 构建、`podman build --format docker`、`podman-compose -p forum up`、`/api/health` 轮询、nginx snippet 同步与 reload、4 项冒烟、旧镜像清理全部通过。实测：`forum-backend` Up (healthy) 仅监听 `127.0.0.1:8086`；`/forum/` 首页引用 `/forum/assets/` 且资源 200；`/forum/api/posts` 返回真实数据；`/forum/api/auth/login`（admin）返回 JWT；Flyway 历史 V1/V2 `success=true`；`postgresql`/`sillytavern` 等原有容器不受影响。
 
+### 4.8 第三轮：Markdown 渲染 + 标签检索（2026-10-19）
+
+计划：`docs/superpowers/plans/2026-10-19-round3-markdown-tags.md`（7 个任务：Markdown 渲染工具与样式 → 详情页渲染与标签跳转 → 编辑页分栏预览 → 后端标签接口 → 前端标签页面与公共帖子行 → 文档更新 → 全量验证与上线）
+
+目标：帖子正文从纯文本升级为 Markdown 渲染；把已有 `tags`/`post_tags` 数据变成可用功能——提供标签总览页与按标签筛选的帖子列表。
+
+新增接口（清单见 §3.4，两条均为公开 GET）：
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `GET /api/tags` | `keyword`（可选，忽略大小写模糊匹配）、`page`（默认 0）、`size`（默认 30，钳制 1~100） | `PageResponse<TagResponse>`（`id`/`name`/`postCount`），按 `postCount` 降序、同数按 `name` 升序 |
+| `GET /api/tags/posts` | `name`（必填，可含 `/`）、`page`（默认 0）、`size`（默认 10，钳制 1~50） | `PageResponse<PostSummaryResponse>`；未知标签返回空页 200，缺参/类型错误 400 |
+
+新增与修改的文件：
+
+| 位置 | 文件 | 要点 |
+| --- | --- | --- |
+| 后端 | `dto/tag/TagResponse.java` | 标签聚合响应（`id`/`name`/`postCount`） |
+| 后端 | `service/TagService.java` | 聚合查询 + 排序 + 服务层分页（用 `long` 运算防 `page*size` 溢出） |
+| 后端 | `controller/TagController.java` | 两个公开 GET，`page`/`size` 服务端钳制 |
+| 后端 | `repository/TagRepository.findWithPostCounts` | JPQL `group by` 投影，只统计 `deleted = false` 的帖子 |
+| 后端 | `repository/PostRepository.searchByTagName` | 按标签名取帖子 id 骨架分页（排序由服务层 `pinnedFirstSort` 传入） |
+| 后端 | `service/PostService.listByTag` | 复用两步水合管道；标签名小写归一，未知标签直接返回空页 |
+| 后端 | `config/SecurityConfig` | `PUBLIC_GET` 增加 `/api/tags/**` |
+| 后端 | `exception/GlobalExceptionHandler` | 新增两个 400 处理器：缺 `@RequestParam`（`MissingServletRequestParameterException`）、参数类型不匹配（`MethodArgumentTypeMismatchException`） |
+| 前端 | `utils/markdown.js` | `markdown-it`（GFM、`html: false`、`breaks: true`、`linkify`）+ DOMPurify 白名单 + highlight.js 高亮 + 外链/图片加固 |
+| 前端 | `styles/markdown.css` | Markdown 排版样式（复用设计令牌），`main.js` 引入 |
+| 前端 | `components/PostListItem.vue` | 从 `HomeView` 抽出的公共帖子行（置顶/精华标记、标签、互动计数、点赞事件） |
+| 前端 | `views/TagsView.vue`、`views/TagPostsView.vue` | 标签总览（检索 + 分页 + 空态/错误重试）与标签下帖子列表（路由变化重置分页） |
+| 前端 | `api/index.js` | 新增 `tagApi.list`、`tagApi.posts` |
+| 前端 | `router/index.js`、`App.vue` | `/tags`、`/tags/:name` 路由与顶栏「标签」导航 |
+| 前端 | `views/PostDetailView.vue` | 正文改 Markdown 渲染（`v-html` 绑定已消毒 HTML，容器带 `.markdown-body`） |
+| 前端 | `views/PostEditView.vue` | 桌面左右分栏实时预览、窄屏编辑/预览 tab |
+| 前端 | `views/HomeView.vue` | 列表改用 `PostListItem`，消除重复的帖子行模板 |
+| 前端 | `styles/breakpoint.spec.js`、`styles/tokens.css` | 断点数量守卫 5→6（新增标签页媒体查询）；令牌补齐 |
+
+关键取舍：
+
+- **客户端渲染 + DOMPurify 白名单**：Markdown 在浏览器端用 `markdown-it` 渲染（`html: false` 先转义原始 HTML），再用 DOMPurify（`USE_PROFILES: { html: true }`）白名单过滤；`afterSanitizeAttributes` 钩子统一为外链补 `target="_blank" rel="noopener noreferrer"`、为图片补 `loading="lazy"`。后端继续只存纯文本，不做服务端渲染，避免 HTML 入库与二次转义问题。
+- **`breaks: true` 兼容历史纯文本帖子**：单换行转 `<br>`，让老帖子的换行观感不退化；代价是纯文本里像 Markdown 的写法会被解释（见 §6）。
+- **代码高亮只注册 11 种语言**：highlight.js 全量入口会把所有语言打进包体，只注册 java/javascript/typescript/bash/json/xml/css/sql/python/yaml/markdown，未注册语言降级为纯文本。
+- **标签聚合在服务层分页**：`postCount` 由 JPQL `group by` 一次取回，排序与分页在内存完成（标签量级小，避免为分页写窗口函数/原生 SQL）。分页边界用 `long` 运算后收窄，防止 `page=Integer.MAX_VALUE` 时 `page*size` 溢出成负数导致 `subList` 抛 500。
+- **标签名走 query 参数**：标签名可能含 `/`（如 `CI/CD`），放进路径段会被 Tomcat 拒绝或需要 `%2F`（易被代理/容器还原成 `/`），因此用 `GET /api/tags/posts?name=...`。
+- **复用既有分页管道**：标签帖子查询沿用「骨架分页取 id → 批量取实体 → 批量取标签」的两步水合与 `pinnedFirstSort`，置顶帖仍排标签列表首位，且不触发 `HHH90003004` 集合分页退化。
+
+测试与验证（2026-10-19 实测）：
+
+- 后端 `mvn -B test`：9 个测试类、39 个用例全绿。新增 `TagFlowIntegrationTest` 8 例（按帖子数降序、关键词过滤、分页与标签携带、未知标签空页且 `size` 钳制、置顶优先、总览分页边界与溢出、缺参/非法参数 400）与 `RepositoryTests.tagAggregationCountsOnlyUndeletedPosts`。
+- 前端 `pnpm test`：20 个 spec、143 个用例全绿。新增 `markdown.spec.js` 14 例、`TagsView.spec.js` 5 例、`TagPostsView.spec.js` 5 例、`PostListItem.spec.js` 4 例、`PostEditView.spec.js` 3 例；`api/index.spec.js` 增 `tagApi` 路径断言（7→9 例）；`PostDetailView.spec.js` 由 3 例增至 5 例（Markdown 渲染）。
+- 构建：`VITE_BASE_PATH=/forum/ pnpm build` 通过（第三轮 Task 5 验证，子路径产物引用 `/forum/assets/`）。
+
+已知限制：
+
+- **无独立 404 标签页**：未知标签返回 200 + 空页，`TagPostsView` 与「标签下暂无帖子」复用同一空态，不区分「标签不存在」与「标签下无帖子」；拼错标签名时页面显示空列表而非 404。
+- **标签聚合在应用层**：聚合结果一次性取回后在内存排序分页，标签数量级变大时需改为 SQL 分页 + 索引。
+- **Markdown 会解释历史纯文本帖子**：详见 §6。
+
 ---
 
 ## 5. 待办与后续计划
@@ -318,20 +385,20 @@ cd frontend && pnpm test --run
 | T9 | ~~Docker 镜像未经实际构建验证~~ | 已关闭 | 2026-10-19 起在 raspi 上由 Jenkins 用 podman 实际构建并部署（`--format docker` 保留 HEALTHCHECK），见 §4.7 |
 | T10 | ~~前端未容器化~~ | 已关闭 | 需求明确前端不进容器：由主机 nginx 直接托管 dist（见 §4.7），不再作为技术债 |
 
-### 5.2 候选功能（第三轮可选，均未开始）
+### 5.2 候选功能（第三轮已取前两项，其余未开始）
 
 第二轮明确列为「不做」的功能，各自需要独立设计：
 
 | 功能 | 价值 | 预估工作量 | 备注 |
 | --- | --- | --- | --- |
-| Markdown 渲染 | 高 | 中 | 帖子正文目前是纯文本；需引入渲染库并做 XSS 白名单过滤 |
-| 标签检索页 | 中 | 小 | 已有 `tags`/`post_tags` 表与 `TagRepository`，只缺按标签查询的接口与页面 |
+| ~~Markdown 渲染~~ ✅ 已完成 | 高 | 中 | 第三轮已交付：客户端 `markdown-it` 渲染 + DOMPurify 白名单 + 编辑页实时预览（§4.8） |
+| ~~标签检索页~~ ✅ 已完成 | 中 | 小 | 第三轮已交付：标签总览 + 按标签筛选帖子，两个公开 GET 接口（§4.8） |
 | 头像上传 | 中 | 中 | 需要文件存储（本地或对象存储）+ 上传接口 + 校验 |
 | 深色模式 | 低 | 小 | 令牌层已就绪，主要是加一套暗色变量与切换开关 |
 | WebSocket 实时通知 | 中 | 大 | 目前是 120 秒轮询兜底 |
 | 全文搜索 | 中 | 中 | PostgreSQL `tsvector` + GIN 索引，替换现有 `LIKE` |
 
-**建议第三轮取 1~2 个**，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
+第三轮已取前两项（见 §4.8）；其余候选留待后续轮次，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
 
 ---
 
@@ -345,6 +412,8 @@ cd frontend && pnpm test --run
 | 无国际化 | 界面文案硬编码中文 | 第一轮非目标 |
 | `AdminView` 桌面表格与窄屏卡片仍需各维护一份 | 加字段要改 2 处（原为 4 处，第二轮已收敛一半） | 进一步收敛需抽列定义，属结构性改动 |
 | 构建产物有 chunk > 500kB 警告 | 首屏加载体积偏大 | Element Plus 全量引入所致，可按需引入或分包 |
+| Markdown 会解释历史纯文本帖子 | 正文里恰好像 Markdown 的写法（`# 标题`、`*斜体*`、`[文字](链接)`）被渲染成格式而非原样显示 | 单换行已转 `<br>` 以保留换行观感；需要原样展示可转义或用代码块；未做「按帖子版本区分渲染」 |
+| 无独立 404 标签页，标签聚合在应用层 | 未知标签与「标签下无帖子」共用空态；标签数量级大时聚合排序分页在应用层完成 | 已接受：标签数据量小；接口语义为「未知标签返回空页」（见 §4.8） |
 
 ---
 
@@ -380,6 +449,7 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-10-19 | feat | 第三轮功能：Markdown 渲染 + 标签检索（提交哈希待回填） | 本次提交 |
 | 2026-10-19 | docs | 部署验收记录（Build #2 成功与实测结果）与变更日志回填 | 本次提交 |
 | 2026-10-19 | fix | 适配 raspi 无内存 cgroup：去掉 compose `mem_limit`，`JAVA_OPTS` 改显式 `-Xmx512m`，`deploy.sh` 启动后立校验容器状态 | `771990d` |
 | 2026-10-19 | feat | 部署环境化：raspi Jenkins + rootless podman + nginx 自动化部署（运行时单阶段 Dockerfile、podman-compose 兼容 compose、Jenkinsfile + deploy.sh + nginx snippet、复用主机 Postgres、子路径 `/forum/` 发布） | `1554869` |
