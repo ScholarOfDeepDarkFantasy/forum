@@ -7,6 +7,8 @@ import App from './App.vue'
 import router from './router'
 import './styles/tokens.css'
 import './styles/common.css'
+import './styles/markdown.css'
+import 'highlight.js/styles/github.css'
 import './style.css'
 
 const app = createApp(App)

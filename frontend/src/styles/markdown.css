@@ -1,0 +1,92 @@
+/* 帖子正文 Markdown 排版。作用域限定 .markdown-body，避免污染评论等纯文本区域 */
+.markdown-body {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--jf-color-text-1);
+  word-wrap: break-word;
+}
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin: 1.2em 0 0.6em;
+  line-height: 1.4;
+}
+.markdown-body h1 {
+  font-size: 1.6em;
+}
+.markdown-body h2 {
+  font-size: 1.35em;
+}
+.markdown-body h3 {
+  font-size: 1.15em;
+}
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body blockquote,
+.markdown-body pre,
+.markdown-body table {
+  margin: 0.8em 0;
+}
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.6em;
+}
+.markdown-body blockquote {
+  padding: 0.2em 1em;
+  color: var(--jf-color-text-2);
+  border-left: 4px solid var(--jf-color-border);
+  background: var(--jf-color-bg-hover);
+}
+.markdown-body code {
+  padding: 0.15em 0.4em;
+  font-size: 0.9em;
+  border-radius: var(--jf-radius-sm);
+  background: var(--jf-color-bg-hover);
+}
+.markdown-body pre {
+  padding: var(--jf-space-3);
+  overflow-x: auto;
+  border-radius: var(--jf-radius-md);
+  background: #f6f8fa;
+}
+.markdown-body pre code {
+  padding: 0;
+  font-size: 0.9em;
+  background: transparent;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.markdown-body th,
+.markdown-body td {
+  padding: 6px 10px;
+  border: 1px solid var(--jf-color-border);
+}
+.markdown-body th {
+  background: var(--jf-color-bg-hover);
+}
+.markdown-body img {
+  max-width: 100%;
+  border-radius: var(--jf-radius-sm);
+}
+.markdown-body a {
+  color: var(--jf-color-primary);
+  text-decoration: none;
+}
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+.markdown-body hr {
+  margin: 1.2em 0;
+  border: none;
+  border-top: 1px solid var(--jf-color-border);
+}
