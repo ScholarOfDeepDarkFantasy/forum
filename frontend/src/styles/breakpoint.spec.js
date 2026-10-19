@@ -16,16 +16,17 @@ if (!existsSync(resolve(SRC_ROOT, 'composables/useResponsive.js'))) {
 }
 
 /**
- * src 下真实存在的媒体查询断点字面量数量：5 处 @media (max-width: 768px)
- * （HomeView / PostDetailView / LoginView / RegisterView / NotificationsView）。
+ * src 下真实存在的媒体查询断点字面量数量：6 处 @media (max-width: 768px)
+ * （HomeView / PostDetailView / LoginView / RegisterView / NotificationsView
+ * 与 components/PostListItem）。
  *
  * 为什么是精确值而不是 `>= 5`：一致性断言只比对「找出来的字面量」的值，删掉一整块
  * @media（或把某处改写成 em 等非 px 单位）之后，剩下的仍是清一色的 768px，用例
  * 照样通过——也就是本任务要修的「零断点也假绿」。只有精确计数才能让「响应式覆盖被
- * 静默移除」变成红灯。新增视图带来第 6 处断点时，须同步更新本常量、tokens.css 里
- * 「断点字面量目前共七处」的说明与 README 的五个视图清单，这是刻意保留的人工闸门。
+ * 静默移除」变成红灯。新增位置带来第 7 处断点时，须同步更新本常量、tokens.css 里
+ * 「断点字面量目前共八处」的说明与 README 的六个位置清单，这是刻意保留的人工闸门。
  */
-const EXPECTED_MEDIA_BREAKPOINTS = 5
+const EXPECTED_MEDIA_BREAKPOINTS = 6
 
 /** 唯一允许的断点字面量：与 MOBILE_BREAKPOINT 拼接出的规范写法 */
 const CANONICAL_BREAKPOINT_LITERAL = `${MOBILE_BREAKPOINT}px`
@@ -48,7 +49,7 @@ function collectStyleFiles(dir) {
  * 5. 非 px 单位（em/rem 等）——正则不匹配，但会让精确计数变化，由计数断言兜住。
  *
  * 规范化规则：字面量必须逐字等于 `${MOBILE_BREAKPOINT}px`（`768 px` 这种数字与单位
- * 之间带空格的写法也不算）。tokens.css 的说明要求「改断点须在同一提交内同步七处」，
+ * 之间带空格的写法也不算）。tokens.css 的说明要求「改断点须在同一提交内同步八处」，
  * 而这一步靠人肉 grep `768px`；`768.0px` / `768PX` / `768 px` 语义等价却会让 grep
  * 漏掉某一处，正是本用例要防的漂移，故一律判失败，而不是「数值相等就放行」。
  */
@@ -100,8 +101,8 @@ describe('断点一致性', () => {
   // 本用例刻意扫描整个 src，而不是只扫当前已知的几处：断点字面量目前散落在
   // tokens.css 的 --jf-breakpoint-mobile、useResponsive.js 的 MOBILE_BREAKPOINT
   // 以及 HomeView / PostDetailView / LoginView / RegisterView / NotificationsView
-  // 五个视图里的 @media (max-width: 768px) 块，靠人肉同步必然漂移。
-  it('媒体查询断点字面量的数量仍为 5（删光 @media 块也会红，杜绝空转假绿）', () => {
+  // 六个位置里的 @media (max-width: 768px) 块，靠人肉同步必然漂移。
+  it('媒体查询断点字面量的数量仍为 6（删光 @media 块也会红，杜绝空转假绿）', () => {
     const found = collectMediaBreakpoints()
     expect(
       found.length,
@@ -132,7 +133,7 @@ describe('断点一致性', () => {
   })
 
   it('src 下不存在 min-width 媒体查询（本项目只用 max-width 单一断点轴）', () => {
-    // 规则选择：五个断点块全是 max-width（桌面样式 + 窄屏覆盖），MOBILE_BREAKPOINT
+    // 规则选择：六个断点块全是 max-width（桌面样式 + 窄屏覆盖），MOBILE_BREAKPOINT
     // 是唯一基准。min-width 会引入第二条轴和第二个基准值（其自然对应物是
     // MOBILE_BREAKPOINT + 1 = 769px），靠人肉同步必然漂移，故本轮直接禁止：
     // 将来确实需要时，应连同本用例一起显式扩展，而不是悄悄多出一个 min-width 块。

@@ -6,6 +6,8 @@ const routes = [
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },
   { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue') },
   { path: '/posts/:id', name: 'post-detail', component: () => import('@/views/PostDetailView.vue') },
+  { path: '/tags', name: 'tags', component: () => import('@/views/TagsView.vue') },
+  { path: '/tags/:name', name: 'tag-posts', component: () => import('@/views/TagPostsView.vue') },
   {
     path: '/posts/create',
     name: 'post-create',

@@ -35,9 +35,10 @@
   --jf-font-small: 12px;
 
   /* 仅供参考：@media 无法使用 var()，故此变量无消费方。
-     断点字面量目前共七处：本变量、useResponsive.js 的 MOBILE_BREAKPOINT = 768，
+     断点字面量目前共八处：本变量、useResponsive.js 的 MOBILE_BREAKPOINT = 768，
      加上 HomeView / PostDetailView / LoginView / RegisterView / NotificationsView
-     里的五处 @media (max-width: 768px)。除本变量无消费方外，其余六处都控制行为；
+     五个视图与 components/PostListItem 里的六处 @media (max-width: 768px)。
+     除本变量无消费方外，其余七处都控制行为；
      改断点须在同一提交内同步全部这些位置。 */
   --jf-breakpoint-mobile: 768px;
 

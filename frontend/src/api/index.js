@@ -102,6 +102,12 @@ export const postApi = {
   myFavorites: (params) => api.get('/posts/favorites/mine', { params })
 }
 
+// ========== 标签 ==========
+export const tagApi = {
+  list: (params) => api.get('/tags', { params }),
+  posts: (name, params) => api.get('/tags/posts', { params: { name, ...params } })
+}
+
 // ========== 评论 ==========
 export const commentApi = {
   list: (postId, params) => api.get(`/posts/${postId}/comments`, { params }),

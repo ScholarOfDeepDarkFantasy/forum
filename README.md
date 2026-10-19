@@ -226,7 +226,7 @@ pnpm build       # 生产构建
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
 - 点赞/收藏共享状态（`src/composables/usePostActions.js`）：失败回滚、同步服务端 `liked`/`favorited` 标志且不覆盖本地已操作状态
-- 响应式判定与断点一致性（`src/composables/useResponsive.js`、`src/styles/breakpoint.spec.js`）：媒体查询断点数量必须恰为 5、字面量必须逐字写成 `768px`、数值须与 `MOBILE_BREAKPOINT` 一致，且禁止出现 `min-width` 查询
+- 响应式判定与断点一致性（`src/composables/useResponsive.js`、`src/styles/breakpoint.spec.js`）：媒体查询断点数量必须恰为 6、字面量必须逐字写成 `768px`、数值须与 `MOBILE_BREAKPOINT` 一致，且禁止出现 `min-width` 查询
 - 分页样式收敛（`src/styles/common.spec.js`）：`.jf-pager` 规则完整、`common.css` 在 `tokens.css` 之后引入、没有视图重新定义 `.pager`、每个 `el-pagination` 都带 `jf-pager` 且数量精确相等
 - 时间格式化（`src/utils/format.spec.js`）：ISO 串截到分钟、空值返回空串、相对时间的刚刚/分钟/小时/回退日期四档，以及未来时间不产生负数
 - 后台卡片组件（`src/components/cards.spec.js`）：字段与空值占位渲染、`formatTime`/`statusTag` 透传、ADMIN 账号的操作按钮禁用、事件 payload
@@ -248,7 +248,7 @@ pnpm build       # 生产构建
 
 `frontend/src/styles/tokens.css` 是设计令牌的唯一来源，包含颜色、间距阶梯、圆角、字号阶梯，以及 `--el-color-primary` 对 Element Plus 主色的覆盖。页面应引用令牌（如 `var(--jf-space-4)`）而不是写死数值。令牌只保留有消费方的条目：无消费方的 `--jf-color-text-2`、`--jf-radius-lg`、`--jf-shadow-card`、`--jf-shadow-hover` 已移除，新增令牌时应连同首个消费方一起加。
 
-注意 768px 断点目前在多处重复出现：`frontend/src/composables/useResponsive.js` 的 `MOBILE_BREAKPOINT = 768`、`tokens.css` 的 `--jf-breakpoint-mobile`（仅作说明，`@media` 无法使用 `var()`），以及 `HomeView` / `PostDetailView` / `LoginView` / `RegisterView` / `NotificationsView` 五个视图中的 `@media (max-width: 768px)`。改断点必须在同一次提交内同步以上所有位置，`breakpoint.spec.js` 会扫描 `src/**/*.{vue,css}` 的媒体查询，并在断点数量不为 5、字面量不是逐字的 `768px`、数值与 `MOBILE_BREAKPOINT` 不一致或出现 `min-width` 查询时报错。
+注意 768px 断点目前在多处重复出现：`frontend/src/composables/useResponsive.js` 的 `MOBILE_BREAKPOINT = 768`、`tokens.css` 的 `--jf-breakpoint-mobile`（仅作说明，`@media` 无法使用 `var()`），以及 `HomeView` / `PostDetailView` / `LoginView` / `RegisterView` / `NotificationsView` 五个视图与 `components/PostListItem`（公共帖子行）中的六处 `@media (max-width: 768px)`。改断点必须在同一次提交内同步以上所有位置，`breakpoint.spec.js` 会扫描 `src/**/*.{vue,css}` 的媒体查询，并在断点数量不为 6、字面量不是逐字的 `768px`、数值与 `MOBILE_BREAKPOINT` 不一致或出现 `min-width` 查询时报错。
 
 ## 已知限制
 

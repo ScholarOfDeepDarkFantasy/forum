@@ -1,11 +1,11 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Plus, View, ChatDotRound, CaretTop, Medal, Star } from '@element-plus/icons-vue'
+import { Search, Plus } from '@element-plus/icons-vue'
 import { boardApi, postApi } from '@/api'
 import { usePostActions } from '@/composables/usePostActions'
 import { useAuthStore } from '@/stores/auth'
-import { formatRelative } from '@/utils/format'
+import PostListItem from '@/components/PostListItem.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -135,40 +135,12 @@ loadPosts()
     <!-- 帖子列表 -->
     <el-card shadow="never" v-loading="loading">
       <template v-if="pageData.content.length">
-        <div v-for="p in pageData.content" :key="p.id" class="post-item" @click="router.push(`/posts/${p.id}`)">
-          <div class="post-main">
-            <div class="post-title-line">
-              <el-tag v-if="p.isPinned" type="danger" size="small" class="flag">
-                <el-icon><CaretTop /></el-icon>置顶
-              </el-tag>
-              <el-tag v-if="p.isExquisite" type="warning" size="small" class="flag">
-                <el-icon><Medal /></el-icon>精华
-              </el-tag>
-              <span class="post-title">{{ p.title }}</span>
-            </div>
-            <div class="post-meta">
-              <span>{{ p.authorNickname || p.authorUsername }}</span>
-              <span>· {{ p.boardName }}</span>
-              <span>· {{ formatRelative(p.createTime) }}</span>
-              <span v-if="p.tags?.length" class="tags">
-                <el-tag v-for="t in p.tags" :key="t" size="small" type="info" effect="plain">{{ t }}</el-tag>
-              </span>
-            </div>
-          </div>
-          <div class="post-stats">
-            <span><el-icon><View /></el-icon>{{ p.viewCount }}</span>
-            <span><el-icon><ChatDotRound /></el-icon>{{ p.commentCount }}</span>
-          </div>
-          <button
-            type="button"
-            class="like-btn"
-            :class="{ active: actions.stateFor(p.id).liked }"
-            :title="actions.stateFor(p.id).liked ? '取消点赞' : '点赞'"
-            @click.stop="toggleLike(p)"
-          >
-            <el-icon><Star /></el-icon>{{ actions.stateFor(p.id).likeCount }}
-          </button>
-        </div>
+        <PostListItem
+          v-for="p in pageData.content"
+          :key="p.id"
+          :post="p"
+          @like="toggleLike"
+        />
       </template>
       <el-empty v-else description="暂无帖子" />
 
@@ -207,80 +179,6 @@ loadPosts()
 .search-input {
   flex: 1;
 }
-.post-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px var(--jf-space-2);
-  border-bottom: 1px solid var(--jf-color-border);
-  cursor: pointer;
-}
-.post-item:last-of-type {
-  border-bottom: none;
-}
-.post-item:hover {
-  background: var(--jf-color-bg-hover);
-}
-.post-title-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.flag {
-  flex-shrink: 0;
-}
-.post-title {
-  font-size: var(--jf-font-title-md);
-  font-weight: 600;
-}
-.post-meta {
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--jf-color-text-3);
-  font-size: var(--jf-font-meta);
-  flex-wrap: wrap;
-}
-.tags {
-  display: inline-flex;
-  gap: var(--jf-space-1);
-}
-.post-stats {
-  display: flex;
-  gap: 14px;
-  color: var(--jf-color-text-3);
-  font-size: var(--jf-font-meta);
-  flex-shrink: 0;
-}
-.post-stats span {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--jf-space-1);
-}
-.like-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--jf-space-1);
-  margin-left: var(--jf-space-3);
-  padding: var(--jf-space-1) var(--jf-space-2);
-  border: 1px solid var(--jf-color-border);
-  border-radius: var(--jf-radius-sm);
-  background: var(--jf-color-bg-card);
-  color: var(--jf-color-text-3);
-  font-size: var(--jf-font-meta);
-  font-family: inherit;
-  line-height: 1.5;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.like-btn:hover {
-  background: var(--jf-color-bg-hover);
-}
-.like-btn.active {
-  border-color: var(--jf-color-primary);
-  color: var(--jf-color-primary);
-}
 
 
 /* 窄屏：板块标签横滑、工具栏堆叠，避免标题被挤压换行 */
@@ -300,16 +198,6 @@ loadPosts()
   .toolbar {
     flex-direction: column;
     align-items: stretch;
-  }
-  .post-item {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-  .post-meta {
-    gap: var(--jf-space-1);
-  }
-  .post-stats {
-    margin-left: var(--jf-space-2);
   }
 }
 </style>

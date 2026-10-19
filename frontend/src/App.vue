@@ -48,6 +48,8 @@ onMounted(() => {
           <span>JavaForum</span>
         </router-link>
 
+        <router-link to="/tags" class="nav-link">标签</router-link>
+
         <div class="nav-actions">
           <template v-if="auth.isLoggedIn">
             <el-badge :value="notifications.unreadCount" :hidden="notifications.unreadCount === 0" class="bell-badge">
@@ -111,6 +113,14 @@ onMounted(() => {
   font-size: 20px;
   font-weight: 700;
   color: var(--jf-color-primary);
+}
+.nav-link {
+  margin-left: var(--jf-space-4);
+  color: var(--jf-color-text-3);
+}
+.nav-link.router-link-active {
+  color: var(--jf-color-primary);
+  font-weight: 600;
 }
 .nav-actions {
   display: flex;
