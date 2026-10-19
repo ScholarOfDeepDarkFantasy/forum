@@ -1,9 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 
 const push = vi.fn()
-const route = { params: { name: 'java' }, query: {}, fullPath: '/tags/java', name: 'tag-posts' }
+// 真实路由对象是响应式的：watch(() => route.params.name) 依赖它，故用 reactive 模拟
+const route = reactive({
+  params: { name: 'java' },
+  query: {},
+  fullPath: '/tags/java',
+  name: 'tag-posts'
+})
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push }) }))
 vi.mock('@/api', () => ({
   tagApi: { list: vi.fn(), posts: vi.fn() }
@@ -32,11 +39,14 @@ const directives = { loading: () => {} }
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 let pinia
+const wrappers = []
 
 function mountTagPosts() {
-  return mount(TagPostsView, {
+  const wrapper = mount(TagPostsView, {
     global: { plugins: [pinia], stubs, directives }
   })
+  wrappers.push(wrapper)
+  return wrapper
 }
 
 function postPayload(over = {}) {
@@ -58,8 +68,16 @@ describe('TagPostsView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
+    route.params.name = 'java'
+    route.fullPath = '/tags/java'
     pinia = createPinia()
     setActivePinia(pinia)
+  })
+
+  // 已挂载的组件会一直 watch 共享的 route，测试之间必须卸载，避免串扰
+  afterEach(() => {
+    wrappers.forEach((w) => w.unmount())
+    wrappers.length = 0
   })
 
   it('按路由标签名加载帖子并显示空状态', async () => {
@@ -127,5 +145,47 @@ describe('TagPostsView', () => {
     expect(tagApi.posts).toHaveBeenCalledTimes(2)
     expect(wrapper.find('.error-state').exists()).toBe(false)
     expect(wrapper.text()).toContain('该标签下暂无帖子')
+  })
+
+  it('路由标签名变化时重置分页并重新加载新标签', async () => {
+    tagApi.posts.mockImplementation((name) =>
+      Promise.resolve(
+        name === 'spring'
+          ? {
+              content: [postPayload({ id: 12, title: 'Spring帖', tags: ['spring'] })],
+              totalElements: 1,
+              totalPages: 1
+            }
+          : {
+              content: [postPayload({ id: 11, title: 'Java帖', tags: ['java'] })],
+              totalElements: 21,
+              totalPages: 3
+            }
+      )
+    )
+    const wrapper = mountTagPosts()
+    await flush()
+
+    expect(wrapper.text()).toContain('Java帖')
+    expect(wrapper.text()).toContain('21 篇')
+
+    // 先翻到第二页，确认切换标签会重置分页
+    await wrapper.find('.pager-next').trigger('click')
+    await flush()
+    expect(tagApi.posts).toHaveBeenLastCalledWith('java', expect.objectContaining({ page: 1 }))
+
+    route.params.name = 'spring'
+    route.fullPath = '/tags/spring'
+    await flush()
+
+    // 同一路由记录下组件复用：必须按新标签、从第 1 页重新加载
+    expect(tagApi.posts).toHaveBeenLastCalledWith(
+      'spring',
+      expect.objectContaining({ page: 0, size: 10 })
+    )
+    expect(wrapper.text()).toContain('标签：spring')
+    expect(wrapper.text()).toContain('Spring帖')
+    expect(wrapper.text()).not.toContain('Java帖')
+    expect(wrapper.text()).toContain('1 篇')
   })
 })

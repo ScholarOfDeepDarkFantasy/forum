@@ -1835,6 +1835,17 @@ git add frontend/src frontend/package.json frontend/pnpm-lock.yaml README.md
 git commit -m "feat: 新增标签总览页与标签帖子页，抽取公共帖子行组件"
 ```
 
+> 偏差说明（2026-10-19 规格评审补记，提交 `fix: 修复标签帖子页路由切换不刷新并补标签接口测试`）：
+> 下面 6 项为 Task 5 实施时自报、但计划中未登记的偏差，本次评审补记；其后的 P1/P2 为本次评审要求的修复。
+> 1. **测试用例 13 例（计划骨架 4 例）**：三个新 spec 在计划骨架上补了分页、空态、错误重试、标签名 URL 编码、共享计数、置顶/精华渲染等断言，实际为 `PostListItem.spec.js` 4 例、`TagsView.spec.js` 5 例、`TagPostsView.spec.js` 4 例（P1 修复后该类增至 5 例）。
+> 2. **spec 挂载补丁（挂载必需，非空转）**：`el-card` stub 需渲染 header 槽（关键词输入框在卡片头里）；`el-input` stub 需实现 v-model 与 keyup（搜索用例）；`TagPostsView.spec.js` 需注入 Pinia（组件 setup 调 `useAuthStore()`）；`v-loading` 用空指令 `directives: { loading: () => {} }` 消掉解析告警。
+> 3. **错误态与重试优于计划**：计划 `load()` 无 catch，接口失败会成为 unhandled rejection 且页面一片空白；实现给 `TagsView` / `TagPostsView` 增加 `error` 态、`catch` 与「重试」按钮，失败时清空列表并隐藏分页，与 axios 拦截器的统一提示配合；空态与错误态互斥。
+> 4. **`.nav-link` 普通色用 `--jf-color-text-3` 而非计划片段的 `--jf-color-text-2`**：`--jf-color-text-2` 已在本轮 `tokens.css` 中作为无消费方令牌删除，照抄计划会引用未定义变量；`text-3` 是当前次级文本令牌。
+> 5. **README 断点段落 5→6 属闸门必需**：`PostListItem` 承接原属 `HomeView` 的 `.post-item` 窄屏 `@media (max-width: 768px)`，断点字面量因此从 5 处变为 6 处；已同步 `breakpoint.spec.js`、`tokens.css`、`README.md` 三处闸门。
+> 6. **额外默认构建无副作用**：除计划要求的 `VITE_BASE_PATH=/forum/ pnpm build` 外，实施时还跑过默认 `pnpm build` 验证根路径构建；产物未提交，无代码影响。
+> 7. **P1 修复（本次评审新增）**：`TagPostsView.vue` 原先只在 `onMounted` 加载，同一路由记录内从 `/tags/java` 切到 `/tags/spring` 时组件复用，标题与总数更新而列表不刷新。现 `watch(() => route.params.name)`，参数变化时 `page = 0` 并 `load()`，并用请求序号丢弃过期响应（防止慢请求把旧标签数据写回）；`TagPostsView.spec.js` 新增「路由标签名变化时重置分页并重新加载新标签」用例。
+> 8. **P2 补测（本次评审新增）**：设计规格 §6 要求更新 `frontend/src/api/index.spec.js` 覆盖 `tagApi` 路径，实施时遗漏；现补两条断言——`tagApi.list({keyword,page,size})` → `GET /tags` 带 params，`tagApi.posts('java',{page})` → `GET /tags/posts` 且 name 在 params 中。
+
 ---
 
 ## Task 6: 文档更新

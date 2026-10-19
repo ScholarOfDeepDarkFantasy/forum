@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { tagApi } from '@/api'
 import { usePostActions } from '@/composables/usePostActions'
@@ -20,20 +20,29 @@ const error = ref('')
 /**
  * 标签帖子加载。标签不存在时后端返回空页而不是 404，因此「未知标签」与
  * 「标签下还没帖子」共用空状态；只有网络/服务异常才进入错误态。
+ *
+ * 同一路由记录内切换标签（/tags/java → /tags/spring）时组件会被复用，
+ * 两个请求可能乱序返回；用递增序号丢弃过期响应，避免慢请求把旧标签的
+ * 列表写回新标签页。
  */
+let requestSeq = 0
+
 async function load() {
+  const seq = ++requestSeq
   loading.value = true
   error.value = ''
   try {
     const data = await tagApi.posts(route.params.name, { page: page.value, size })
+    if (seq !== requestSeq) return
     // 与首页一致：把列表的互动字段播种进共享状态，点进详情后仍是同一份计数
     data.content.forEach((p) => actions.syncFromPost(p))
     pageData.value = data
   } catch {
+    if (seq !== requestSeq) return
     error.value = '标签帖子加载失败'
     pageData.value = { content: [], totalElements: 0, totalPages: 0 }
   } finally {
-    loading.value = false
+    if (seq === requestSeq) loading.value = false
   }
 }
 
@@ -53,6 +62,15 @@ async function toggleLike(p) {
     // 失败回滚由 usePostActions 完成，提示由 axios 拦截器统一给出
   }
 }
+
+// 路由参数变化时组件不会重新挂载，必须手动重置分页并重新拉取
+watch(
+  () => route.params.name,
+  () => {
+    page.value = 0
+    load()
+  }
+)
 
 onMounted(load)
 </script>

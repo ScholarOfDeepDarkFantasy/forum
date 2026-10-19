@@ -9,8 +9,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  */
 const handlers = { request: null, requestError: null, response: null, responseError: null }
 
+/**
+ * 业务方法（tagApi 等）在模块加载时引用 axios 实例的 get/post/...，
+ * 这里用可断言的 vi.fn 代理它们，以便验证「请求了哪个路径、带了哪些参数」。
+ */
+const apiGet = vi.fn()
+const apiPost = vi.fn()
+const apiPut = vi.fn()
+const apiDelete = vi.fn()
+
 vi.mock('axios', () => {
   const fakeInstance = {
+    get: (...args) => apiGet(...args),
+    post: (...args) => apiPost(...args),
+    put: (...args) => apiPut(...args),
+    delete: (...args) => apiDelete(...args),
     interceptors: {
       request: {
         use: (onFulfilled, onRejected) => {
@@ -33,7 +46,7 @@ const elMessageError = vi.fn()
 vi.mock('element-plus', () => ({ ElMessage: { error: (...a) => elMessageError(...a) } }))
 
 // 动态 import：确保上面的 mock 在模块求值前已生效
-await import('./index.js')
+const { tagApi } = await import('./index.js')
 
 /** 构造一个 axios 错误对象，模拟后端返回 Result.fail 的响应体 */
 function httpError(status, message, url) {
@@ -125,5 +138,27 @@ describe('api 拦截器', () => {
 
   it('成功响应解包出 data 字段', () => {
     expect(handlers.response({ data: { success: true, data: { id: 7 } } })).toEqual({ id: 7 })
+  })
+})
+
+describe('tagApi 请求路径', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('list 请求 GET /tags 并透传 keyword/page/size', () => {
+    tagApi.list({ keyword: 'java', page: 0, size: 10 })
+
+    expect(apiGet).toHaveBeenCalledWith('/tags', {
+      params: { keyword: 'java', page: 0, size: 10 }
+    })
+  })
+
+  it('posts 请求 GET /tags/posts 且标签名进入 params', () => {
+    tagApi.posts('java', { page: 1 })
+
+    expect(apiGet).toHaveBeenCalledWith('/tags/posts', {
+      params: { name: 'java', page: 1 }
+    })
   })
 })
