@@ -166,6 +166,7 @@ describe('renderMarkdown', () => {
 
   it('站内、锚点与邮件链接不补 target', () => {
     const div = parse(renderMarkdown('[站内](/posts/1) [锚点](#section) [邮件](mailto:a@b.com)'))
+    expect(div.querySelectorAll('a')).toHaveLength(3)
     expect(div.querySelector('a[target]')).toBeNull()
   })
 
@@ -267,8 +268,8 @@ md.renderer.rules.table_open = (tokens, idx, options, env, self) =>
 md.renderer.rules.table_close = (tokens, idx, options, env, self) =>
   `${defaultTableClose(tokens, idx, options, env, self)}</div>`
 
-// 渲染后统一加安全属性：DOMPurify 3.x 会保留 target，但不会补 rel，也不区分链接协议，
-// 因此在外链（含 // 协议相对链接）和图片上集中施加同一套 after-sanitize 策略。
+// 渲染后统一加安全属性：DOMPurify 会过滤 target（不在其允许属性列表），rel 即使保留也不会自动补，
+// 也不区分链接协议，因此在消毒后统一为外链（含 // 协议相对链接）和图片补全同一套安全属性。
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A') {
     const href = node.getAttribute('href') || ''

@@ -68,6 +68,7 @@ describe('renderMarkdown', () => {
 
   it('站内、锚点与邮件链接不补 target', () => {
     const div = parse(renderMarkdown('[站内](/posts/1) [锚点](#section) [邮件](mailto:a@b.com)'))
+    expect(div.querySelectorAll('a')).toHaveLength(3)
     expect(div.querySelector('a[target]')).toBeNull()
   })
 
