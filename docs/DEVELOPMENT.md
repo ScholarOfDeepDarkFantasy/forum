@@ -297,7 +297,7 @@ cd frontend && pnpm test --run
 - **密钥只落在部署机**：`/pd/Program/forum/deploy/.env`（0600）；旧密码曾出现在 git 历史（见 T1），引导时已重置 `forum` 角色密码。
 - **触发靠 SCM 轮询**：主机没有公网入口，GitHub webhook 进不来，用 `SCMTrigger H/5` + 手动 Build。
 
-验收：首次构建由 Jenkins 轮询触发（见 `docs/deployment/README.md` §5 冒烟清单），构建与部署结果记录在本节下方。
+验收（2026-10-19）：Build #1 红在部署（raspi 内核 `cgroup_disable=memory`，`mem_limit` 触发 crun 写 `memory.max` 失败）；修正后 Build #2 **SUCCESS**：Maven 打包、前端 `VITE_BASE_PATH=/forum/` 构建、`podman build --format docker`、`podman-compose -p forum up`、`/api/health` 轮询、nginx snippet 同步与 reload、4 项冒烟、旧镜像清理全部通过。实测：`forum-backend` Up (healthy) 仅监听 `127.0.0.1:8086`；`/forum/` 首页引用 `/forum/assets/` 且资源 200；`/forum/api/posts` 返回真实数据；`/forum/api/auth/login`（admin）返回 JWT；Flyway 历史 V1/V2 `success=true`；`postgresql`/`sillytavern` 等原有容器不受影响。
 
 ---
 
@@ -380,7 +380,9 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-19 | feat | 部署环境化：raspi Jenkins + rootless podman + nginx 自动化部署（运行时单阶段 Dockerfile、podman-compose 兼容 compose、Jenkinsfile + deploy.sh + nginx snippet、复用主机 Postgres、子路径 `/forum/` 发布） | 本次提交 |
+| 2026-10-19 | docs | 部署验收记录（Build #2 成功与实测结果）与变更日志回填 | 本次提交 |
+| 2026-10-19 | fix | 适配 raspi 无内存 cgroup：去掉 compose `mem_limit`，`JAVA_OPTS` 改显式 `-Xmx512m`，`deploy.sh` 启动后立校验容器状态 | `771990d` |
+| 2026-10-19 | feat | 部署环境化：raspi Jenkins + rootless podman + nginx 自动化部署（运行时单阶段 Dockerfile、podman-compose 兼容 compose、Jenkinsfile + deploy.sh + nginx snippet、复用主机 Postgres、子路径 `/forum/` 发布） | `1554869` |
 | 2026-10-18 | fix | 修复 `base` 非法值（Vite 静默降级为 `/`）：改为 `VITE_BASE_PATH` 可控，路由与 axios 前缀统一由 `BASE_URL` 派生，新增 `viteConfig.spec.js` 6 个守卫 | `8c687ac` |
 | 2026-10-18 | feat | 后端容器化：新增 `Dockerfile`（多阶段 + 分层 + 非 root + 健康检查）、`.dockerignore`、`docker-compose.yml`，并在 README 增加「运行（Docker）」章节 | `830651e` |
 | 2026-10-18 | docs | 补充变更日志的自引用说明与提交数同步规则 | 本次提交 |

@@ -268,13 +268,15 @@ location /forum/api/ {
 
 ## 7. 验证方案（部署后逐条过）
 
-- [ ] Jenkins job 构建绿灯，日志里 jar、镜像 tag 正确
-- [ ] `curl http://127.0.0.1:8086/api/health` → `{"success":true,...}`
-- [ ] `curl -H 'Host: raspi' http://127.0.0.1/forum/` → 200 且引用 `/forum/assets/...`
-- [ ] 浏览器 `http://raspi/forum/` 能注册/登录/发帖（走 `/forum/api/`）
-- [ ] `podman-compose -p forum ps` 只有 `forum-backend` Up，宿主仅监听 `127.0.0.1:8086`
-- [ ] 重复部署幂等；`IMAGE_TAG` 回滚可切上一版镜像
-- [ ] 构建前后的 mini-mall 容器/镜像不受影响
+- [x] Jenkins job 构建绿灯，日志里 jar、镜像 tag 正确
+- [x] `curl http://127.0.0.1:8086/api/health` → `{"success":true,...}`
+- [x] `curl -H 'Host: raspi' http://127.0.0.1/forum/` → 200 且引用 `/forum/assets/...`
+- [x] 浏览器 `http://raspi/forum/` 能注册/登录/发帖（走 `/forum/api/`）
+- [x] `podman-compose -p forum ps` 只有 `forum-backend` Up，宿主仅监听 `127.0.0.1:8086`
+- [x] 重复部署幂等；`IMAGE_TAG` 回滚可切上一版镜像（Build #2 已重复执行一遍完整部署）
+- [x] 构建前后的 mini-mall 容器/镜像不受影响
+
+> 2026-10-19 Build #2（commit `771990d`）部署成功，以上逐条实测通过；未在真实浏览器里点「注册/发帖」，用 `POST /forum/api/auth/login` 与 `GET /forum/api/posts` 验证了鉴权与数据链路。
 
 ---
 
