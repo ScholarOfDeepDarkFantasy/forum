@@ -1158,7 +1158,7 @@ git commit -m "feat: 新增标签总览与标签帖子接口"
 - Modify: `frontend/src/styles/tokens.css`（断点说明同步）
 - Modify: `README.md`（断点段落同步）
 
-- [ ] **Step 1: 先写失败测试**
+- [x] **Step 1: 先写失败测试**
 
 `frontend/src/components/PostListItem.spec.js`：
 
@@ -1305,12 +1305,12 @@ describe('TagPostsView', () => {
 })
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/components/PostListItem.spec.js src/views/TagsView.spec.js src/views/TagPostsView.spec.js`
 Expected: FAIL —— 组件文件不存在。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 `frontend/src/api/index.js` 在评论接口之前加：
 
@@ -1813,22 +1813,22 @@ onMounted(load)
 </style>
 ```
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/components/PostListItem.spec.js src/views/TagsView.spec.js src/views/TagPostsView.spec.js`
 Expected: PASS。
 
-- [ ] **Step 5: 跑全量前端测试，修掉 HomeView 既有用例的适配问题**
+- [x] **Step 5: 跑全量前端测试，修掉 HomeView 既有用例的适配问题**
 
 Run: `cd frontend && pnpm test`
 Expected: 全绿。若 `HomeView.spec.js` 因组件抽取失败，按失败断言调整测试（选择器 `.like-btn`/`.post-item` 已在 `PostListItem` 中保留，通常无需改动）。
 
-- [ ] **Step 6: 构建验证**
+- [x] **Step 6: 构建验证**
 
 Run: `cd frontend && VITE_BASE_PATH=/forum/ pnpm build`（bash 下可用 `VITE_BASE_PATH=/forum/ pnpm build`；Windows 本地可用 `cross-env` 等价写法 `$env:VITE_BASE_PATH='/forum/'; pnpm build`）
 Expected: 构建成功，`dist/index.html` 引用 `/forum/assets/...`。
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add frontend/src frontend/package.json frontend/pnpm-lock.yaml README.md
@@ -1843,7 +1843,7 @@ git commit -m "feat: 新增标签总览页与标签帖子页，抽取公共帖�
 > 4. **`.nav-link` 普通色用 `--jf-color-text-3` 而非计划片段的 `--jf-color-text-2`**：`--jf-color-text-2` 已在本轮 `tokens.css` 中作为无消费方令牌删除，照抄计划会引用未定义变量；`text-3` 是当前次级文本令牌。
 > 5. **README 断点段落 5→6 属闸门必需**：`PostListItem` 承接原属 `HomeView` 的 `.post-item` 窄屏 `@media (max-width: 768px)`，断点字面量因此从 5 处变为 6 处；已同步 `breakpoint.spec.js`、`tokens.css`、`README.md` 三处闸门。
 > 6. **额外默认构建无副作用**：除计划要求的 `VITE_BASE_PATH=/forum/ pnpm build` 外，实施时还跑过默认 `pnpm build` 验证根路径构建；产物未提交，无代码影响。
-> 7. **P1 修复（本次评审新增）**：`TagPostsView.vue` 原先只在 `onMounted` 加载，同一路由记录内从 `/tags/java` 切到 `/tags/spring` 时组件复用，标题与总数更新而列表不刷新。现 `watch(() => route.params.name)`，参数变化时 `page = 0` 并 `load()`，并用请求序号丢弃过期响应（防止慢请求把旧标签数据写回）；`TagPostsView.spec.js` 新增「路由标签名变化时重置分页并重新加载新标签」用例。
+> 7. **P1 修复（本次评审新增，质量评审后修订措辞）**：`TagPostsView.vue` 原先只在 `onMounted` 加载，本意是覆盖同一路由记录内从 `/tags/java` 切到 `/tags/spring` 的复用场景；后经质量评审确认，`App.vue` 既有的 `<router-view :key="$route.fullPath">` 已使标签切换必然重建组件，故该缺陷在当前代码下不可复现。`watch(() => route.params.name)`（重置 `page = 0` 并 `load()`，请求序号丢弃过期响应）作为防御性守卫保留，避免将来去掉 key 时出现列表不刷新；`TagPostsView.spec.js` 的「路由标签名变化」用例覆盖无 key 的防御路径。
 > 8. **P2 补测（本次评审新增）**：设计规格 §6 要求更新 `frontend/src/api/index.spec.js` 覆盖 `tagApi` 路径，实施时遗漏；现补两条断言——`tagApi.list({keyword,page,size})` → `GET /tags` 带 params，`tagApi.posts('java',{page})` → `GET /tags/posts` 且 name 在 params 中。
 
 ---

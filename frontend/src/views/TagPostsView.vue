@@ -63,7 +63,8 @@ async function toggleLike(p) {
   }
 }
 
-// 路由参数变化时组件不会重新挂载，必须手动重置分页并重新拉取
+// 防御性守卫：App.vue 的 <router-view :key="$route.fullPath"> 目前会让标签切换时重建组件，
+// 这里仍监听参数变化，保证将来去掉 key 后也能重置分页并重新拉取
 watch(
   () => route.params.name,
   () => {
