@@ -29,9 +29,20 @@ public class TagService {
                         .thenComparing(TagResponse::name))
                 .toList();
 
-        int from = Math.min(page * size, all.size());
-        int to = Math.min(from + size, all.size());
-        int totalPages = size > 0 ? (int) Math.ceil((double) all.size() / size) : 0;
-        return new PageResponse<>(all.subList(from, to), page, size, all.size(), totalPages, to >= all.size());
+        // 分页用 long 运算再收窄：page=Integer.MAX_VALUE&size=100 时 int 乘法会溢出成负数，
+        // subList(from, to) 随即抛 IndexOutOfBoundsException（500）。size 在此处再做一次兜底，
+        // 保证 from/to 恒落在 [0, all.size()] 且 to >= from。
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(size, 1);
+        long fromL = (long) safePage * safeSize;
+        int from = (int) Math.min(fromL, all.size());
+        int to = (int) Math.min(fromL + safeSize, all.size());
+        if (to < from) {
+            to = from;
+        }
+        // totalPages 同样用 long 计算，避免 (all.size()+size-1) 在 int 下溢出
+        int totalPages = (int) ((all.size() + (long) safeSize - 1) / safeSize);
+        return new PageResponse<>(all.subList(from, to), safePage, safeSize, all.size(), totalPages,
+                to >= all.size());
     }
 }

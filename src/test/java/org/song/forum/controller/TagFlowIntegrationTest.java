@@ -32,7 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 第三轮标签接口集成测试（H2 + 随机端口）：
- * 建板块 → 发帖带标签 → 标签总览（数量排序/过滤）→ 标签帖子列表（分页/置顶优先/空标签）
+ * 建板块 → 发帖带标签 → 标签总览（数量排序/过滤/分页边界）→ 标签帖子列表（分页/置顶优先/空标签）
+ * → 缺参数与参数类型错误返回 400（质量评审回归）
  */
 @ActiveProfiles("test")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -55,6 +56,8 @@ class TagFlowIntegrationTest {
     private static String adminToken;
     private static String userToken;
     private static Long boardId;
+    /** "Java 第一篇" 的帖子 ID：置顶用例用它验证置顶帖恒在标签列表首位 */
+    private static Long firstJavaPostId;
 
     private String url(String path) {
         return "http://localhost:" + port + path;
@@ -89,14 +92,15 @@ class TagFlowIntegrationTest {
         return resp.getBody().getData().getToken();
     }
 
-    private void createPost(String token, String title, List<String> tags) {
+    private Long createPost(String token, String title, List<String> tags) {
         PostRequest req = new PostRequest();
         req.setBoardId(boardId);
         req.setTitle(title);
         req.setContent(title + " 正文");
         req.setTags(tags);
-        rest.exchange(url("/api/posts"), HttpMethod.POST, new HttpEntity<>(req, bearer(token)),
-                new ParameterizedTypeReference<Result<PostDetailResponse>>() {});
+        ResponseEntity<Result<PostDetailResponse>> resp = rest.exchange(url("/api/posts"), HttpMethod.POST,
+                new HttpEntity<>(req, bearer(token)), new ParameterizedTypeReference<>() {});
+        return resp.getBody().getData().getId();
     }
 
     @Test
@@ -112,11 +116,12 @@ class TagFlowIntegrationTest {
         boardId = created.getBody().getData().getId();
 
         userToken = registerAndLogin("tagger");
-        createPost(userToken, "Java 第一篇", List.of("java", "Spring"));
+        firstJavaPostId = createPost(userToken, "Java 第一篇", List.of("java", "Spring"));
         createPost(userToken, "Java 第二篇", List.of("java"));
         createPost(userToken, "Spring Boot 笔记", List.of("spring-boot"));
 
         assertThat(boardId).isNotNull();
+        assertThat(firstJavaPostId).isNotNull();
     }
 
     @Test
@@ -167,5 +172,68 @@ class TagFlowIntegrationTest {
                 url("/api/tags/posts?name=java&size=999"), HttpMethod.GET,
                 null, new ParameterizedTypeReference<>() {});
         assertThat(clamped.getBody().getData().size()).isEqualTo(50);
+    }
+
+    @Test
+    @Order(6)
+    void pinnedPostIsFirstInTagPostList() {
+        ResponseEntity<Result<PostDetailResponse>> pinned = rest.exchange(
+                url("/api/posts/" + firstJavaPostId + "/pin?pinned=true"), HttpMethod.PUT,
+                new HttpEntity<>(bearer(adminToken)), new ParameterizedTypeReference<>() {});
+        assertThat(pinned.getStatusCode().value()).isEqualTo(200);
+        assertThat(pinned.getBody().getData().getIsPinned()).isTrue();
+
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> resp = rest.exchange(
+                url("/api/tags/posts?name=java"), HttpMethod.GET,
+                null, new ParameterizedTypeReference<>() {});
+        List<PostSummaryResponse> posts = resp.getBody().getData().content();
+        // 置顶的是较早发布的"第一篇"，排序仍须把它放到最新的"第二篇"之前
+        assertThat(posts).hasSize(2);
+        assertThat(posts.get(0).getId()).isEqualTo(firstJavaPostId);
+        assertThat(posts.get(0).getIsPinned()).isTrue();
+        assertThat(posts.get(1).getIsPinned()).isFalse();
+    }
+
+    @Test
+    @Order(7)
+    void overviewPaginationBoundariesAreClampedAndOverflowSafe() {
+        // size 超过上限按 100 收窄
+        ResponseEntity<Result<PageResponse<TagResponse>>> big = rest.exchange(url("/api/tags?size=999"),
+                HttpMethod.GET, null, new ParameterizedTypeReference<>() {});
+        assertThat(big.getStatusCode().value()).isEqualTo(200);
+        assertThat(big.getBody().getData().size()).isEqualTo(100);
+
+        // page 为负数归零
+        ResponseEntity<Result<PageResponse<TagResponse>>> negative = rest.exchange(url("/api/tags?page=-1"),
+                HttpMethod.GET, null, new ParameterizedTypeReference<>() {});
+        assertThat(negative.getStatusCode().value()).isEqualTo(200);
+        assertThat(negative.getBody().getData().page()).isZero();
+
+        // 回归：page*size 在 int 下溢出为负数，subList 抛 IndexOutOfBoundsException → 500
+        ResponseEntity<Result<PageResponse<TagResponse>>> huge = rest.exchange(
+                url("/api/tags?page=2147483647&size=100"), HttpMethod.GET,
+                null, new ParameterizedTypeReference<>() {});
+        assertThat(huge.getStatusCode().value()).isEqualTo(200);
+        assertThat(huge.getBody().getData().content()).isEmpty();
+        assertThat(huge.getBody().getData().totalElements()).isEqualTo(3);
+    }
+
+    @Test
+    @Order(8)
+    void missingOrMalformedParamsReturn400() {
+        // 回归：缺 name 曾落到 Exception 兜底返回 500
+        ResponseEntity<Result<Void>> missing = rest.exchange(url("/api/tags/posts"), HttpMethod.GET,
+                null, new ParameterizedTypeReference<>() {});
+        assertThat(missing.getStatusCode().value()).isEqualTo(400);
+        assertThat(missing.getBody().isSuccess()).isFalse();
+        assertThat(missing.getBody().getMessage()).contains("name");
+
+        // 回归：size 类型不匹配同样应返回 400
+        ResponseEntity<Result<Void>> malformed = rest.exchange(
+                url("/api/tags/posts?name=java&size=abc"), HttpMethod.GET,
+                null, new ParameterizedTypeReference<>() {});
+        assertThat(malformed.getStatusCode().value()).isEqualTo(400);
+        assertThat(malformed.getBody().isSuccess()).isFalse();
+        assertThat(malformed.getBody().getMessage()).contains("size");
     }
 }

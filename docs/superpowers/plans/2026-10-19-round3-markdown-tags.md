@@ -1052,10 +1052,21 @@ public class TagService {
                         .thenComparing(TagResponse::name))
                 .toList();
 
-        int from = Math.min(page * size, all.size());
-        int to = Math.min(from + size, all.size());
-        int totalPages = size > 0 ? (int) Math.ceil((double) all.size() / size) : 0;
-        return new PageResponse<>(all.subList(from, to), page, size, all.size(), totalPages, to >= all.size());
+        // 分页用 long 运算再收窄：page=Integer.MAX_VALUE&size=100 时 int 乘法会溢出成负数，
+        // subList(from, to) 随即抛 IndexOutOfBoundsException（500）。size 在此处再做一次兜底，
+        // 保证 from/to 恒落在 [0, all.size()] 且 to >= from。
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.max(size, 1);
+        long fromL = (long) safePage * safeSize;
+        int from = (int) Math.min(fromL, all.size());
+        int to = (int) Math.min(fromL + safeSize, all.size());
+        if (to < from) {
+            to = from;
+        }
+        // totalPages 同样用 long 计算，避免 (all.size()+size-1) 在 int 下溢出
+        int totalPages = (int) ((all.size() + (long) safeSize - 1) / safeSize);
+        return new PageResponse<>(all.subList(from, to), safePage, safeSize, all.size(), totalPages,
+                to >= all.size());
     }
 }
 ```
@@ -1121,6 +1132,12 @@ Expected: BUILD SUCCESS，无失败。
 git add src/main/java src/test/java
 git commit -m "feat: 新增标签总览与标签帖子接口"
 ```
+
+> 偏差说明（2026-10-19 质量评审修正，提交 `fix: 修复标签分页溢出并为参数错误返回 400`）：
+> 1. **新增两个 400 异常处理器（计划未涉及）**：`GlobalExceptionHandler` 增加 `MissingServletRequestParameterException`（缺 `name` 等必需请求参数）与 `MethodArgumentTypeMismatchException`（如 `size=abc`）处理器。修正前两者都会落到 `Exception` 兜底返回 500「服务器内部错误」，把客户端错误误报为服务端故障；现在返回 400，消息分别为「缺少必需参数: xxx」「参数格式不正确: xxx」，响应仍是既有 `Result` 错误结构。
+> 2. **`TagService` 分页 long 化**：原 `page * size` 在 int 下溢出，`GET /api/tags?page=2147483647&size=100` 时 `from` 变负，`subList` 抛 `IndexOutOfBoundsException` → 500。改为先 `long` 运算再安全收窄到 `int`，并保证 `to >= from`、`totalPages` 用 long 计算不溢出；`page`/`size` 在服务层再做一次兜底（负数归零、size 至少 1）。上面 Step 3 的 `TagService` 代码片段已按修正后的实现更新。
+> 3. **补充测试**：`TagFlowIntegrationTest` 由 5 例增至 8 例——新增置顶优先（管理员 `PUT /api/posts/{id}/pin?pinned=true` 后断言置顶帖在 `/api/tags/posts?name=java` 首位且 `isPinned=true`）、分页边界（`size=999` 收窄为 100、`page=-1` 归零、`page=2147483647` 返回 200 且 content 为空）、参数错误 400（缺 `name`、`size=abc`）。Step 4 中的「Tests run: 5」为当时记录，修正后该类为 8 例；全量 9 类 39 例。
+> 4. **已知 minor（本次未改，仅登记）**：LIKE 通配符未转义、`findWithPostCounts` 返回 `Object[]` 未改投影、`SecurityConfig` 未把标签接口限定为 GET、标签排序依赖数据库 locale。
 
 ---
 
