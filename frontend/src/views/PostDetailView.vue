@@ -347,10 +347,6 @@ onMounted(async () => {
   display: flex;
   gap: var(--jf-space-2);
 }
-.post-content {
-  line-height: 1.8;
-  font-size: 15px;
-}
 .post-tags {
   margin-top: 14px;
   display: flex;

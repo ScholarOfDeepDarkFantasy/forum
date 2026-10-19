@@ -184,6 +184,18 @@ describe('PostDetailView 互动状态与共享状态同源', () => {
     expect(wrapper.findAll('.post-actions button')[0].attributes('data-type')).toBe('primary')
   })
 
+})
+
+/** Markdown 渲染与标签导航：与互动状态无关，单独成组 */
+describe('PostDetailView Markdown 渲染与标签导航', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    pinia = createPinia()
+    setActivePinia(pinia)
+    commentApi.list.mockResolvedValue({ content: [], totalElements: 0 })
+  })
+
   it('正文按 Markdown 渲染而不是原样输出', async () => {
     postApi.detail.mockResolvedValue(detailPayload({ id: 301, content: '## 小标题\n\n**加粗**' }))
     const wrapper = mountDetail()
@@ -195,12 +207,16 @@ describe('PostDetailView 互动状态与共享状态同源', () => {
     expect(content.html()).toContain('<strong>加粗</strong>')
   })
 
-  it('点击标签 chip 跳转标签帖子页', async () => {
-    postApi.detail.mockResolvedValue(detailPayload({ id: 302, tags: ['spring-boot'] }))
+  it('点击标签 chip 跳转标签帖子页，标签名经过编码', async () => {
+    postApi.detail.mockResolvedValue(detailPayload({ id: 302, tags: ['spring-boot', 'C#'] }))
     const wrapper = mountDetail()
     await flush()
 
-    await wrapper.find('.post-tags .el-tag, .post-tags span').trigger('click')
+    const chips = wrapper.findAll('.post-tags .tag-link')
+    expect(chips).toHaveLength(2)
+    await chips[0].trigger('click')
     expect(push).toHaveBeenCalledWith('/tags/spring-boot')
+    await chips[1].trigger('click')
+    expect(push).toHaveBeenCalledWith('/tags/C%23')
   })
 })

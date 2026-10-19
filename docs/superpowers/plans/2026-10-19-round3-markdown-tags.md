@@ -439,27 +439,42 @@ git commit -m "feat: 新增帖子 Markdown 渲染工具与排版样式"
 
 - [x] **Step 1: 先写失败测试**
 
-在 `frontend/src/views/PostDetailView.spec.js` 的 `describe` 内追加（沿用文件顶部的 mock 与 `mountDetail`）：
+在 `frontend/src/views/PostDetailView.spec.js` 末尾新增独立 `describe`（沿用文件顶部的 mock、`mountDetail` 与 `beforeEach` 状态初始化约定）：
 
 ```js
-it('正文按 Markdown 渲染而不是原样输出', async () => {
-  postApi.detail.mockResolvedValue(detailPayload({ id: 301, content: '## 小标题\n\n**加粗**' }))
-  const wrapper = mountDetail()
-  await flush()
+/** Markdown 渲染与标签导航：与互动状态无关，单独成组 */
+describe('PostDetailView Markdown 渲染与标签导航', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    pinia = createPinia()
+    setActivePinia(pinia)
+    commentApi.list.mockResolvedValue({ content: [], totalElements: 0 })
+  })
 
-  const content = wrapper.find('.post-content')
-  expect(content.classes()).toContain('markdown-body')
-  expect(content.html()).toContain('<h2>小标题</h2>')
-  expect(content.html()).toContain('<strong>加粗</strong>')
-})
+  it('正文按 Markdown 渲染而不是原样输出', async () => {
+    postApi.detail.mockResolvedValue(detailPayload({ id: 301, content: '## 小标题\n\n**加粗**' }))
+    const wrapper = mountDetail()
+    await flush()
 
-it('点击标签 chip 跳转标签帖子页', async () => {
-  postApi.detail.mockResolvedValue(detailPayload({ id: 302, tags: ['spring-boot'] }))
-  const wrapper = mountDetail()
-  await flush()
+    const content = wrapper.find('.post-content')
+    expect(content.classes()).toContain('markdown-body')
+    expect(content.html()).toContain('<h2>小标题</h2>')
+    expect(content.html()).toContain('<strong>加粗</strong>')
+  })
 
-  await wrapper.find('.post-tags .el-tag, .post-tags span').trigger('click')
-  expect(push).toHaveBeenCalledWith('/tags/spring-boot')
+  it('点击标签 chip 跳转标签帖子页，标签名经过编码', async () => {
+    postApi.detail.mockResolvedValue(detailPayload({ id: 302, tags: ['spring-boot', 'C#'] }))
+    const wrapper = mountDetail()
+    await flush()
+
+    const chips = wrapper.findAll('.post-tags .tag-link')
+    expect(chips).toHaveLength(2)
+    await chips[0].trigger('click')
+    expect(push).toHaveBeenCalledWith('/tags/spring-boot')
+    await chips[1].trigger('click')
+    expect(push).toHaveBeenCalledWith('/tags/C%23')
+  })
 })
 ```
 
@@ -512,16 +527,12 @@ const renderedContent = computed(() => (post.value ? renderMarkdown(post.value.c
 `<style scoped>` 中：
 
 ```css
-.post-content {
-  line-height: 1.8;
-  font-size: 15px;
-}
 .tag-link {
   cursor: pointer;
 }
 ```
 
-（注意：删除原 `.post-content` 的 `white-space: pre-wrap`，评论样式不动。）
+（注意：`.post-content` 只保留为查询/测试钩子，排版交给全局 `.markdown-body`，因此删除其 `white-space: pre-wrap` 与字号/行高；评论样式不动。）
 
 - [x] **Step 4: 运行确认通过**
 
