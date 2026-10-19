@@ -554,7 +554,7 @@ git commit -m "feat: 帖子详情页渲染 Markdown，标签支持跳转"
 - Modify: `frontend/src/views/PostEditView.vue`
 - Test: `frontend/src/views/PostEditView.spec.js`（新建）
 
-- [ ] **Step 1: 先写失败测试**
+- [x] **Step 1: 先写失败测试**
 
 创建 `frontend/src/views/PostEditView.spec.js`：
 
@@ -647,12 +647,12 @@ describe('PostEditView Markdown 预览', () => {
 })
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/views/PostEditView.spec.js`
 Expected: FAIL —— 编辑页还没有 `.editor-grid` / `.preview`。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 `PostEditView.vue` `<script setup>` 增加：
 
@@ -723,12 +723,12 @@ const previewHtml = computed(() => renderMarkdown(form.content))
 }
 ```
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/views/PostEditView.spec.js`
 Expected: PASS（2 个用例）。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add frontend/src/views/PostEditView.vue frontend/src/views/PostEditView.spec.js
