@@ -29,10 +29,14 @@ services:
       SERVER_PORT: "8080"
       LOG_FILE: /app/logs/javaforum.log
       TZ: ${TZ:-Asia/Shanghai}
-      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError}
+      # 显式 -Xmx 而不是 -XX:MaxRAMPercentage：raspi 内核 cmdline 带 cgroup_disable=memory，
+      # 容器看不到内存上限，MaxRAMPercentage 会按整机内存算，反而容易 OOM 整机
+      JAVA_OPTS: ${JAVA_OPTS:--Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError}
     ports:
       # 只绑本机回环：由 nginx 反代，局域网不直接暴露后端
       - "127.0.0.1:${HOST_PORT:-8086}:8080"
     restart: unless-stopped
-    # 小内存主机（3.7G）上必须限制，避免 JVM 吃满
-    mem_limit: 768m
+    # 不要写 mem_limit：raspi 的 /proc/cmdline 带 cgroup_disable=memory，
+    # rootless crun 写 memory.max 会直接失败
+    # （crun: opening file `memory.max` for writing: No such file or directory）。
+    # 内存上限靠上面的 JAVA_OPTS -Xmx 控制。

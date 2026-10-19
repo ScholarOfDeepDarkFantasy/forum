@@ -282,7 +282,7 @@ cd frontend && pnpm test --run
 | 文件 | 要点 |
 | --- | --- |
 | `Dockerfile` | 改为**运行时单阶段**：`eclipse-temurin:17-jre-jammy`（主机已有 arm64 镜像）+ 预构建 jar；数字 UID 1001（不依赖 `useradd`）；`HEALTHCHECK` 用 bash `/dev/tcp`（jammy 无 curl），需 `--format docker` 构建才会保留 |
-| `docker-compose.yml` | 只保留 `backend`（podman-compose 1.0.3 兼容：无顶层 `name:`、无 `depends_on.condition`、无 volume `:U`）；绑定 `127.0.0.1:${HOST_PORT:-8086}`；`mem_limit 768m` |
+| `docker-compose.yml` | 只保留 `backend`（podman-compose 1.0.3 兼容：无顶层 `name:`、无 `depends_on.condition`、无 volume `:U`）；绑定 `127.0.0.1:${HOST_PORT:-8086}`；不写 `mem_limit`（内核 `cgroup_disable=memory`），内存靠 `JAVA_OPTS -Xms128m -Xmx512m` |
 | `Jenkinsfile` | 工作区固定 `/pd/jenkins-workspace/forum`；`tools { jdk 'Java17'; maven 'M3' }`；pnpm 绝对路径 + npmmirror；`podman build --format docker`；部署用 `sudo -u pi` |
 | `deploy/deploy.sh` | compose 同步 → `podman-compose -p forum down/up` → 轮询 `/api/health`（120s）→ rsync dist → nginx `cp/-t/reload` → 4 项冒烟 → 只清旧数字 tag（保留 2 个） |
 | `deploy/nginx/forum.conf` | `/forum/` alias + SPA 回退（`try_files`）；`/forum/api/` 反代 8086；`/forum/assets/` 长缓存 |

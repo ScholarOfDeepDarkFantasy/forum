@@ -52,6 +52,13 @@ log "重建后端容器（镜像 localhost/forum-backend:$TAG）"
 podman rm -f forum-backend >/dev/null 2>&1 || true
 (cd "$DEPLOY_DIR" && podman-compose -p forum up -d)
 
+# podman-compose 1.0.3 不会把子命令失败透传成非零退出码：必须自己确认容器真的起来了，
+# 否则要白等 120s 才报健康检查超时，真正的错误（如不兼容的运行时参数）会被埋掉。
+if [ "$(podman inspect -f '{{.State.Running}}' forum-backend 2>/dev/null || true)" != "true" ]; then
+    podman logs --tail 100 forum-backend 2>&1 || true
+    die "forum-backend 未运行（见上方 podman 输出；常见原因：crun 不支持的运行时参数，如 mem_limit）"
+fi
+
 log "等待后端就绪 http://127.0.0.1:$HOST_PORT/api/health"
 ready=0
 for _ in $(seq 1 60); do

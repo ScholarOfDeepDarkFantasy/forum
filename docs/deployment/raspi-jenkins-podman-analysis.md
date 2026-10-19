@@ -94,7 +94,7 @@ ENV TZ=Asia/Shanghai \
     SERVER_PORT=8080 \
     SPRING_PROFILES_ACTIVE=prod \
     LOG_FILE=/app/logs/javaforum.log \
-    JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError"
+    JAVA_OPTS="-Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError"
 
 # 用数字 UID/GID，避免精简镜像缺 passwd/useradd；1001 只存在于容器内
 WORKDIR /app
@@ -131,11 +131,12 @@ services:
       SERVER_PORT: "8080"
       LOG_FILE: /app/logs/javaforum.log
       TZ: ${TZ:-Asia/Shanghai}
-      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError}
+      # 显式 -Xmx：主机 cgroup_disable=memory，容器看不到内存上限（见 §10）
+      JAVA_OPTS: ${JAVA_OPTS:--Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError}
     ports:
       - "127.0.0.1:${HOST_PORT:-8086}:8080"
     restart: unless-stopped
-    mem_limit: 768m
+    # 不写 mem_limit：cgroup_disable=memory，crun 写 memory.max 会失败（见 §10）
 ```
 
 1.0.3 的已知限制与对策：
@@ -144,7 +145,7 @@ services:
 - 不支持 volume 的 `:U` 等扩展选项（旧版解析会静默忽略）→ 不挂日志卷，`podman logs` 看日志；
 - 无 `profiles`；顶层 `name:` 不可靠 → 统一 `podman-compose -p forum`；
 - healthcheck 支持是 WIP → 不依赖它，部署脚本用 curl 轮询；
-- `mem_limit` 支持（转 `-m`），小内存机器必须限制。
+- `mem_limit` 会转成 `-m`，但本机内核带 `cgroup_disable=memory`，crun 写 `memory.max` 直接失败 → 不用 `mem_limit`，靠 `JAVA_OPTS -Xmx` 限堆。
 
 ### 4.4 Jenkins 流水线（新增 `Jenkinsfile`）
 
@@ -228,7 +229,7 @@ location /forum/api/ {
 
 ### 4.8 资源与稳定性
 
-- 内存 3.7G、已用 1.4G：只有一个 backend 容器，`mem_limit 768m`（JVM `MaxRAMPercentage=70` ≈ 537m），数据库是已有的 postgresql 容器（~50MB），余量充足。
+- 内存 3.7G、已用 1.4G：只有一个 backend 容器；JVM 用 `-Xms128m -Xmx512m` 显式限堆（主机无内存 cgroup，不能用 `mem_limit`/`MaxRAMPercentage`），数据库是已有的 postgresql 容器（~50MB），余量充足。
 - 镜像/卷/工作区都在 `/pd`（1TB 空余），根盘 5G 不参与。
 - 容器 `restart: unless-stopped`，主机重启后 pi 的 rootless podman 是否自启取决于 `podman-restart.service`/linger；当前 pi 的 linger=no。**当前pi 有运行中的容器（mini-mall 等），说明靠登录/手动恢复**；我们保持同样方式，不额外引入系统级改动。这点会在部署文档里写明。
 - 不与现有容器冲突：compose 项目名 `forum`，卷/网络名带 `forum_` 前缀；端口 8086 空闲。
@@ -300,3 +301,17 @@ location /forum/api/ {
 5. 执行方式：本机完成代码/文档修改，主机侧一次性引导由本次会话直接完成，并跑通首次构建与冒烟。
 
 确认后我按 §5 改文件并跑通首次部署。
+
+---
+
+## 10. 实施记录（2026-10-19）
+
+- **首次构建（Build #1）红在部署**：`podman run ... -m 768m` 启动容器失败：
+  `crun: opening file `memory.max` for writing: No such file or directory`。
+  原因：raspi 的 `/proc/cmdline` 带 `cgroup_disable=memory`，`/sys/fs/cgroup/cgroup.controllers` 只有 `cpuset cpu io pids`；
+  rootless crun 没有内存控制器可写，`mem_limit` 在此机器上必然失败。
+- **修正**：compose 去掉 `mem_limit`；内存改由 `JAVA_OPTS=-Xms128m -Xmx512m` 显式限堆
+  （无内存上限时 `MaxRAMPercentage` 会按整机 3.7G 算，反而容易把整机拖进 OOM）；
+  `deploy.sh` 在 `podman-compose up` 后立即检查容器 `Running`，失败即打印 `podman logs` 并退出，不再白等 120s 健康检查。
+- 宿主机 `/pd/Program/forum/deploy/.env` 的 `JAVA_OPTS` 同步为 `-Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError`。
+- 首次构建已验证的前半段：Maven 打包成功（jar 63M）、前端 `VITE_BASE_PATH=/forum/` 构建成功、镜像 `localhost/forum-backend:1` 构建成功（390MB）。

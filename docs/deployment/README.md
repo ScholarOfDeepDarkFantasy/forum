@@ -38,7 +38,7 @@ JWT_SECRET='$JWT_SECRET'
 HOST_PORT=8086
 TZ=Asia/Shanghai
 IMAGE_TAG=latest
-JAVA_OPTS='-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError'
+JAVA_OPTS='-Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError'   # 不要用 MaxRAMPercentage，见第 7 节
 EOF
 chmod 600 .env
 sudo -u pi podman exec postgresql psql -U postgres -c "ALTER ROLE forum WITH PASSWORD '$DB_PASSWORD';"
@@ -108,6 +108,7 @@ curl -fsS -H 'Host: raspi' 'http://127.0.0.1/forum/api/posts?page=0&size=1'   # 
 | 部署阶段 `缺少 .env` | 执行第 2 步引导；`chmod 600` 且属主 pi |
 | `podman-compose: command not found` | 脚本在 pi 环境执行；jenkins 的 sudoers 已放行 `/usr/bin/podman-compose` |
 | 后端启动即退出 | `sudo -u pi podman logs forum-backend`：常见是 DB 连不上（`host.containers.internal` 解析/密码） |
+| 容器 `Created` 但起不来，日志有 `crun: opening file 'memory.max' ...` | compose 里写了 `mem_limit`，而本机 `/proc/cmdline` 带 `cgroup_disable=memory`（没有内存 cgroup 控制器）；删掉 `mem_limit`，用 `JAVA_OPTS` 的 `-Xmx` 限制堆 |
 | 数据库密码错 | `sudo -u pi podman exec postgresql psql -U postgres -c "ALTER ROLE forum WITH PASSWORD '<.env 里的值>';"` |
 | `/forum/` 404 | `app.conf` 是否 include snippet；`/pd/Program/forum/frontend/index.html` 是否存在 |
 | `/forum/api/` 502 | `forum-backend` 未起或未监听 8086：`sudo -u pi curl -v http://127.0.0.1:8086/api/health` |
@@ -118,6 +119,7 @@ curl -fsS -H 'Host: raspi' 'http://127.0.0.1/forum/api/posts?page=0&size=1'   # 
 - **没有公网入口**：不用 GitHub webhook，靠 `pollSCM`（最长延迟约 5 分钟）；想即时构建需手动 Build。
 - **重启后容器不会自动拉起**：pi（和 jenkins）没有开启 linger，rootless 容器依赖登录/手动启动（与主机上现有 mini-mall 等服务同一现状）。重启后执行：`sudo -u pi podman-compose -p forum -f /pd/Program/forum/deploy/docker-compose.yml up -d`。
 - **`/` 根盘只剩约 5G**：Jenkins 工作区固定在 `/pd/jenkins-workspace/forum`，pnpm store 在 `/pd/pnpm-store`，镜像在 `/pd/container`。
+- **不能用 `mem_limit` 限制容器内存**：内核 cmdline 带 `cgroup_disable=memory`，rootless crun 写 `memory.max` 会失败；堆大小由 `.env` 里的 `JAVA_OPTS=-Xmx512m` 控制。
 - **不要执行全局 `podman image prune`**：会把 mini-mall 等其它项目的镜像一起删掉；流水线只清理 `localhost/forum-backend` 的旧数字 tag。
 
 ## 附录 A：Jenkins job `config.xml`
