@@ -81,6 +81,9 @@ cd frontend && pnpm test --run
 | Axios | 1.20.0 |
 | Element Plus | 2.14.7（+ `@element-plus/icons-vue` 2.3.2） |
 | Vitest | 5.0.4（+ `@vue/test-utils` 2.5.1、jsdom 30.1.3） |
+| Markdown | markdown-it 15.0.3（`html: false`，客户端渲染） |
+| HTML 过滤 | DOMPurify 3.4.17（白名单 + `afterSanitizeAttributes` 钩子） |
+| 代码高亮 | highlight.js 11.12.0（core + 11 种语言） |
 
 **测试**
 
@@ -113,10 +116,10 @@ cd frontend && pnpm test --run
 | --- | --- | --- | --- | --- |
 | 第一轮 | 体验迭代：视觉层级 + 响应式 + 通知闭环 | 13 | ✅ 已完成 | 2026-10-17 |
 | 第二轮 | 优化：性能 + 安全 + 可维护性 | 7 | ✅ 已完成 | 2026-10-17 |
-| 第三轮 | Markdown 渲染 + 标签检索 | 7 | ✅ 已完成 | 2026-10-19 |
+| 第三轮 | Markdown 渲染 + 标签检索 | 7 | 🚧 验证/上线中 | — |
 | 部署工程化 | raspi：Jenkins + rootless podman + nginx 自动化部署（见 §4.7） | — | ✅ 已完成 | 2026-10-19 |
 
-**当前进度：MVP 100% ｜ 已完成 3 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 2 轮迭代，第三轮验证/上线中。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
@@ -128,7 +131,7 @@ cd frontend && pnpm test --run
 | --- | --- | --- |
 | 后端主代码（`src/main/java`） | 69 | 3390 |
 | 后端测试（`src/test/java`） | 9 | 1653 |
-| 前端产品代码（`frontend/src`，不含 spec） | 28 | 3230 |
+| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 28 | 3230 |
 | 前端测试（`*.spec.js`） | 20 | 2709 |
 
 后端分层（文件数）：`entity/` 12、`dto/` 17、`repository/` 9、`controller/` 8、`service/` 8、`security/` 5、`config/` 4、`util/` 3、`exception/` 2。
@@ -343,7 +346,7 @@ cd frontend && pnpm test --run
 | 前端 | `views/PostDetailView.vue` | 正文改 Markdown 渲染（`v-html` 绑定已消毒 HTML，容器带 `.markdown-body`） |
 | 前端 | `views/PostEditView.vue` | 桌面左右分栏实时预览、窄屏编辑/预览 tab |
 | 前端 | `views/HomeView.vue` | 列表改用 `PostListItem`，消除重复的帖子行模板 |
-| 前端 | `styles/breakpoint.spec.js`、`styles/tokens.css` | 断点数量守卫 5→6（新增标签页媒体查询）；令牌补齐 |
+| 前端 | `styles/breakpoint.spec.js`、`styles/tokens.css` | 断点数量守卫 5→6（新增标签页媒体查询）；同步 tokens.css 断点字面量注释（7→8 处），未新增令牌 |
 
 关键取舍：
 
