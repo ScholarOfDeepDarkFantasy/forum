@@ -80,6 +80,8 @@
 - Modify: `frontend/src/main.js`
 - Test: `frontend/src/utils/markdown.spec.js`
 
+> 说明：markdown.css 使用 --jf-color-text-3（--jf-color-text-2 已在第二轮移除，不再新增令牌）。
+
 - [ ] **Step 1: 安装依赖**
 
 ```bash
@@ -146,12 +148,16 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('onerror')
   })
 
-  it('javascript: 链接不可用', () => {
+  it('javascript: 链接不会变成可点击链接', () => {
     const html = renderMarkdown('[点我](javascript:alert(1))')
-    expect(html).not.toContain('javascript:alert')
+    expect(html).not.toMatch(/href\s*=\s*["']?\s*javascript:/i)
+    expect(html).not.toContain('<a ')
+    expect(html).toContain('点我')
   })
 })
 ```
+
+markdown-it 默认校验链接协议：javascript: 链接不会生成 <a>，断言的是真实安全属性（无可执行链接）而不是输出中不出现该字符串。
 
 - [ ] **Step 3: 运行测试确认失败**
 
@@ -294,7 +300,7 @@ export function renderMarkdown(source) {
 }
 .markdown-body blockquote {
   padding: 0.2em 1em;
-  color: var(--jf-color-text-2);
+  color: var(--jf-color-text-3);
   border-left: 4px solid var(--jf-color-border);
   background: var(--jf-color-bg-hover);
 }

@@ -50,8 +50,10 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('onerror')
   })
 
-  it('javascript: 链接不可用', () => {
+  it('javascript: 链接不会变成可点击链接', () => {
     const html = renderMarkdown('[点我](javascript:alert(1))')
-    expect(html).not.toContain('javascript:alert')
+    expect(html).not.toMatch(/href\s*=\s*["']?\s*javascript:/i)
+    expect(html).not.toContain('<a ')
+    expect(html).toContain('点我')
   })
 })

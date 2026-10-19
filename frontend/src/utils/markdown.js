@@ -45,13 +45,6 @@ const md = new MarkdownIt({
   }
 })
 
-// 链接协议白名单交给 DOMPurify 统一裁决（markdown-it 没有 afterValidateLink 之类的
-// 钩子，只能在渲染后剥离 href/src）。markdown-it 默认拒绝 javascript: 的方式是把整段
-// Markdown 语法原样当纯文本输出——「[点我](javascript:alert(1))」会连危险协议一起
-// 显示在页面上。放开这里的校验后，链接会先渲染成 <a>，再由 DOMPurify 连同 href
-// 一起剥离：链接文字保留、不可点击，危险协议不出现在成品 HTML 里。
-md.validateLink = () => true
-
 // 渲染后统一加安全属性（DOMPurify 默认会丢掉 target，必须在 afterSanitizeAttributes 里补）
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A') {

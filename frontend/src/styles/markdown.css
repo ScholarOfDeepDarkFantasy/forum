@@ -41,7 +41,7 @@
 }
 .markdown-body blockquote {
   padding: 0.2em 1em;
-  color: var(--jf-color-text-2);
+  color: var(--jf-color-text-3);
   border-left: 4px solid var(--jf-color-border);
   background: var(--jf-color-bg-hover);
 }
