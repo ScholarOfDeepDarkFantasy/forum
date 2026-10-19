@@ -183,4 +183,24 @@ describe('PostDetailView 互动状态与共享状态同源', () => {
     expect(wrapper.find('.post-actions').text()).toContain('点赞 3')
     expect(wrapper.findAll('.post-actions button')[0].attributes('data-type')).toBe('primary')
   })
+
+  it('正文按 Markdown 渲染而不是原样输出', async () => {
+    postApi.detail.mockResolvedValue(detailPayload({ id: 301, content: '## 小标题\n\n**加粗**' }))
+    const wrapper = mountDetail()
+    await flush()
+
+    const content = wrapper.find('.post-content')
+    expect(content.classes()).toContain('markdown-body')
+    expect(content.html()).toContain('<h2>小标题</h2>')
+    expect(content.html()).toContain('<strong>加粗</strong>')
+  })
+
+  it('点击标签 chip 跳转标签帖子页', async () => {
+    postApi.detail.mockResolvedValue(detailPayload({ id: 302, tags: ['spring-boot'] }))
+    const wrapper = mountDetail()
+    await flush()
+
+    await wrapper.find('.post-tags .el-tag, .post-tags span').trigger('click')
+    expect(push).toHaveBeenCalledWith('/tags/spring-boot')
+  })
 })

@@ -437,7 +437,7 @@ git commit -m "feat: 新增帖子 Markdown 渲染工具与排版样式"
 - Modify: `frontend/src/views/PostDetailView.vue`
 - Test: `frontend/src/views/PostDetailView.spec.js`
 
-- [ ] **Step 1: 先写失败测试**
+- [x] **Step 1: 先写失败测试**
 
 在 `frontend/src/views/PostDetailView.spec.js` 的 `describe` 内追加（沿用文件顶部的 mock 与 `mountDetail`）：
 
@@ -463,12 +463,12 @@ it('点击标签 chip 跳转标签帖子页', async () => {
 })
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/views/PostDetailView.spec.js`
 Expected: FAIL —— `.post-content` 仍是纯文本、无点击行为。
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 在 `PostDetailView.vue` `<script setup>` 中：
 
@@ -523,12 +523,12 @@ const renderedContent = computed(() => (post.value ? renderMarkdown(post.value.c
 
 （注意：删除原 `.post-content` 的 `white-space: pre-wrap`，评论样式不动。）
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/views/PostDetailView.spec.js`
 Expected: PASS（原 3 个用例 + 新增 2 个）。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add frontend/src/views/PostDetailView.vue frontend/src/views/PostDetailView.spec.js

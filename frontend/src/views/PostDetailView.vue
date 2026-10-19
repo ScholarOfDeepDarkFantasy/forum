@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePostActions } from '@/composables/usePostActions'
 import { useNotificationStore } from '@/stores/notifications'
 import { formatDateTime } from '@/utils/format'
+import { renderMarkdown } from '@/utils/markdown'
 
 const route = useRoute()
 const router = useRouter()
@@ -53,6 +54,9 @@ async function loadPost() {
   actions.syncFromPost(detail)
   post.value = detail
 }
+
+// 正文渲染：渲染函数与编辑页预览共用，保证所见即所得
+const renderedContent = computed(() => (post.value ? renderMarkdown(post.value.content) : ''))
 
 /**
  * 把 URL 锚点（#comment-N）滚动定位到对应评论并短暂高亮。
@@ -216,9 +220,19 @@ onMounted(async () => {
       </div>
 
       <el-divider />
-      <div class="post-content">{{ post.content }}</div>
+      <div class="post-content markdown-body" v-html="renderedContent"></div>
       <div class="post-tags" v-if="post.tags?.length">
-        <el-tag v-for="t in post.tags" :key="t" size="small" type="info" effect="plain">{{ t }}</el-tag>
+        <el-tag
+          v-for="t in post.tags"
+          :key="t"
+          size="small"
+          type="info"
+          effect="plain"
+          class="tag-link"
+          @click="router.push(`/tags/${encodeURIComponent(t)}`)"
+        >
+          {{ t }}
+        </el-tag>
       </div>
 
       <div class="post-actions">
@@ -334,7 +348,6 @@ onMounted(async () => {
   gap: var(--jf-space-2);
 }
 .post-content {
-  white-space: pre-wrap;
   line-height: 1.8;
   font-size: 15px;
 }
@@ -342,6 +355,9 @@ onMounted(async () => {
   margin-top: 14px;
   display: flex;
   gap: 6px;
+}
+.tag-link {
+  cursor: pointer;
 }
 .post-actions {
   margin-top: 18px;
