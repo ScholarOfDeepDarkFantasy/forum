@@ -42,6 +42,11 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @EntityGraph(attributePaths = {"board", "author", "tags"})
     List<Post> findWithAssociations(@Param("ids") Collection<Long> ids);
 
+    /** 某标签下的帖子分页第一步：只取骨架，不 join tags 集合（原因同 searchIds） */
+    @Query("SELECT p FROM Post p JOIN p.tags t WHERE p.deleted = false AND t.name = :name")
+    @EntityGraph(attributePaths = {"board", "author"})
+    Page<Post> searchByTagName(@Param("name") String name, Pageable pageable);
+
     /** "我的帖子"分页第一步：同 {@link #searchIds}，只取骨架不 join tags。 */
     @EntityGraph(attributePaths = {"board", "author"})
     Page<Post> findIdsByAuthorIdAndDeletedFalse(Long authorId, Pageable pageable);

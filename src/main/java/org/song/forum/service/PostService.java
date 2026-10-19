@@ -145,6 +145,18 @@ public class PostService {
         return PageResponse.of(mapSummaries(hydrate(skeletons)));
     }
 
+    /** 标签帖子列表：复用与首页相同的两步查询与互动状态计算；标签不存在时返回空页 */
+    @Transactional(readOnly = true)
+    public PageResponse<PostSummaryResponse> listByTag(String tagName, int page, int size) {
+        String normalized = tagName == null ? "" : tagName.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty() || tagRepository.findByName(normalized).isEmpty()) {
+            return new PageResponse<>(List.of(), page, size, 0, 0, true);
+        }
+        Pageable pageable = PageRequest.of(page, size, pinnedFirstSort());
+        Page<Post> skeletons = postRepository.searchByTagName(normalized, pageable);
+        return PageResponse.of(mapSummaries(hydrate(skeletons)));
+    }
+
     /** 帖子详情：浏览量原子 +1 后返回 */
     @Transactional
     public PostDetailResponse getDetail(Long postId) {

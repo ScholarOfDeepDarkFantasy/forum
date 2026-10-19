@@ -255,4 +255,28 @@ class RepositoryTests {
         assertThat(hydrated).hasSize(1);
         assertThat(hydrated.get(0).getTags()).extracting(Tag::getName).containsExactly("fav-tag");
     }
+
+    @Test
+    void tagAggregationCountsOnlyUndeletedPosts() {
+        User author = user("tag-owner");
+        Board board = boardRepository.save(Board.builder().name("标签板块").description("d").build());
+        Tag java = tagRepository.save(Tag.builder().name("java").build());
+        Tag spring = tagRepository.save(Tag.builder().name("spring").build());
+
+        Post alive = postRepository.save(Post.builder()
+                .board(board).author(author).title("a").content("a").build());
+        alive.getTags().add(java);
+        postRepository.save(alive);
+
+        Post deleted = postRepository.save(Post.builder()
+                .board(board).author(author).title("b").content("b").build());
+        deleted.getTags().add(java);
+        deleted.getTags().add(spring);
+        deleted.setDeleted(true);
+        postRepository.save(deleted);
+
+        assertThat(tagRepository.findWithPostCounts(""))
+                .extracting(row -> row[1], row -> ((Number) row[2]).longValue())
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("java", 1L));
+    }
 }

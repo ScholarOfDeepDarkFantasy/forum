@@ -752,7 +752,7 @@ git commit -m "feat: 帖子编辑页新增 Markdown 实时预览（桌面分栏/
 - Modify: `src/main/java/org/song/forum/config/SecurityConfig.java`
 - Modify: `src/test/java/org/song/forum/repository/RepositoryTests.java`
 
-- [ ] **Step 1: 写集成测试（先失败）**
+- [x] **Step 1: 写集成测试（先失败）**
 
 创建 `src/test/java/org/song/forum/controller/TagFlowIntegrationTest.java`：
 
@@ -957,12 +957,12 @@ void tagAggregationCountsOnlyUndeletedPosts() {
 }
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `cd /e/JavaSpace/forum && mvn -B -q -Dtest=TagFlowIntegrationTest,RepositoryTests test`
 Expected: 编译失败 —— `TagResponse`/`findWithPostCounts`/`TagController` 尚不存在。
 
-- [ ] **Step 3: 实现后端**
+- [x] **Step 3: 实现后端**
 
 `src/main/java/org/song/forum/dto/tag/TagResponse.java`：
 
@@ -1105,17 +1105,17 @@ public class TagController {
 
 `SecurityConfig.PUBLIC_GET` 数组里加一行 `"/api/tags/**"`。
 
-- [ ] **Step 4: 运行后端测试确认通过**
+- [x] **Step 4: 运行后端测试确认通过**
 
 Run: `cd /e/JavaSpace/forum && mvn -B -q -Dtest=TagFlowIntegrationTest,RepositoryTests test`
 Expected: BUILD SUCCESS，`Tests run: 5, Failures: 0`（标签类）+ RepositoryTests 全绿。
 
-- [ ] **Step 5: 跑全量后端测试**
+- [x] **Step 5: 跑全量后端测试**
 
 Run: `cd /e/JavaSpace/forum && mvn -B -q test`
 Expected: BUILD SUCCESS，无失败。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/main/java src/test/java
