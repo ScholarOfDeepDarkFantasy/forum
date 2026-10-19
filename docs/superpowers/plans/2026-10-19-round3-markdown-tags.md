@@ -647,6 +647,10 @@ describe('PostEditView Markdown 预览', () => {
 })
 ```
 
+> 偏差说明（2026-10-19 实施时同步）：上面 Step 1 的测试骨架在实施时有两处必要修正，语义与断言未变：
+> 1. `mountEditor` 需注入 Pinia（`createPinia()`/`setActivePinia` + `global.plugins`），因为组件 setup 里调用了 `useAuthStore()`，否则挂载即抛 "no active Pinia"；写法同 `frontend/src/views/PostDetailView.spec.js` 先例。
+> 2. `el-input` stub 需按键位区分：`type === 'textarea'` 渲染 `<textarea>`，否则渲染 `<input>`。原骨架对所有 `el-input` 都渲染 `<textarea>`，`find('textarea')` 会命中排在前面的标题输入框，正文预览断言永远无法通过。测试用例正文与断言保持原样。
+
 - [x] **Step 2: 运行确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/views/PostEditView.spec.js`
