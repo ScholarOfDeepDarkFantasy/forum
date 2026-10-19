@@ -1131,6 +1131,9 @@ git commit -m "feat: 新增标签总览与标签帖子接口"
 - Modify: `frontend/src/router/index.js`
 - Modify: `frontend/src/App.vue`
 - Modify: `frontend/src/views/HomeView.vue`
+- Modify: `frontend/src/styles/breakpoint.spec.js`（断点闸门计数 5→6）
+- Modify: `frontend/src/styles/tokens.css`（断点说明同步）
+- Modify: `README.md`（断点段落同步）
 
 - [ ] **Step 1: 先写失败测试**
 
@@ -1492,6 +1495,12 @@ function openTag(tag) {
 </style>
 ```
 
+> **断点闸门同步（本任务必做，与上面媒体查询同一提交）**：`.post-item` 的窄屏规则从 `HomeView` 整体迁移到 `PostListItem`，`frontend/src` 下的 `@media (max-width: 768px)` 字面量因此从 5 处变为 6 处（`HomeView` 仍保留板块/工具栏的媒体查询）。`frontend/src/styles/breakpoint.spec.js` 把数量精确锁定为 5，故必须同步：
+> - `frontend/src/styles/breakpoint.spec.js`：`EXPECTED_MEDIA_BREAKPOINTS` 5 → 6；用例标题「数量仍为 5」→「数量仍为 6」；文件清单注释加入 `components/PostListItem.vue`。
+> - `frontend/src/styles/tokens.css`：「断点字面量目前共七处」→「共八处」、「其余六处」→「其余七处」，并把 `PostListItem` 加入媒体查询位置清单。
+> - `README.md`「样式与设计令牌」段落：「五个视图」→ 六个位置（含 `components/PostListItem`），「断点数量不为 5」→「不为 6」。
+> - 跑 `pnpm test` 确认 `breakpoint.spec.js` 的精确计数用例通过。
+
 `frontend/src/views/HomeView.vue`：删掉内联的 `.post-item` 模板块，改为：
 
 ```vue
@@ -1799,7 +1808,7 @@ Expected: 构建成功，`dist/index.html` 引用 `/forum/assets/...`。
 - [ ] **Step 7: 提交**
 
 ```bash
-git add frontend/src frontend/package.json frontend/pnpm-lock.yaml
+git add frontend/src frontend/package.json frontend/pnpm-lock.yaml README.md
 git commit -m "feat: 新增标签总览页与标签帖子页，抽取公共帖子行组件"
 ```
 
