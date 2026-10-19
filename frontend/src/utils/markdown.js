@@ -45,11 +45,24 @@ const md = new MarkdownIt({
   }
 })
 
-// 渲染后统一加安全属性（DOMPurify 默认会丢掉 target，必须在 afterSanitizeAttributes 里补）
+// 宽表格横向滚动容器：table 用外层 div 包一层，避免撑破正文列
+const defaultTableOpen =
+  md.renderer.rules.table_open ||
+  ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options))
+const defaultTableClose =
+  md.renderer.rules.table_close ||
+  ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options))
+md.renderer.rules.table_open = (tokens, idx, options, env, self) =>
+  `<div class="table-wrap">${defaultTableOpen(tokens, idx, options, env, self)}`
+md.renderer.rules.table_close = (tokens, idx, options, env, self) =>
+  `${defaultTableClose(tokens, idx, options, env, self)}</div>`
+
+// 渲染后统一加安全属性：DOMPurify 3.x 会保留 target，但不会补 rel，也不区分链接协议，
+// 因此在外链（含 // 协议相对链接）和图片上集中施加同一套 after-sanitize 策略。
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A') {
     const href = node.getAttribute('href') || ''
-    if (/^https?:\/\//i.test(href)) {
+    if (/^(?:https?:)?\/\//i.test(href)) {
       node.setAttribute('target', '_blank')
       node.setAttribute('rel', 'noopener noreferrer')
     }
@@ -70,6 +83,8 @@ export function escapeHtml(text) {
 
 /**
  * 帖子正文渲染入口：详情页与编辑页预览共用，保证「预览所见 = 详情所得」。
+ * 返回的 HTML 只能绑定到带 .markdown-body 的元素的 v-html 上；
+ * 禁止把原始 post.content 直接插值到模板，也不要绑定到普通容器上。
  * @param {string} source Markdown 源文本
  * @returns {string} 已消毒的 HTML
  */

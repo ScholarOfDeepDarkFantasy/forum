@@ -82,7 +82,7 @@
 
 > 说明：markdown.css 使用 --jf-color-text-3（--jf-color-text-2 已在第二轮移除，不再新增令牌）。
 
-- [ ] **Step 1: 安装依赖**
+- [x] **Step 1: 安装依赖**
 
 ```bash
 cd frontend
@@ -91,7 +91,7 @@ pnpm add markdown-it dompurify highlight.js
 
 Expected: `package.json` 的 `dependencies` 出现三个包，`pnpm-lock.yaml` 更新。
 
-- [ ] **Step 2: 先写失败的测试**
+- [x] **Step 2: 先写失败的测试**
 
 创建 `frontend/src/utils/markdown.spec.js`：
 
@@ -143,9 +143,48 @@ describe('renderMarkdown', () => {
     expect(html).toContain('&lt;script&gt;')
   })
 
-  it('img onerror 之类的事件属性被清除', () => {
-    const html = renderMarkdown('![x](https://example.com/a.png)')
-    expect(html).not.toContain('onerror')
+  it('原始 HTML 中的事件属性不会生效', () => {
+    const div = parse(
+      renderMarkdown('<img src=x onerror="alert(1)"> <a href="https://e.com" onmouseover="x">a</a>')
+    )
+    expect(div.querySelector('[onerror]')).toBeNull()
+    expect(div.querySelector('[onmouseover]')).toBeNull()
+    expect(div.innerHTML).toContain('&lt;img')
+  })
+
+  it('未注册语言按纯文本输出且不抛错', () => {
+    const html = renderMarkdown('```kotlin\nfun main() {}\n```')
+    expect(html).toContain('language-kotlin')
+    expect(html).toContain('fun main')
+  })
+
+  it('裸链接被自动识别为外链', () => {
+    const html = renderMarkdown('访问 https://example.com 查看')
+    expect(html).toContain('href="https://example.com"')
+    expect(html).toContain('target="_blank"')
+  })
+
+  it('站内、锚点与邮件链接不补 target', () => {
+    const div = parse(renderMarkdown('[站内](/posts/1) [锚点](#section) [邮件](mailto:a@b.com)'))
+    expect(div.querySelector('a[target]')).toBeNull()
+  })
+
+  it('协议相对链接也按外链处理', () => {
+    const div = parse(renderMarkdown('[x](//evil.example/a)'))
+    const a = div.querySelector('a')
+    expect(a).not.toBeNull()
+    expect(a.getAttribute('target')).toBe('_blank')
+    expect(a.getAttribute('rel')).toBe('noopener noreferrer')
+  })
+
+  it('表格包在横向滚动容器里', () => {
+    const div = parse(renderMarkdown('| a | b |\n| - | - |\n| 1 | 2 |'))
+    expect(div.querySelector('.table-wrap table')).not.toBeNull()
+  })
+
+  it('无语言代码块中的 HTML 被转义', () => {
+    const html = renderMarkdown('```\n<b>x</b>\n```')
+    expect(html).toContain('&lt;b&gt;')
   })
 
   it('javascript: 链接不会变成可点击链接', () => {
@@ -159,12 +198,12 @@ describe('renderMarkdown', () => {
 
 markdown-it 默认校验链接协议：javascript: 链接不会生成 <a>，断言的是真实安全属性（无可执行链接）而不是输出中不出现该字符串。
 
-- [ ] **Step 3: 运行测试确认失败**
+- [x] **Step 3: 运行测试确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/utils/markdown.spec.js`
 Expected: FAIL，`Failed to resolve import "@/utils/markdown"`（文件还不存在）。
 
-- [ ] **Step 4: 实现渲染工具**
+- [x] **Step 4: 实现渲染工具**
 
 创建 `frontend/src/utils/markdown.js`：
 
@@ -216,11 +255,24 @@ const md = new MarkdownIt({
   }
 })
 
-// 渲染后统一加安全属性（DOMPurify 默认会丢掉 target，必须在 afterSanitizeAttributes 里补）
+// 宽表格横向滚动容器：table 用外层 div 包一层，避免撑破正文列
+const defaultTableOpen =
+  md.renderer.rules.table_open ||
+  ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options))
+const defaultTableClose =
+  md.renderer.rules.table_close ||
+  ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options))
+md.renderer.rules.table_open = (tokens, idx, options, env, self) =>
+  `<div class="table-wrap">${defaultTableOpen(tokens, idx, options, env, self)}`
+md.renderer.rules.table_close = (tokens, idx, options, env, self) =>
+  `${defaultTableClose(tokens, idx, options, env, self)}</div>`
+
+// 渲染后统一加安全属性：DOMPurify 3.x 会保留 target，但不会补 rel，也不区分链接协议，
+// 因此在外链（含 // 协议相对链接）和图片上集中施加同一套 after-sanitize 策略。
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   if (node.tagName === 'A') {
     const href = node.getAttribute('href') || ''
-    if (/^https?:\/\//i.test(href)) {
+    if (/^(?:https?:)?\/\//i.test(href)) {
       node.setAttribute('target', '_blank')
       node.setAttribute('rel', 'noopener noreferrer')
     }
@@ -241,6 +293,8 @@ export function escapeHtml(text) {
 
 /**
  * 帖子正文渲染入口：详情页与编辑页预览共用，保证「预览所见 = 详情所得」。
+ * 返回的 HTML 只能绑定到带 .markdown-body 的元素的 v-html 上；
+ * 禁止把原始 post.content 直接插值到模板，也不要绑定到普通容器上。
  * @param {string} source Markdown 源文本
  * @returns {string} 已消毒的 HTML
  */
@@ -290,8 +344,7 @@ export function renderMarkdown(source) {
 .markdown-body ul,
 .markdown-body ol,
 .markdown-body blockquote,
-.markdown-body pre,
-.markdown-body table {
+.markdown-body pre {
   margin: 0.8em 0;
 }
 .markdown-body ul,
@@ -321,8 +374,13 @@ export function renderMarkdown(source) {
   font-size: 0.9em;
   background: transparent;
 }
+.markdown-body .table-wrap {
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
 .markdown-body table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
 }
 .markdown-body th,
@@ -358,12 +416,12 @@ import './styles/markdown.css'
 import 'highlight.js/styles/github.css'
 ```
 
-- [ ] **Step 5: 运行测试确认通过**
+- [x] **Step 5: 运行测试确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/utils/markdown.spec.js`
-Expected: PASS（8 个用例）。
+Expected: PASS（14 个用例）。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add frontend/package.json frontend/pnpm-lock.yaml frontend/src/utils/markdown.js frontend/src/utils/markdown.spec.js frontend/src/styles/markdown.css frontend/src/main.js

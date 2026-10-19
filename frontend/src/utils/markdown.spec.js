@@ -45,9 +45,48 @@ describe('renderMarkdown', () => {
     expect(html).toContain('&lt;script&gt;')
   })
 
-  it('img onerror 之类的事件属性被清除', () => {
-    const html = renderMarkdown('![x](https://example.com/a.png)')
-    expect(html).not.toContain('onerror')
+  it('原始 HTML 中的事件属性不会生效', () => {
+    const div = parse(
+      renderMarkdown('<img src=x onerror="alert(1)"> <a href="https://e.com" onmouseover="x">a</a>')
+    )
+    expect(div.querySelector('[onerror]')).toBeNull()
+    expect(div.querySelector('[onmouseover]')).toBeNull()
+    expect(div.innerHTML).toContain('&lt;img')
+  })
+
+  it('未注册语言按纯文本输出且不抛错', () => {
+    const html = renderMarkdown('```kotlin\nfun main() {}\n```')
+    expect(html).toContain('language-kotlin')
+    expect(html).toContain('fun main')
+  })
+
+  it('裸链接被自动识别为外链', () => {
+    const html = renderMarkdown('访问 https://example.com 查看')
+    expect(html).toContain('href="https://example.com"')
+    expect(html).toContain('target="_blank"')
+  })
+
+  it('站内、锚点与邮件链接不补 target', () => {
+    const div = parse(renderMarkdown('[站内](/posts/1) [锚点](#section) [邮件](mailto:a@b.com)'))
+    expect(div.querySelector('a[target]')).toBeNull()
+  })
+
+  it('协议相对链接也按外链处理', () => {
+    const div = parse(renderMarkdown('[x](//evil.example/a)'))
+    const a = div.querySelector('a')
+    expect(a).not.toBeNull()
+    expect(a.getAttribute('target')).toBe('_blank')
+    expect(a.getAttribute('rel')).toBe('noopener noreferrer')
+  })
+
+  it('表格包在横向滚动容器里', () => {
+    const div = parse(renderMarkdown('| a | b |\n| - | - |\n| 1 | 2 |'))
+    expect(div.querySelector('.table-wrap table')).not.toBeNull()
+  })
+
+  it('无语言代码块中的 HTML 被转义', () => {
+    const html = renderMarkdown('```\n<b>x</b>\n```')
+    expect(html).toContain('&lt;b&gt;')
   })
 
   it('javascript: 链接不会变成可点击链接', () => {

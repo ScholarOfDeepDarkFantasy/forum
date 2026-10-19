@@ -50,11 +50,12 @@ JavaForum 已完成 MVP、体验迭代轮与部署环境化（raspi + Jenkins + 
 - `markdown-it` 实例配置：`html: false`（不解析原始 HTML）、`linkify: true`、`breaks: true`（老帖子的单换行不被合并）。
 - 代码块：`highlight.js/lib/core`，仅注册 `java、javascript、typescript、bash、json、xml、css、sql、python、yaml、markdown`；
   未注册语言按纯文本输出，不抛错。
-- 自定义 renderer：
-  - 链接：外链补 `target="_blank" rel="noopener noreferrer"`（锚点/相对链接保持默认行为）。
-  - 图片：补 `loading="lazy"`。
-- 输出前统一 `DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, ADD_ATTR: ['target'] })`；
-  渲染异常时降级为 HTML 转义后的纯文本（`escapeHtml`）。
+- 自定义 renderer：表格用 `<div class="table-wrap">` 包一层（配合 CSS `overflow-x: auto` 让宽表格横向滚动，不撑破正文列）。
+- 消毒与补属性：输出前统一 `DOMPurify.sanitize(html, { USE_PROFILES: { html: true } })`，不需要 `ADD_ATTR`；
+  外链的 `target="_blank" rel="noopener noreferrer"` 与图片的 `loading="lazy"` 由 `afterSanitizeAttributes` 钩子统一补，
+  外链判定为大小写不敏感的 `^(?:https?:)?//`（含 `//` 协议相对链接；锚点/相对/邮件链接保持默认行为）。
+- markdown-it 默认 `validateLink` 保留：`javascript:` 等危险协议不会生成 `<a>`。
+- 渲染异常时降级为 HTML 转义后的纯文本（`escapeHtml`）。
 
 新增 `frontend/src/styles/markdown.css`，定义 `.markdown-body` 作用域内的标题/段落/列表/引用/行内与块代码/表格/图片/链接样式，
 全部使用既有设计令牌（`--jf-*`）；highlight.js 使用自带 github 主题（仅代码块着色）。在 `main.js` 中于 `common.css` 之后引入。

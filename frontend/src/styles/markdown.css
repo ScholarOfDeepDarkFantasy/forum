@@ -31,8 +31,7 @@
 .markdown-body ul,
 .markdown-body ol,
 .markdown-body blockquote,
-.markdown-body pre,
-.markdown-body table {
+.markdown-body pre {
   margin: 0.8em 0;
 }
 .markdown-body ul,
@@ -62,8 +61,13 @@
   font-size: 0.9em;
   background: transparent;
 }
+.markdown-body .table-wrap {
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
 .markdown-body table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
 }
 .markdown-body th,
