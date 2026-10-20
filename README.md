@@ -12,13 +12,15 @@
 
 ## 功能
 
-- 用户：注册 / 登录 / 个人资料修改（昵称、头像、简介、邮箱展示），JWT 无状态会话
+- 用户：注册 / 登录 / 个人资料修改（昵称、简介、邮箱展示），JWT 无状态会话；资料页支持上传与移除头像
 - 帖子：板块内发帖、编辑、删除（软删除），分页列表与关键词搜索，浏览量统计
 - 互动：点赞、收藏与「我的收藏」；评论支持楼中楼，删除后保留占位
 - 权限：管理员 / 版主 / 普通用户三级角色，支持置顶、加精、禁言、封禁
 - 通知：点赞、收藏、回复三类通知（另有 `SYSTEM` 预留类型），未读角标与单条已读，点击跳转到帖子或具体评论
 - **Markdown 渲染**：帖子正文按 CommonMark + 表格/删除线（`markdown-it`）渲染（标题、列表、表格、代码块高亮、链接、图片），编辑页提供实时预览；渲染结果经 DOMPurify 白名单过滤、外链补 `target`/`rel`、图片懒加载后才插入 DOM，服务端仍只存纯文本
 - **标签检索**：帖子可带多个标签，`/tags` 展示标签云（按帖子数降序，支持关键词检索与分页），点击标签进入 `/tags/:name` 查看该标签下的帖子
+- **深色模式**：默认跟随系统，也可手动选择浅色/深色（顶栏右侧、通知铃铛之前的主题菜单），选择存于 `localStorage` 的 `jf_theme`；`index.html` 的内联脚本在首屏挂上 `html.dark`，避免刷新时先白后黑；配色来自 `styles/tokens.css` 的双套 CSS 变量与 Element Plus 官方暗色变量
+- **头像上传**：资料页选择 JPEG/PNG（不超过 2MB），服务端只按文件魔数判定类型、按 EXIF 方向校正后居中裁剪为 256×256 JPEG，落盘到宿主机的 `/pd/Program/forum/uploads/avatars/` 并由 nginx 直出；支持移除，图片缺失或加载失败时回退为昵称首字母
 - 部署：前端由 nginx 托管、后端容器化运行，Jenkins 自动构建发布（见 `docs/deployment/README.md`）
 
 ## 环境要求
@@ -146,6 +148,8 @@ http://raspi/forum/            nginx :80
 | `deploy/deploy.sh` | 部署脚本：compose 同步、镜像切换、健康检查、前端 rsync、nginx reload、冒烟、旧镜像清理 |
 | `deploy/nginx/forum.conf` | nginx snippet：`/forum/` 静态 + SPA 回退、`/forum/api/` 反代 |
 
+头像文件既不在镜像里，也不进数据库：宿主机目录 `/pd/Program/forum/uploads/` 通过 bind mount 挂进容器（部署机 `.env` 的 `UPLOAD_HOST_DIR`，容器内固定 `/app/uploads`），再由 nginx 的 `location ^~ /forum/uploads/` 直出静态文件，并带 `X-Content-Type-Options: nosniff`。`deploy/deploy.sh` 每次部署都会 `mkdir -p .../uploads/avatars`、在 rootless podman 的 user namespace 里 `podman unshare chown -R 1001:1001`、再 `podman unshare chmod -R a+rX`（既抹平 umask 差异，也顺带治愈历史上 0600 导致 nginx 403 的文件），并把 `UPLOAD_HOST_DIR` 幂等写入 `.env`。注意容器内 UID 1001 在宿主上映射为 subuid（如 101000），直接在宿主上 `chown 1001:1001` 会落到错误的用户。
+
 ### 1. 本地构建镜像（可选）
 
 部署主机上没有 maven 镜像，jar 由 Jenkins 的 M3 + JDK17 构建。手工验证镜像：
@@ -222,7 +226,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 9 个测试类、39 个用例。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 12 个测试类、90 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 
@@ -232,7 +236,7 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 20 个 spec、143 个用例，覆盖：
+当前为 25 个 spec、211 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
@@ -245,6 +249,8 @@ pnpm build       # 生产构建
 - Markdown 渲染（`src/utils/markdown.js`）：CommonMark + 表格（标题/列表/表格）与代码块高亮、单换行转 `<br>`、外链补 `target`/`rel`、图片补 `loading=lazy`、原始 HTML 与事件属性被过滤、`javascript:` 链接不可点击、未注册语言降级为纯文本、裸链接自动识别、站内/锚点/邮件链接不加 `target`、表格包在横向滚动容器内、空输入与渲染异常兜底
 - 标签页（`src/views/TagsView.spec.js`、`src/views/TagPostsView.spec.js`、`src/components/PostListItem.spec.js`）：标签云渲染与点击跳转、关键词检索重置到第一页、分页切换、空态与失败重试、路由标签名变化时重置分页并重新加载、公共帖子行渲染置顶/精华标记与互动计数、点击标签按 URL 规则编码且不触发行跳转、点赞走共享计数
 - 编辑页 Markdown 预览（`src/views/PostEditView.spec.js`）：桌面左右分栏且输入正文时预览实时渲染、窄屏显示编辑/预览 tab 而不是分栏、编辑模式回填旧正文并渲染预览
+- 深色模式（`src/composables/useTheme.spec.js`、`src/components/ThemeToggle.spec.js`、`src/styles/tokens.spec.js`）：默认跟随系统并实时响应系统主题变化、手动选择写入 `localStorage`、存储值损坏时回退 `system`、`toggle` 按当前实际明暗取反、切到显式模式后解除 `matchMedia` 监听、`matchMedia` 缺失或 Storage 抛错不崩溃；`tokens.spec.js` 另守两套令牌集合一致、每个颜色令牌都有 `var()` 消费方、`main.js` 的 8 条样式导入顺序、首屏脚本先于模块脚本读取 `jf_theme`
+- 头像（`src/utils/avatar.spec.js`、`src/components/UserAvatar.spec.js`、`src/views/ProfileView.spec.js`）：站内 `/uploads/` 前缀拼 `BASE_URL`（含 `/forum/` 子路径）、外链与 data URL 原样透传、空值与仅前缀返回空串、加载失败回退昵称首字母并在 url 变化后重试、代理对昵称只取一个码点、上传成功刷新用户、非法类型与超过 2MB 时客户端拦截、移除头像
 
 ## 优化记录（第二轮）
 
@@ -261,6 +267,8 @@ pnpm build       # 生产构建
 ## 样式与设计令牌
 
 `frontend/src/styles/tokens.css` 是设计令牌的唯一来源，包含颜色、间距阶梯、圆角、字号阶梯，以及 `--el-color-primary` 对 Element Plus 主色的覆盖。页面应引用令牌（如 `var(--jf-space-4)`）而不是写死数值。令牌只保留有消费方的条目：无消费方的 `--jf-color-text-2`、`--jf-radius-lg`、`--jf-shadow-card`、`--jf-shadow-hover` 已移除，新增令牌时应连同首个消费方一起加。
+
+第四轮起颜色令牌分成两套：`:root` 为亮色、`html.dark` 为暗色，两套的 `--jf-color-*` 名称必须完全一致。样式导入顺序固定为 Element Plus 基础样式 → 官方暗色变量 → `tokens.css` → `common.css` → `markdown.css` → `github.css` → `highlight-dark.css` → `style.css`（共 8 条，`tokens.spec.js` 逐条校验）。`styles/tokens.spec.js` 还守住：两套令牌集合相等、11 个颜色令牌与设计一致、每个颜色都是 6 位小写十六进制、每个颜色令牌在 `src` 下至少有一处 `var()` 消费、页面底与卡片底在两套中取值不同（否则切换主题看不出变化）。暗色语法高亮在 `styles/highlight-dark.css` 里以 `html.dark .hljs-*` 逐条叠加（手工同步 highlight.js 11.12.0 的 github-dark.css），代码块底色统一走 `--jf-color-code-bg`。`html.dark` 类由 `composables/useTheme.js` 与 `index.html` 的首屏内联脚本共同维护，存储键与类名以 `useTheme.js` 为唯一来源。
 
 注意 768px 断点目前在多处重复出现：`frontend/src/composables/useResponsive.js` 的 `MOBILE_BREAKPOINT = 768`、`tokens.css` 的 `--jf-breakpoint-mobile`（仅作说明，`@media` 无法使用 `var()`），以及 `HomeView` / `PostDetailView` / `LoginView` / `RegisterView` / `NotificationsView` 五个视图与 `components/PostListItem`（公共帖子行）中的六处 `@media (max-width: 768px)`。改断点必须在同一次提交内同步以上所有位置，`breakpoint.spec.js` 会扫描 `src/**/*.{vue,css}` 的媒体查询，并在断点数量不为 6、字面量不是逐字的 `768px`、数值与 `MOBILE_BREAKPOINT` 不一致或出现 `min-width` 查询时报错。
 
@@ -279,15 +287,16 @@ docker-compose.yml   # 部署用：仅 backend（复用主机已有 PostgreSQL�
 Jenkinsfile          # CI/CD：构建 jar、前端、镜像并部署
 deploy/              # deploy.sh + nginx snippet + 部署手册
 .env.example         # 环境变量模板（复制为 .env，后者不入库）
+uploads/             # 本地开发的头像落盘目录（运行时生成、已 gitignore；生产在 /pd/Program/forum/uploads）
 
 frontend/src/
 ├── api/           # Axios 实例与接口封装
-├── components/    # 可复用组件（UserCard、BoardCard）
-├── composables/   # 组合式函数（useResponsive、usePostActions）
+├── components/    # 可复用组件（UserCard、BoardCard、PostListItem、UserAvatar、ThemeToggle）
+├── composables/   # 组合式函数（useResponsive、usePostActions、useTheme）
 ├── router/        # 路由表与登录/管理员守卫
 ├── stores/        # Pinia store（auth、notifications）
-├── styles/        # tokens.css 设计令牌、common.css 跨视图共用类
-├── utils/         # 纯函数（通知跳转映射、时间格式化）
+├── styles/        # tokens.css 双套设计令牌、common.css 跨视图共用类、markdown.css、highlight-dark.css
+├── utils/         # 纯函数（通知跳转映射、时间格式化、Markdown 渲染、头像地址解析）
 └── views/         # 页面组件
 
 src/main/java/org/song/forum/

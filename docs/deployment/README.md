@@ -9,6 +9,7 @@
 浏览器 ── http://raspi/forum/
   nginx :80（系统服务）
     ├─ /forum/       → /pd/Program/forum/frontend/      Vue dist（nginx 直出，不进容器）
+    ├─ /forum/uploads/ → /pd/Program/forum/uploads/     头像文件（bind mount 进后端容器，nginx 直出）
     └─ /forum/api/   → 127.0.0.1:8086/api/              反向代理
                        forum-backend 容器（eclipse-temurin:17-jre-jammy）
                          │ jdbc:postgresql://host.containers.internal:5432/javaforum
@@ -38,22 +39,30 @@ JWT_SECRET='$JWT_SECRET'
 HOST_PORT=8086
 TZ=Asia/Shanghai
 IMAGE_TAG=latest
+UPLOAD_HOST_DIR=/pd/Program/forum/uploads
 JAVA_OPTS='-Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError'   # 不要用 MaxRAMPercentage，见第 7 节
 EOF
 chmod 600 .env
 sudo -u pi podman exec postgresql psql -U postgres -c "ALTER ROLE forum WITH PASSWORD '$DB_PASSWORD';"
 
-# 3) nginx：snippet + 在 app.conf 的 server 块内加 include（只加一次）
+# 3) 头像上传目录：容器内 UID 1001 映射到宿主 subuid（如 101000），属主不是 pi、也不是 1001
+sudo -u pi mkdir -p /pd/Program/forum/uploads/avatars
+sudo -u pi podman unshare chown -R 1001:1001 /pd/Program/forum/uploads
+sudo -u pi podman unshare chmod -R a+rX /pd/Program/forum/uploads
+
+# 4) nginx：snippet + 在 app.conf 的 server 块内加 include（只加一次）
 sudo cp /pd/Program/forum/deploy/nginx/forum.conf /etc/nginx/snippets/forum.conf 2>/dev/null || true
 sudo sed -i '/server_name raspi;/a\    include /etc/nginx/snippets/forum.conf;' /etc/nginx/conf.d/app.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-> 第 3 步的 snippet 内容来自仓库 `deploy/nginx/forum.conf`，部署时流水线会自动 `cp` 覆盖它；
+> 第 4 步的 snippet 内容来自仓库 `deploy/nginx/forum.conf`，部署时流水线会自动 `cp` 覆盖它；
 > 如果 `app.conf` 里已经有 `include /etc/nginx/snippets/forum.conf;`，不要重复执行 `sed`。
+> 第 3 步必须在第一次 `podman-compose up` 之前完成：目录不存在时 rootless podman 会以映射 uid 创建挂载点，nginx 会先看到 403。
+> `.env` 里的 `UPLOAD_HOST_DIR` 由 `deploy.sh` 每次部署幂等写入（缺失则追加、已有则更正），一般不要手工改；`ls -ln /pd/Program/forum` 看到 `uploads/` 属主是 `101000` 这类 subuid 属正常现象，不要改回 `pi`。
 
 ```bash
-# 4) Jenkins job（主机无公网入口，没有 Jenkins 管理员密码时用文件方式创建；有密码也可在 UI 里建）
+# 5) Jenkins job（主机无公网入口，没有 Jenkins 管理员密码时用文件方式创建；有密码也可在 UI 里建）
 sudo mkdir -p /var/lib/jenkins/jobs/javaforum
 # config.xml 见附录 A，写入后：
 sudo chown -R jenkins:jenkins /var/lib/jenkins/jobs/javaforum
@@ -93,6 +102,19 @@ curl -fsS http://127.0.0.1:8086/api/health                                   # {
 curl -fsS -H 'Host: raspi' http://127.0.0.1/forum/ | grep '/forum/assets/'    # 前端资源前缀
 curl -fsS -H 'Host: raspi' http://127.0.0.1/forum/posts/1 | grep 'id="app"'   # SPA 回退
 curl -fsS -H 'Host: raspi' 'http://127.0.0.1/forum/api/posts?page=0&size=1'   # 经 nginx 的 API
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' \
+  http://127.0.0.1/forum/uploads/__probe__/missing.jpg                        # 期望 404（不是 200 HTML）
+```
+
+```bash
+# 头像上传冒烟：登录拿 token → 上传本地 avatar.jpg（JPEG，≤2MB）→ 经 nginx 取回
+TOKEN=$(curl -fsS -H 'Content-Type: application/json' \
+  -d "{\"username\":\"${SMOKE_USER:-admin}\",\"password\":\"${SMOKE_PASS:-admin123456}\"}" \
+  http://127.0.0.1:8086/api/auth/login | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+AVATAR=$(curl -fsS -H "Authorization: Bearer $TOKEN" -F 'file=@avatar.jpg;type=image/jpeg' \
+  http://127.0.0.1:8086/api/users/me/avatar | sed -n 's/.*"avatarUrl":"\([^"]*\)".*/\1/p')
+curl -fsSI -H 'Host: raspi' "http://127.0.0.1/forum$AVATAR" | grep -Ei '^(HTTP/|content-type)'
+# 期望 HTTP/1.1 200 OK 与 Content-Type: image/jpeg
 ```
 
 > 必须带 `Host: raspi`：`app.conf` 是 `server_name raspi`，用 IP 访问会落到 `sites-enabled/default`。
@@ -112,6 +134,10 @@ curl -fsS -H 'Host: raspi' 'http://127.0.0.1/forum/api/posts?page=0&size=1'   # 
 | 数据库密码错 | `sudo -u pi podman exec postgresql psql -U postgres -c "ALTER ROLE forum WITH PASSWORD '<.env 里的值>';"` |
 | `/forum/` 404 | `app.conf` 是否 include snippet；`/pd/Program/forum/frontend/index.html` 是否存在 |
 | `/forum/api/` 502 | `forum-backend` 未起或未监听 8086：`sudo -u pi curl -v http://127.0.0.1:8086/api/health` |
+| `/forum/uploads/xxx` 返回 200 HTML | nginx 的 `^~ /forum/uploads/` 必须排在 `location /forum/`（SPA 回退）之前，否则 `try_files` 把请求兜到 `index.html`；确认 snippet 顺序后 `sudo nginx -t && sudo systemctl reload nginx` |
+| 上传返回 `413` 或 `400 图片不能超过 2MB` | 413 来自 nginx（默认 `client_max_body_size 1m`，2MB 上限需在 server 块调大后 reload）；400 来自后端（超过 2MB 或 multipart 上限），响应体里带 `图片不能超过 2MB` |
+| 上传返回 `400 保存头像失败` | 容器内写 `/app/uploads` 失败：多为宿主目录属主/权限不对，重跑 `deploy.sh`（`podman unshare chown -R 1001:1001` + `chmod -R a+rX`），并确认 `uploads` 不是符号链接 |
+| 取头像 `403` | 文件对 nginx worker 不可读（历史 0600 或属主错）：重跑 `deploy.sh` 由 `chmod -R a+rX` 治愈；仍失败则 `ls -ln /pd/Program/forum/uploads/avatars` 检查权限 |
 | Jenkins 起不来 | `sudo journalctl -u jenkins -n 100 --no-pager`；job config.xml 写坏时先移走 `/var/lib/jenkins/jobs/javaforum` 再重启 |
 
 ## 7. 已知限制
@@ -121,6 +147,8 @@ curl -fsS -H 'Host: raspi' 'http://127.0.0.1/forum/api/posts?page=0&size=1'   # 
 - **`/` 根盘只剩约 5G**：Jenkins 工作区固定在 `/pd/jenkins-workspace/forum`，pnpm store 在 `/pd/pnpm-store`，镜像在 `/pd/container`。
 - **不能用 `mem_limit` 限制容器内存**：内核 cmdline 带 `cgroup_disable=memory`，rootless crun 写 `memory.max` 会失败；堆大小由 `.env` 里的 `JAVA_OPTS=-Xmx512m` 控制。
 - **不要执行全局 `podman image prune`**：会把 mini-mall 等其它项目的镜像一起删掉；流水线只清理 `localhost/forum-backend` 的旧数字 tag。
+- **头像文件不在数据库备份范围**：`/pd/Program/forum/uploads/` 是独立目录，数据库备份/迁移不覆盖它。恢复时用 `sudo tar -C /pd/Program/forum -p -xf uploads.tar uploads` 保留属主，再跑一次 `deploy.sh` 修正权限。
+- **孤儿头像文件不会自动清理**：换头像、删号后旧文件只在「没有其他用户引用」时由后端删除；异常中断或历史数据可能留下无引用文件，目前没有清理任务，需要时按 `users.avatar_url` 人工对账。
 
 ## 附录 A：Jenkins job `config.xml`
 

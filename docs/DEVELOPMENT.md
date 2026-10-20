@@ -3,7 +3,7 @@
 > 本文件是项目的**单一事实来源（single source of truth）**：记录开发情况、当前进度、已知问题与后续计划。
 > **每次开发（新功能、修复、优化、重构）结束前都必须更新本文件**，约定见 §0。
 >
-> 最近更新：2026-10-19 ｜ 文档版本：v1.3
+> 最近更新：2026-10-20 ｜ 文档版本：v1.4
 
 ---
 
@@ -118,37 +118,38 @@ cd frontend && pnpm test --run
 | 第二轮 | 优化：性能 + 安全 + 可维护性 | 7 | ✅ 已完成 | 2026-10-17 |
 | 第三轮 | Markdown 渲染 + 标签检索 | 7 | ✅ 已完成 | 2026-10-19 |
 | 部署工程化 | raspi：Jenkins + rootless podman + nginx 自动化部署（见 §4.7） | — | ✅ 已完成 | 2026-10-19 |
+| 第四轮 | 深色模式 + 头像上传 | 6 | ✅ 已完成 | 2026-10-20 |
 
-**当前进度：MVP 100% ｜ 已完成 3 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 4 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
-## 3. 当前状态快照（2026-10-19）
+## 3. 当前状态快照（2026-10-20）
 
 ### 3.1 代码规模
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 69 | 3390 |
-| 后端测试（`src/test/java`） | 9 | 1653 |
-| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 28 | 3230 |
-| 前端测试（`*.spec.js`） | 20 | 2709 |
+| 后端主代码（`src/main/java`） | 73 | 3969 |
+| 后端测试（`src/test/java`） | 13 | 2711 |
+| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 33 | 3696 |
+| 前端测试（`*.spec.js`） | 25 | 3594 |
 
-后端分层（文件数）：`entity/` 12、`dto/` 17、`repository/` 9、`controller/` 8、`service/` 8、`security/` 5、`config/` 4、`util/` 3、`exception/` 2。
+后端分层（文件数）：`entity/` 12、`dto/` 17、`repository/` 9、`controller/` 9、`service/` 9、`security/` 5、`config/` 5、`util/` 4、`exception/` 2。
 
-前端目录（文件数）：`views/` 18（10 个页面 + 8 个 spec）、`composables/` 4、`styles/` 5、`utils/` 6、`components/` 5、`stores/` 3、`api/` 2、`router/` 1。
+前端目录（文件数）：`views/` 18（10 个页面 + 8 个 spec）、`components/` 9（5 个组件 + 4 个 spec）、`composables/` 6（3 个组合式函数 + 3 个 spec）、`styles/` 7（4 个 css + 3 个 spec）、`utils/` 8（4 个纯函数 + 4 个 spec）、`stores/` 3（2 个 store + 1 个 spec）、`api/` 2（1 个封装 + 1 个 spec）、`router/` 1、根目录 4（`App.vue`、`main.js`、`style.css`、`viteConfig.spec.js`）。
 
 ### 3.2 测试基线
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **39** 个用例 / 9 个测试类 | 全绿 |
-| 前端 | **143** 个用例 / 20 个 spec | 全绿 |
-| 构建 | `pnpm build` | 通过 |
+| 后端 | **90** 个用例 / 12 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 前端 | **211** 个用例 / 25 个 spec | 全绿 |
+| 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布：`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1、`PostFlowIntegrationTest` 4、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`TagFlowIntegrationTest` 8、`RepositoryTests` 7、`JwtTokenProviderTest` 2、`NotificationServiceTest` 4。
+后端测试类分布（合计 90）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`TagFlowIntegrationTest` 8、`RepositoryTests` 7、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 4、`AvatarServiceTest` 4、`NotificationServiceTest` 4、`ForumApplicationTests` 2、`JwtTokenProviderTest` 2、`AuthFlowIntegrationTest` 1。
 
-前端 spec 分布：`markdown` 14、`usePostActions` 13、`AdminView` 11、`cards` 10、`notifications` 9、`format` 9、`index`（api）9、`HomeView` 8、`breakpoint` 7、`notificationLink` 7、`ProfileView` 6、`viteConfig` 6、`common` 5、`TagsView` 5、`TagPostsView` 5、`PostDetailView` 5、`NotificationsView` 4、`PostListItem` 4、`PostEditView` 3、`useResponsive` 3。
+前端 spec 分布（合计 211）：`ProfileView` 18、`useTheme` 17、`markdown` 14、`usePostActions` 13、`index`（api）12、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`notifications` 9、`avatar` 9、`format` 9、`HomeView` 8、`breakpoint` 7、`notificationLink` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`PostListItem` 4、`NotificationsView` 4、`useResponsive` 3、`PostEditView` 3。
 
 ### 3.3 数据库
 
@@ -160,7 +161,7 @@ cd frontend && pnpm test --run
 | 软删除 | `posts.deleted`、`comments.deleted` |
 | 默认管理员 | `admin` / `admin123456`（由 `DataInitializer` 幂等创建，角色 ADMIN+MODERATOR+USER） |
 
-### 3.4 接口清单（33 个端点）
+### 3.4 接口清单（35 个端点）
 
 | 控制器 | 端点 |
 | --- | --- |
@@ -172,6 +173,7 @@ cd frontend && pnpm test --run
 | `CommentController` | `GET /api/posts/{postId}/comments`、`POST /api/posts/{postId}/comments`、`DELETE /api/posts/{postId}/comments/{id}` |
 | `NotificationController` | `GET /api/notifications`、`GET /api/notifications/unread-count`、`POST /api/notifications/read-all`、`POST /api/notifications/{id}/read` |
 | `AdminUserController` | `GET /api/admin/users`、`PUT /api/admin/users/{id}/status` |
+| `UserController` | `POST /api/users/me/avatar`、`DELETE /api/users/me/avatar` |
 | Actuator | `GET /actuator/health`（仅 ADMIN，仅暴露 health） |
 
 两个标签端点均为公开 GET（`SecurityConfig` 的 `PUBLIC_GET` 含 `/api/tags/**`），响应统一包在 `Result<T>` 里：
@@ -181,6 +183,15 @@ cd frontend && pnpm test --run
 | `GET /api/tags` | `keyword`（可选，标签名忽略大小写模糊匹配）、`page`（默认 0）、`size`（默认 30，钳制到 1~100） | `PageResponse<TagResponse>`；`TagResponse` 为 `id`/`name`/`postCount`，按 `postCount` 降序、同数按 `name` 升序，只统计未删除帖子 |
 | `GET /api/tags/posts` | `name`（必填，标签名，可含 `/`）、`page`（默认 0）、`size`（默认 10，钳制到 1~50） | `PageResponse<PostSummaryResponse>`；未知标签返回空页（200），缺 `name` 或 `page`/`size` 非数字返回 400 |
 
+头像端点由 `UserController`（`@RequestMapping("/api/users")`）提供，只操作当前登录用户，`DELETE` 幂等：
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `POST /api/users/me/avatar` | `multipart/form-data` 的 `file`（必填，JPEG/PNG，≤2MB） | `Result<UserResponse>`（消息「头像已更新」），`avatarUrl` 变为 `/uploads/avatars/<uuid>.jpg` |
+| `DELETE /api/users/me/avatar` | 无 | `Result<UserResponse>`（消息「头像已移除」）；本来没有头像也返回 200 |
+
+错误统一为 400：`仅支持 JPEG/PNG 图片`（魔数不符）、`无法解析图片`（解码失败、单边超 4096 或总像素超 2^24）、`图片不能超过 2MB`（multipart 超限或文件字节超限）、`请选择图片文件`（空文件）、`读取图片失败`（读流异常）、`保存头像失败`（落盘失败，消息可读但 HTTP 仍是 400）。服务端按 EXIF Orientation 校正方向后居中裁剪为 256×256 JPEG（quality 0.9）；文件名是服务端生成的 UUID（客户端文件名不参与路径拼接），权限 0644，先写临时文件再原子改名，事务提交后才删除旧文件（旧 URL 仍被其他用户引用时不删）。`GET /uploads/avatars/**` 是公开 GET（`SecurityConfig` 的 `PUBLIC_GET`）；本地开发由 `WebConfig` 把 `/uploads/**` 映射到 `app.upload-dir`，生产环境该前缀由 nginx 的 `location ^~ /forum/uploads/` 从宿主机目录直出，不经过 Spring。
+
 ### 3.5 前端页面
 
 | 路由 | 页面 | 说明 |
@@ -189,7 +200,7 @@ cd frontend && pnpm test --run
 | `/login`、`/register` | `LoginView`、`RegisterView` | 认证 |
 | `/posts/:id` | `PostDetailView` | 详情 + 评论树 + 楼中楼 + 评论锚点定位 + 版主操作 |
 | `/posts/new`、`/posts/:id/edit` | `PostEditView` | 发帖 / 编辑 |
-| `/profile` | `ProfileView` | 资料 / 我的帖子 / 我的收藏（三个 tab） |
+| `/profile` | `ProfileView` | 资料（含头像上传/移除）/ 我的帖子 / 我的收藏（三个 tab） |
 | `/notifications` | `NotificationsView` | 通知列表 + 单条已读 + 点击跳转 |
 | `/tags` | `TagsView` | 标签云（按帖子数降序）+ 关键词检索 + 分页 |
 | `/tags/:name` | `TagPostsView` | 某标签下的帖子列表（复用 `PostListItem` + 分页） |
@@ -370,6 +381,49 @@ cd frontend && pnpm test --run
 - **标签聚合在应用层**：聚合结果一次性取回后在内存排序分页，标签数量级变大时需改为 SQL 分页 + 索引。
 - **Markdown 会解释历史纯文本帖子**：详见 §6。
 
+### 4.9 第四轮：深色模式 + 头像上传（2026-10-20）
+
+计划：`docs/superpowers/plans/2026-10-20-round4-darkmode-avatar.md`（6 个任务：深色模式前端 → 头像上传后端 → 头像上传前端 → 部署支持上传目录 → 文档 → 全量验证与上线）
+
+目标：在既有令牌层上增加暗色配色，支持跟随系统/手动切换且刷新不闪白；把「头像」从纯文本 URL 字段升级为可上传、可移除、服务端裁剪压缩并落盘到宿主机目录的真实文件。
+
+新增/修改的文件：
+
+| 位置 | 文件 | 要点 |
+| --- | --- | --- |
+| 后端 | `util/AvatarImageProcessor.java` | 只按魔数识别 JPEG/PNG；`ImageIO` 解码后按 EXIF Orientation 1–8 校正，居中裁剪为 256×256，输出 JPEG（quality 0.9）；限制单边 4096、总像素 2^24 |
+| 后端 | `service/AvatarService.java` | 校验（空文件/2MB/魔数/解码）→ 转码 → 临时文件 + `ATOMIC_MOVE` → 更新 `users.avatar_url` → 提交后删旧文件；UUID 文件名、权限 0644，旧文件仍被其他用户引用则不删 |
+| 后端 | `controller/UserController.java` | `POST/DELETE /api/users/me/avatar`，只允许登录用户操作自己（`SecurityUtils.currentUserId()`） |
+| 后端 | `config/SecurityConfig.java`、`config/WebConfig.java` | `PUBLIC_GET` 放行 `/uploads/avatars/**`；本地开发把 `/uploads/**` 映射到 `app.upload-dir` |
+| 后端 | `exception/GlobalExceptionHandler.java`、`application.yml` | multipart 2MB/3MB 上限；`MaxUploadSizeExceededException` → 400「图片不能超过 2MB」 |
+| 前端 | `composables/useTheme.js`、`components/ThemeToggle.vue` | `system/light/dark` 三态、`localStorage` 的 `jf_theme`，系统模式跟随 `matchMedia`；顶栏下拉切换 |
+| 前端 | `styles/tokens.css`、`styles/highlight-dark.css`、`styles/tokens.spec.js` | `:root` 亮色 + `html.dark` 暗色两套同名令牌；暗色代码高亮逐条 `html.dark .hljs-*` |
+| 前端 | `index.html`、`main.js` | 首屏内联脚本先挂 `html.dark` 防闪白；8 条样式导入顺序固定 |
+| 前端 | `utils/avatar.js`、`components/UserAvatar.vue` | 站内 `/uploads/` 拼 `BASE_URL`；加载失败回退昵称首字母 |
+| 前端 | `views/ProfileView.vue`、`api/index.js` | 头像选择/上传/移除 + 客户端类型与 2MB 预校验，`uploadAvatar` 超时 60s |
+| 部署 | `Dockerfile`、`docker-compose.yml`、`deploy/deploy.sh`、`deploy/nginx/forum.conf`、`.env.example` | 容器内 `/app/uploads` 卷、`UPLOAD_HOST_DIR`、目录创建与 `podman unshare chown/chmod`、`^~ /forum/uploads/` 直出 + `nosniff` |
+
+关键取舍：
+
+- **主题不引入 UI 库之外的依赖**：复用 Element Plus 官方暗色 css-vars，再叠加自建 `--jf-color-*` 双套令牌，避免再引一套主题框架；首屏闪白用 `index.html` 内联脚本解决（Vue 挂载前就定好 `html.dark`）。
+- **服务端转码而不是原图直存**：统一裁成 256×256 JPEG，既控制体积，也顺手剥掉 EXIF/GPS 等元数据；只认魔数，改扩展名的伪图片会被「仅支持 JPEG/PNG 图片」挡住。
+- **文件落在宿主机 bind mount**：头像不随镜像发布、也不进数据库，升级/回滚容器不影响已有头像；代价是备份要单独覆盖该目录（T11）。
+- **写临时文件 + 原子改名**：中途失败不会留下半张图；数据库提交成功后才删旧文件，回滚时旧头像仍可用。
+- **文件权限显式 0644**：nginx worker 与后端容器不是同一 uid，历史上 umask 产出 0600 导致线上 403；`deploy.sh` 每次部署 `podman unshare chmod -R a+rX` 顺带治愈旧文件。
+- **nginx 用 `^~ /forum/uploads/` 且排在 SPA 回退之前**：否则 `/forum/uploads/xxx` 会命中 `try_files ... /forum/index.html` 返回 200 HTML；`nosniff` 防止浏览器把内容当脚本嗅探。
+- **图片 URL 只做站内拼接**：`resolveAvatarUrl` 对 `/uploads/` 前缀拼 `BASE_URL`，外链与 data URL 原样透传，兼容历史用户自填的头像 URL。
+
+测试与验证（2026-10-20 实测）：
+
+- 后端 `mvn -B clean test`：12 个测试类、90 个用例全绿（1 例 POSIX 权限用例在 Windows 上跳过）。新增 `AvatarImageProcessorTest` 27 例、`AvatarFlowIntegrationTest` 20 例、`AvatarServiceTest` 4 例。
+- 前端 `pnpm test`：25 个 spec、211 个用例全绿。新增 `useTheme` 17 例、`tokens` 12 例、`UserAvatar` 10 例、`avatar` 9 例、`ThemeToggle` 5 例；`ProfileView` 由 6 例增至 18 例（含头像上传/移除）。
+- 构建：`VITE_BASE_PATH=/forum/ pnpm build` 通过（index chunk 约 874kB，仍有 >500kB 警告）。
+
+已知限制：
+
+- **头像文件不在备份范围**（T11）：数据库备份不含 `/pd/Program/forum/uploads/`，恢复时需单独 `tar` 并保留属主，之后重跑 `deploy.sh` 修正权限；孤儿文件（换头像/删号后残留）没有清理任务。
+- **主题选择不跨标签页同步**（T12）：`localStorage` 变化不会通知其他标签页，多标签下可能一亮一暗，刷新后一致。
+
 ---
 
 ## 5. 待办与后续计划
@@ -388,8 +442,10 @@ cd frontend && pnpm test --run
 | T8 | **残留的冒烟测试数据** | 低 | 真实库中存在 `smoke_user`、`t4_op`、`t4_ap`、板块「冒烟测试板块」等手工测试数据，交付演示前应清理 |
 | T9 | ~~Docker 镜像未经实际构建验证~~ | 已关闭 | 2026-10-19 起在 raspi 上由 Jenkins 用 podman 实际构建并部署（`--format docker` 保留 HEALTHCHECK），见 §4.7 |
 | T10 | ~~前端未容器化~~ | 已关闭 | 需求明确前端不进容器：由主机 nginx 直接托管 dist（见 §4.7），不再作为技术债 |
+| T11 | **头像文件不在备份范围** | 中 | 头像落在宿主机 `/pd/Program/forum/uploads/`，数据库备份不含它；恢复时需单独 `tar` 该目录并保留属主，再跑 `deploy.sh` 修正权限（`podman unshare chmod a+rX`）。孤儿文件（换头像/删号后残留）目前无清理任务，见 §4.9 |
+| T12 | **主题选择不跨标签页同步** | 低 | 主题存 `localStorage` 的 `jf_theme`，但未监听 `storage` 事件；同源多标签下切换主题不会互相更新，刷新后一致。修法：在 `useTheme` 里监听 `window.addEventListener('storage', ...)` |
 
-### 5.2 候选功能（第三轮已取前两项，其余未开始）
+### 5.2 候选功能（第四轮已取头像上传与深色模式，其余未开始）
 
 第二轮明确列为「不做」的功能，各自需要独立设计：
 
@@ -397,12 +453,12 @@ cd frontend && pnpm test --run
 | --- | --- | --- | --- |
 | ~~Markdown 渲染~~ ✅ 已完成 | 高 | 中 | 第三轮已交付：客户端 `markdown-it` 渲染 + DOMPurify 白名单 + 编辑页实时预览（§4.8） |
 | ~~标签检索页~~ ✅ 已完成 | 中 | 小 | 第三轮已交付：标签总览 + 按标签筛选帖子，两个公开 GET 接口（§4.8） |
-| 头像上传 | 中 | 中 | 需要文件存储（本地或对象存储）+ 上传接口 + 校验 |
-| 深色模式 | 低 | 小 | 令牌层已就绪，主要是加一套暗色变量与切换开关 |
+| ~~头像上传~~ ✅ 已完成 | 中 | 中 | 第四轮已交付：JPEG/PNG 校验 + EXIF 校正 + 256×256 裁剪、宿主机上传目录、全站头像展示与移除（§4.9） |
+| ~~深色模式~~ ✅ 已完成 | 低 | 小 | 第四轮已交付：双套设计令牌 + 跟随系统/手动切换 + 首屏防闪白（§4.9） |
 | WebSocket 实时通知 | 中 | 大 | 目前是 120 秒轮询兜底 |
 | 全文搜索 | 中 | 中 | PostgreSQL `tsvector` + GIN 索引，替换现有 `LIKE` |
 
-第三轮已取前两项（见 §4.8）；其余候选留待后续轮次，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
+第三轮已取前两项（见 §4.8），第四轮已取头像上传与深色模式（见 §4.9）；其余候选（WebSocket 实时通知、全文搜索）留待后续轮次，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
 
 ---
 
@@ -453,6 +509,11 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-10-20 | docs | 记录第四轮深色模式与头像上传功能（README、开发记录、部署手册） | 本次提交 |
+| 2026-10-20 | chore | 部署支持头像上传目录：`UPLOAD_HOST_DIR` 卷、目录创建与属主/权限修正、nginx `/forum/uploads/` 直出 | `85940c3` |
+| 2026-10-20 | feat | 第四轮头像上传前端：资料页上传/移除、全站 `UserAvatar`、站内 URL 拼接与失败回退 | `c171279` |
+| 2026-10-20 | feat | 第四轮头像上传后端：`POST/DELETE /api/users/me/avatar`、魔数校验 + EXIF 校正 + 256×256 裁剪、原子落盘 | `6fad63c` |
+| 2026-10-20 | feat | 第四轮深色模式：双套设计令牌、跟随系统/手动切换、首屏防闪白、暗色代码高亮 | `1e3b94c` |
 | 2026-10-19 | feat | 第三轮功能：Markdown 渲染 + 标签检索（`7e0f9ab` 工具与样式、`3089446` 详情页、`936347e` 编辑页预览、`1bbd026` 标签接口、`aacc70e` 标签页与公共帖子行） | `7e0f9ab`/`3089446`/`936347e`/`1bbd026`/`aacc70e` |
 | 2026-10-19 | docs | 部署验收记录（Build #2 成功与实测结果）与变更日志回填 | 本次提交 |
 | 2026-10-19 | fix | 适配 raspi 无内存 cgroup：去掉 compose `mem_limit`，`JAVA_OPTS` 改显式 `-Xmx512m`，`deploy.sh` 启动后立校验容器状态 | `771990d` |

@@ -3441,3 +3441,12 @@ Expected: 推送成功（会再触发一次 Jenkins 构建，属预期；该次�
 - `deploy.sh`：`mkdir -p uploads/avatars` 前拒绝 `uploads` 为符号链接，避免 `chown -R` 跟随到链接目标。
 - `deploy.sh`：`podman unshare chown` 失败转 `die`，提示需要 pi 的 rootless podman user namespace 并指向部署文档。
 - 验证：`mvn -B clean test` 12 个测试类 / 90 例全绿（1 例因 Windows 无 POSIX 权限跳过）；`bash -n deploy/deploy.sh` OK。
+
+### Task 5 实施偏差记录
+
+- 测试数：计划写后端 70 例 / 11 类、前端 186 例 / 25 spec，实测为后端 90 例 / 12 类（1 例 POSIX 用例在 Windows 跳过）、前端 211 例 / 25 spec。
+- 端点：计划写 33 个，实测 35 个（新增 `UserController` 的 `POST`/`DELETE /api/users/me/avatar`）。
+- README：原文「9 个测试类、39 个用例」「20 个 spec、143 个用例」「已完成 3 轮」按实测改为 12/90、25/211、4 轮；目录结构与令牌说明同步补入组件、composable、`highlight-dark.css` 与 `uploads/`。
+- `grep -c '本次提交'` 为 4 而非任务预期的 6：原有 3 处（§0 正文 1 处 + 表格 2 行），第四轮 4 个已发生提交用真实短哈希，仅 docs 行写 `本次提交`。
+- 「保存头像失败」实际返回 400（`BusinessException` 统一映射 400），不是 500；部署手册排障行按 400 记录。
+- nginx snippet 未设 `client_max_body_size`（默认 1m），超过 1MB 的头像会在 nginx 层直接 413 —— Task 6 上线前需在 raspi 的 server 块调大并 reload。
