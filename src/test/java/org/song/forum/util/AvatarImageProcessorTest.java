@@ -219,11 +219,89 @@ class AvatarImageProcessorTest {
     }
 
     @Test
+    void processRejectsWebpAndGif() {
+        byte[] webp = {'R', 'I', 'F', 'F', 0x24, 0, 0, 0, 'W', 'E', 'B', 'P', 'V', 'P', '8', ' '};
+        assertThatThrownBy(() -> AvatarImageProcessor.process(webp))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("仅支持 JPEG/PNG");
+        assertThatThrownBy(() -> AvatarImageProcessor.process("GIF89a......".getBytes()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("仅支持 JPEG/PNG");
+    }
+
+    @Test
     void processThrowsOnCorruptJpegPayload() {
         byte[] corrupt = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1, 2, 3, 4, 5, 6, 7};
 
         assertThatThrownBy(() -> AvatarImageProcessor.process(corrupt))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("无法解析图片");
+    }
+
+    @Test
+    void decompressionBombRejectedFromHeaderBeforeDecode() {
+        byte[] bomb = TestImageFixtures.pngDeclaringSize(20000, 20000);
+
+        assertThatThrownBy(() -> AvatarImageProcessor.process(bomb))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("尺寸");
+    }
+
+    @Test
+    void decompressionBombRejectedWhenOnlyHeightExceedsBudget() {
+        byte[] bomb = TestImageFixtures.pngDeclaringSize(300, 5000);
+
+        assertThatThrownBy(() -> AvatarImageProcessor.process(bomb))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("尺寸");
+    }
+
+    @Test
+    void transparentPngIsCompositedOnWhiteWhenEncodedAsJpeg() throws IOException {
+        byte[] output = AvatarImageProcessor.process(TestImageFixtures.transparentPngWithRedQuadrant());
+
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(output));
+        assertThat(image).isNotNull();
+        int corner = image.getRGB(250, 250);
+        assertThat((corner >> 16) & 0xFF).as("透明区域的红通道").isGreaterThan(240);
+        assertThat((corner >> 8) & 0xFF).as("透明区域的绿通道").isGreaterThan(240);
+        assertThat(corner & 0xFF).as("透明区域的蓝通道").isGreaterThan(240);
+
+        int red = image.getRGB(64, 64);
+        assertThat((red >> 16) & 0xFF).as("红方块的红色").isGreaterThan(200);
+        assertThat((red >> 8) & 0xFF).as("红方块的绿色").isLessThan(80);
+        assertThat(red & 0xFF).as("红方块的蓝色").isLessThan(80);
+    }
+
+    @Test
+    void readOrientationReadsRealExifSegment() throws IOException {
+        byte[] jpeg = TestImageFixtures.jpegWithExifOrientation(6, jpegBytes(20, 10));
+
+        assertThat(AvatarImageProcessor.readOrientation(jpeg)).isEqualTo(6);
+    }
+
+    @Test
+    void processAppliesExifOrientation() throws IOException {
+        BufferedImage source = new BufferedImage(120, 60, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = source.createGraphics();
+        graphics.setColor(Color.RED);
+        graphics.fillRect(0, 0, 60, 60);
+        graphics.setColor(Color.BLUE);
+        graphics.fillRect(60, 0, 60, 60);
+        graphics.dispose();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(source, "jpg", out);
+        byte[] withExif = TestImageFixtures.jpegWithExifOrientation(6, out.toByteArray());
+
+        byte[] output = AvatarImageProcessor.process(withExif);
+
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(output));
+        // 方向 6 = 顺时针 90°：原图左半红会转到上半；居中裁剪后仍是上红下蓝
+        int top = image.getRGB(128, 40);
+        assertThat((top >> 16) & 0xFF).isGreaterThan(180);
+        assertThat(top & 0xFF).isLessThan(90);
+        int bottom = image.getRGB(128, 216);
+        assertThat(bottom & 0xFF).isGreaterThan(180);
+        assertThat((bottom >> 16) & 0xFF).isLessThan(90);
     }
 }

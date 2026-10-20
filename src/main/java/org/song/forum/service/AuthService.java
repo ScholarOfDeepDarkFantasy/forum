@@ -90,14 +90,14 @@ public class AuthService {
         if (req.getNickname() != null) user.setNickname(req.getNickname());
         if (req.getBio() != null) user.setBio(req.getBio());
         user = userRepository.save(user);
-        return toUserResponse(user);
+        return UserResponse.from(user);
     }
 
     /** 用户公开信息 */
     @Transactional(readOnly = true)
     public UserResponse getPublicProfile(Long userId) {
         return userRepository.findById(userId)
-                .map(this::toUserResponse)
+                .map(UserResponse::from)
                 .orElseThrow(() -> new BusinessException("用户不存在"));
     }
 
@@ -133,17 +133,6 @@ public class AuthService {
                 .roles(roles)
                 .status(user.getStatus().name())
                 .mutedUntil(user.getMutedUntil())
-                .build();
-    }
-
-    private UserResponse toUserResponse(User user) {
-        return UserResponse.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .nickname(user.getNickname())
-                .avatarUrl(user.getAvatarUrl())
-                .bio(user.getBio())
-                .createTime(user.getCreateTime())
                 .build();
     }
 }

@@ -1,10 +1,7 @@
 package org.song.forum.controller;
 
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -25,7 +22,11 @@ import org.song.forum.dto.auth.AuthResponse;
 import org.song.forum.dto.auth.LoginRequest;
 import org.song.forum.dto.auth.RegisterRequest;
 import org.song.forum.dto.user.UserResponse;
+import org.song.forum.entity.User;
+import org.song.forum.entity.UserStatus;
+import org.song.forum.repository.UserRepository;
 import org.song.forum.util.Result;
+import org.song.forum.util.TestImageFixtures;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -35,13 +36,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
+import java.util.Comparator;
+import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 头像全链路：上传 → 换图删旧 → 非法/超限被拒 → 静态直出 → 删除幂等 → 资料接口不再改头像。
- * 上传目录指向 JUnit 的 @TempDir，避免污染工作区。
+ * 头像全链路：上传 → 换图删旧 → 非法/超限被拒 → 静态直出 → 删除幂等 → 多人共享旧 URL。
+ * 每个用例自注册唯一用户，可单独运行；上传目录只创建一次，结束后清理。
  */
 @ActiveProfiles("test")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -52,33 +55,38 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.flyway.enabled=false",
         "spring.jpa.hibernate.ddl-auto=create-drop"
 })
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class AvatarFlowIntegrationTest {
 
     private static final String AVATAR_PREFIX = "/uploads/avatars/";
 
-    @TempDir
-    static Path uploadDir;
+    /** 类加载时创建一次，DynamicPropertySource 与断言共用同一个目录，避免兜底逻辑再建第二个目录。 */
+    private static final Path UPLOAD_DIR = createUploadDir();
 
-    /**
-     * JUnit 的 @TempDir 与 Spring 的上下文创建都挂在 beforeAll，
-     * 谁先执行取决于扩展顺序；这里在属性求值时兜底建目录，保证两条路径都拿得到同一个目录。
-     */
     @DynamicPropertySource
     static void uploadProperties(DynamicPropertyRegistry registry) {
         // @Value 注入的是 String；直接给 Path 会因缺少 Path→String 转换器导致上下文启动失败
         registry.add("app.upload-dir", () -> resolveUploadDir().toString());
     }
 
+    private static Path createUploadDir() {
+        try {
+            return Files.createTempDirectory("avatar-upload-");
+        } catch (IOException e) {
+            throw new IllegalStateException("无法创建临时上传目录", e);
+        }
+    }
+
     private static Path resolveUploadDir() {
-        if (uploadDir == null) {
-            try {
-                uploadDir = Files.createTempDirectory("avatar-upload-");
-            } catch (IOException e) {
-                throw new IllegalStateException("无法创建临时上传目录", e);
+        return UPLOAD_DIR;
+    }
+
+    @AfterAll
+    static void cleanUploadDir() throws IOException {
+        try (Stream<Path> paths = Files.walk(UPLOAD_DIR)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
             }
         }
-        return uploadDir;
     }
 
     @LocalServerPort
@@ -87,8 +95,8 @@ class AvatarFlowIntegrationTest {
     @Autowired
     TestRestTemplate rest;
 
-    private static String token;
-    private static String avatarUrl;
+    @Autowired
+    UserRepository userRepository;
 
     private String url(String path) {
         return "http://localhost:" + port + path;
@@ -98,6 +106,10 @@ class AvatarFlowIntegrationTest {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(bearerToken);
         return headers;
+    }
+
+    private static String newUsername() {
+        return "avatar" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
     }
 
     private String registerAndLogin(String name) {
@@ -116,6 +128,10 @@ class AvatarFlowIntegrationTest {
         return resp.getBody().getData().getToken();
     }
 
+    private String freshToken() {
+        return registerAndLogin(newUsername());
+    }
+
     private ResponseEntity<Result<UserResponse>> upload(String bearerToken, byte[] bytes, String filename) {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", new ByteArrayResource(bytes) {
@@ -124,6 +140,11 @@ class AvatarFlowIntegrationTest {
                 return filename;
             }
         });
+        return postMultipart(bearerToken, body);
+    }
+
+    private ResponseEntity<Result<UserResponse>> postMultipart(String bearerToken,
+                                                              MultiValueMap<String, Object> body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         if (bearerToken != null) {
@@ -134,14 +155,14 @@ class AvatarFlowIntegrationTest {
                 });
     }
 
-    private ResponseEntity<Result<UserResponse>> deleteAvatar() {
+    private ResponseEntity<Result<UserResponse>> deleteAvatar(String bearerToken) {
         return rest.exchange(url("/api/users/me/avatar"), HttpMethod.DELETE,
-                new HttpEntity<>(bearer(token)), new ParameterizedTypeReference<>() {
+                new HttpEntity<>(bearer(bearerToken)), new ParameterizedTypeReference<>() {
                 });
     }
 
-    private Path uploadedFile(String url) {
-        return uploadDir.resolve("avatars").resolve(url.substring(AVATAR_PREFIX.length()));
+    private Path uploadedFile(String avatarUrl) {
+        return UPLOAD_DIR.resolve("avatars").resolve(avatarUrl.substring(AVATAR_PREFIX.length()));
     }
 
     private byte[] jpegBytes(int width, int height, Color color) throws IOException {
@@ -167,7 +188,6 @@ class AvatarFlowIntegrationTest {
     }
 
     @Test
-    @Order(1)
     void anonymousUploadRejected() throws IOException {
         ResponseEntity<Result<UserResponse>> resp = upload(null, jpegBytes(200, 200, Color.ORANGE), "a.jpg");
 
@@ -175,14 +195,13 @@ class AvatarFlowIntegrationTest {
     }
 
     @Test
-    @Order(2)
     void uploadJpegStoresSquareJpeg() throws IOException {
-        token = registerAndLogin("avatar-user");
+        String token = freshToken();
 
         ResponseEntity<Result<UserResponse>> resp = upload(token, jpegBytes(400, 300, Color.ORANGE), "photo.jpg");
 
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
-        avatarUrl = resp.getBody().getData().getAvatarUrl();
+        String avatarUrl = resp.getBody().getData().getAvatarUrl();
         assertThat(avatarUrl).startsWith(AVATAR_PREFIX).endsWith(".jpg");
         Path stored = uploadedFile(avatarUrl);
         assertThat(stored).exists();
@@ -195,8 +214,9 @@ class AvatarFlowIntegrationTest {
     }
 
     @Test
-    @Order(3)
     void uploadPngAccepted() throws IOException {
+        String token = freshToken();
+
         ResponseEntity<Result<UserResponse>> resp = upload(token, pngBytes(300, 500, Color.BLUE), "photo.png");
 
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
@@ -204,22 +224,23 @@ class AvatarFlowIntegrationTest {
     }
 
     @Test
-    @Order(4)
     void replacingAvatarDeletesOldFile() throws IOException {
-        String old = avatarUrl;
+        String token = freshToken();
+        String old = upload(token, jpegBytes(400, 300, Color.ORANGE), "first.jpg").getBody().getData().getAvatarUrl();
 
         ResponseEntity<Result<UserResponse>> resp = upload(token, jpegBytes(500, 500, Color.GREEN), "again.jpg");
 
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
-        avatarUrl = resp.getBody().getData().getAvatarUrl();
-        assertThat(avatarUrl).isNotEqualTo(old);
+        String current = resp.getBody().getData().getAvatarUrl();
+        assertThat(current).isNotEqualTo(old);
         assertThat(uploadedFile(old)).doesNotExist();
-        assertThat(uploadedFile(avatarUrl)).exists();
+        assertThat(uploadedFile(current)).exists();
     }
 
     @Test
-    @Order(5)
     void textFileRenamedJpgRejected() {
+        String token = freshToken();
+
         ResponseEntity<Result<UserResponse>> resp = upload(token, "not an image".getBytes(), "fake.jpg");
 
         assertThat(resp.getStatusCode().value()).isEqualTo(400);
@@ -227,8 +248,22 @@ class AvatarFlowIntegrationTest {
     }
 
     @Test
-    @Order(6)
+    void webpAndGifRejected() {
+        String token = freshToken();
+        byte[] webp = {'R', 'I', 'F', 'F', 0x24, 0, 0, 0, 'W', 'E', 'B', 'P', 'V', 'P', '8', ' '};
+
+        ResponseEntity<Result<UserResponse>> webpResp = upload(token, webp, "photo.webp");
+        ResponseEntity<Result<UserResponse>> gifResp = upload(token, "GIF89a......".getBytes(), "photo.gif");
+
+        assertThat(webpResp.getStatusCode().value()).isEqualTo(400);
+        assertThat(webpResp.getBody().getMessage()).contains("仅支持 JPEG/PNG");
+        assertThat(gifResp.getStatusCode().value()).isEqualTo(400);
+        assertThat(gifResp.getBody().getMessage()).contains("仅支持 JPEG/PNG");
+    }
+
+    @Test
     void oversizeUploadRejected() throws IOException {
+        String token = freshToken();
         byte[] jpeg = jpegBytes(300, 300, Color.RED);
         byte[] oversize = new byte[2 * 1024 * 1024 + 1024];
         System.arraycopy(jpeg, 0, oversize, 0, jpeg.length);
@@ -240,8 +275,120 @@ class AvatarFlowIntegrationTest {
     }
 
     @Test
-    @Order(7)
-    void uploadedFileServedByWebConfig() {
+    void twoPointOneMegabyteUploadRejected() throws IOException {
+        String token = freshToken();
+        byte[] jpeg = jpegBytes(300, 300, Color.RED);
+        byte[] oversize = new byte[(int) (2.1 * 1024 * 1024)];
+        System.arraycopy(jpeg, 0, oversize, 0, jpeg.length);
+
+        ResponseEntity<Result<UserResponse>> resp = upload(token, oversize, "big.jpg");
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+        assertThat(resp.getBody().getMessage()).contains("2MB");
+    }
+
+    @Test
+    void decompressionBombRejectedWithoutOom() {
+        String token = freshToken();
+        byte[] bomb = TestImageFixtures.pngDeclaringSize(20000, 20000);
+
+        ResponseEntity<Result<UserResponse>> resp = upload(token, bomb, "bomb.png");
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+        assertThat(resp.getBody().getMessage()).contains("尺寸");
+    }
+
+    @Test
+    void transparentPngBecomesWhiteJpeg() throws IOException {
+        String token = freshToken();
+
+        ResponseEntity<Result<UserResponse>> resp = upload(token,
+                TestImageFixtures.transparentPngWithRedQuadrant(), "alpha.png");
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        BufferedImage image = ImageIO.read(uploadedFile(resp.getBody().getData().getAvatarUrl()).toFile());
+        int corner = image.getRGB(250, 250);
+        assertThat((corner >> 16) & 0xFF).as("透明区域应为白色").isGreaterThan(240);
+        assertThat((corner >> 8) & 0xFF).isGreaterThan(240);
+        assertThat(corner & 0xFF).isGreaterThan(240);
+        int red = image.getRGB(64, 64);
+        assertThat((red >> 16) & 0xFF).as("红色方块应保留").isGreaterThan(200);
+        assertThat(red & 0xFF).isLessThan(80);
+    }
+
+    @Test
+    void exifOrientedJpegIsRotated() throws IOException {
+        String token = freshToken();
+        BufferedImage source = new BufferedImage(120, 60, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = source.createGraphics();
+        graphics.setColor(Color.RED);
+        graphics.fillRect(0, 0, 60, 60);
+        graphics.setColor(Color.BLUE);
+        graphics.fillRect(60, 0, 60, 60);
+        graphics.dispose();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(source, "jpg", out);
+        byte[] jpeg = TestImageFixtures.jpegWithExifOrientation(6, out.toByteArray());
+
+        ResponseEntity<Result<UserResponse>> resp = upload(token, jpeg, "exif.jpg");
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        BufferedImage image = ImageIO.read(uploadedFile(resp.getBody().getData().getAvatarUrl()).toFile());
+        int top = image.getRGB(128, 40);
+        assertThat((top >> 16) & 0xFF).as("顺时针旋转后上半应为红色").isGreaterThan(180);
+        assertThat(top & 0xFF).isLessThan(90);
+        int bottom = image.getRGB(128, 216);
+        assertThat(bottom & 0xFF).as("顺时针旋转后下半应为蓝色").isGreaterThan(180);
+        assertThat((bottom >> 16) & 0xFF).isLessThan(90);
+    }
+
+    @Test
+    void missingFilePartReturns400() {
+        String token = freshToken();
+
+        ResponseEntity<Result<UserResponse>> resp = postMultipart(token, new LinkedMultiValueMap<>());
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+        assertThat(resp.getBody().getMessage()).contains("缺少图片文件");
+    }
+
+    @Test
+    void wrongPartNameReturns400() {
+        String token = freshToken();
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("image", new ByteArrayResource(new byte[]{1, 2, 3}) {
+            @Override
+            public String getFilename() {
+                return "photo.jpg";
+            }
+        });
+
+        ResponseEntity<Result<UserResponse>> resp = postMultipart(token, body);
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+        assertThat(resp.getBody().getMessage()).contains("缺少图片文件");
+    }
+
+    @Test
+    void nonMultipartPostReturns400() {
+        String token = freshToken();
+        HttpHeaders headers = bearer(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        ResponseEntity<Result<UserResponse>> resp = rest.exchange(url("/api/users/me/avatar"), HttpMethod.POST,
+                new HttpEntity<>("{}", headers), new ParameterizedTypeReference<>() {
+                });
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
+        assertThat(resp.getBody().getMessage()).contains("multipart/form-data");
+    }
+
+    @Test
+    void uploadedFileServedByWebConfig() throws IOException {
+        String token = freshToken();
+        String avatarUrl = upload(token, jpegBytes(300, 300, Color.ORANGE), "served.jpg")
+                .getBody().getData().getAvatarUrl();
+
         ResponseEntity<byte[]> resp = rest.getForEntity(url(avatarUrl), byte[].class);
 
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
@@ -249,31 +396,33 @@ class AvatarFlowIntegrationTest {
     }
 
     @Test
-    @Order(8)
-    void deleteRemovesAvatarAndFile() {
-        String target = avatarUrl;
+    void deleteRemovesAvatarAndFile() throws IOException {
+        String token = freshToken();
+        String avatarUrl = upload(token, jpegBytes(300, 300, Color.ORANGE), "delete.jpg")
+                .getBody().getData().getAvatarUrl();
 
-        ResponseEntity<Result<UserResponse>> resp = deleteAvatar();
+        ResponseEntity<Result<UserResponse>> resp = deleteAvatar(token);
 
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody().getData().getAvatarUrl()).isNull();
-        assertThat(uploadedFile(target)).doesNotExist();
+        assertThat(uploadedFile(avatarUrl)).doesNotExist();
     }
 
     @Test
-    @Order(9)
     void deleteIsIdempotent() {
-        ResponseEntity<Result<UserResponse>> resp = deleteAvatar();
+        String token = freshToken();
+
+        ResponseEntity<Result<UserResponse>> resp = deleteAvatar(token);
 
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody().getData().getAvatarUrl()).isNull();
     }
 
     @Test
-    @Order(10)
     void profileUpdateNoLongerChangesAvatar() throws IOException {
-        ResponseEntity<Result<UserResponse>> uploaded = upload(token, jpegBytes(200, 200, Color.MAGENTA), "keep.jpg");
-        String current = uploaded.getBody().getData().getAvatarUrl();
+        String token = freshToken();
+        String current = upload(token, jpegBytes(200, 200, Color.MAGENTA), "keep.jpg")
+                .getBody().getData().getAvatarUrl();
         assertThat(current).isNotNull();
 
         HttpHeaders headers = bearer(token);
@@ -286,5 +435,33 @@ class AvatarFlowIntegrationTest {
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody().getData().getNickname()).isEqualTo("新昵称");
         assertThat(resp.getBody().getData().getAvatarUrl()).isEqualTo(current);
+    }
+
+    @Test
+    void sharedLegacyAvatarUrlIsKeptWhileAnotherUserReferencesIt() throws IOException {
+        String ownerName = newUsername();
+        String ownerToken = registerAndLogin(ownerName);
+        String sharedUrl = upload(ownerToken, jpegBytes(300, 300, Color.CYAN), "shared.jpg")
+                .getBody().getData().getAvatarUrl();
+        Path sharedFile = uploadedFile(sharedUrl);
+        assertThat(sharedFile).exists();
+
+        String otherName = newUsername();
+        User other = User.builder()
+                .username(otherName)
+                .password("x")
+                .email(otherName + "@test.com")
+                .nickname("另一个用户")
+                .status(UserStatus.ACTIVE)
+                .avatarUrl(sharedUrl)
+                .build();
+        User saved = userRepository.save(other);
+
+        ResponseEntity<Result<UserResponse>> resp = deleteAvatar(ownerToken);
+
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        assertThat(sharedFile).as("另一个用户仍引用该文件，不能删除").exists();
+        assertThat(rest.getForEntity(url(sharedUrl), byte[].class).getStatusCode().value()).isEqualTo(200);
+        assertThat(userRepository.findById(saved.getId()).orElseThrow().getAvatarUrl()).isEqualTo(sharedUrl);
     }
 }

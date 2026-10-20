@@ -12,4 +12,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByUsername(String username);
 
     boolean existsByEmail(String email);
+
+    /** 是否仍有其他用户引用同一个头像地址（用于避免删除共享文件）。 */
+    boolean existsByAvatarUrlAndIdNot(String avatarUrl, Long id);
 }

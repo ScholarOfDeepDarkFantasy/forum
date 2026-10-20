@@ -3,12 +3,15 @@ package org.song.forum.util;
 import com.drew.imaging.ImageMetadataReader;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.exif.ExifIFD0Directory;
+import lombok.extern.slf4j.Slf4j;
 import org.song.forum.exception.BusinessException;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -25,11 +28,16 @@ import java.util.Iterator;
  * <p>安全策略：只按魔数接受 JPEG/PNG，并且一定重新编码为 JPEG——不落原始字节，
  * 因此 SVG 脚本、EXIF 元数据、伪造 Content-Type 都不会被写入磁盘。</p>
  */
+@Slf4j
 public final class AvatarImageProcessor {
 
     /** 规格固定 256×256 */
     public static final int AVATAR_SIZE = 256;
     private static final float JPEG_QUALITY = 0.9f;
+    /** 单边上限：解码前先看头部，避免解压炸弹把堆打满 */
+    private static final int MAX_DIMENSION = 4096;
+    /** 总像素上限（4096×4096），与单边上限共同限制解码内存 */
+    private static final long MAX_PIXELS = 16_777_216L;
     private static final byte[] JPEG_MAGIC = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
     private static final byte[] PNG_MAGIC = {(byte) 0x89, (byte) 0x50, (byte) 0x4E, (byte) 0x47, (byte) 0x0D, (byte) 0x0A, (byte) 0x1A, (byte) 0x0A};
 
@@ -65,6 +73,7 @@ public final class AvatarImageProcessor {
             int orientation = directory.getInt(ExifIFD0Directory.TAG_ORIENTATION);
             return orientation >= 1 && orientation <= 8 ? orientation : 1;
         } catch (Exception e) {
+            log.debug("读取 EXIF 方向失败，按不旋转处理", e);
             return 1;
         }
     }
@@ -96,10 +105,11 @@ public final class AvatarImageProcessor {
         boolean swapAxes = orientation >= 5;
         int outWidth = swapAxes ? height : width;
         int outHeight = swapAxes ? width : height;
-        BufferedImage target = new BufferedImage(outWidth, outHeight, BufferedImage.TYPE_INT_RGB);
+        // 保留 alpha：透明 PNG 必须撑到 JPEG 编码前才铺白底，否则会被合成到黑底上
+        BufferedImage target = new BufferedImage(outWidth, outHeight, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = target.createGraphics();
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         graphics.drawImage(source, transform, null);
         graphics.dispose();
         return target;
@@ -110,16 +120,28 @@ public final class AvatarImageProcessor {
         int size = Math.min(source.getWidth(), source.getHeight());
         int x = (source.getWidth() - size) / 2;
         int y = (source.getHeight() - size) / 2;
-        BufferedImage cropped = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+        BufferedImage cropped = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = cropped.createGraphics();
         graphics.drawImage(source, 0, 0, size, size, x, y, x + size, y + size, null);
         graphics.dispose();
         return cropped;
     }
 
-    /** 缩放到指定尺寸（小图允许放大） */
+    /** 缩放到指定尺寸（小图允许放大）；大图分步减半，避免单步双线性降采样产生锯齿 */
     public static BufferedImage resizeTo(BufferedImage source, int width, int height) {
-        BufferedImage target = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        BufferedImage current = toArgb(source);
+        int currentWidth = current.getWidth();
+        int currentHeight = current.getHeight();
+        while (currentWidth / 2 >= width && currentHeight / 2 >= height) {
+            currentWidth /= 2;
+            currentHeight /= 2;
+            current = scale(current, currentWidth, currentHeight);
+        }
+        return scale(current, width, height);
+    }
+
+    private static BufferedImage scale(BufferedImage source, int width, int height) {
+        BufferedImage target = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = target.createGraphics();
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                 RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -151,24 +173,54 @@ public final class AvatarImageProcessor {
         return out.toByteArray();
     }
 
-    /** 一次完成：魔数校验 → EXIF 方向 → 解码 → 居中裁剪 → 256×256 → JPEG 字节 */
+    /** 一次完成：魔数校验 → 头部尺寸校验 → 解码 → EXIF 方向 → 居中裁剪 → 256×256 → JPEG 字节 */
     public static byte[] process(byte[] raw) {
         if (detectType(raw) == null) {
             throw new BusinessException("仅支持 JPEG/PNG 图片");
         }
-        BufferedImage decoded;
-        try {
-            decoded = ImageIO.read(new ByteArrayInputStream(raw));
-        } catch (IOException e) {
-            throw new BusinessException("无法解析图片");
-        }
-        if (decoded == null) {
-            throw new BusinessException("无法解析图片");
-        }
+        BufferedImage decoded = decodeChecked(raw);
         BufferedImage oriented = orientationTransform(decoded, readOrientation(raw));
         BufferedImage squared = centerCrop(oriented);
         BufferedImage resized = resizeTo(squared, AVATAR_SIZE, AVATAR_SIZE);
         return toJpegBytes(resized);
+    }
+
+    /**
+     * 先读头部宽高再解码：解压炸弹的压缩包很小，但声明尺寸可以是 20000×20000。
+     * 在 {@code reader.read} 之前拒绝超大图，避免一次性分配数百 MB 像素内存。
+     */
+    private static BufferedImage decodeChecked(byte[] raw) {
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(raw))) {
+            if (input == null) {
+                throw new BusinessException("无法解析图片");
+            }
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) {
+                throw new BusinessException("无法解析图片");
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(input, true, true);
+                int width = reader.getWidth(0);
+                int height = reader.getHeight(0);
+                if (width > MAX_DIMENSION || height > MAX_DIMENSION
+                        || (long) width * height > MAX_PIXELS) {
+                    throw new BusinessException("图片尺寸过大，最大支持 "
+                            + MAX_DIMENSION + "×" + MAX_DIMENSION);
+                }
+                BufferedImage decoded = reader.read(0);
+                if (decoded == null) {
+                    throw new BusinessException("无法解析图片");
+                }
+                return decoded;
+            } finally {
+                reader.dispose();
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new BusinessException("无法解析图片", e);
+        }
     }
 
     private static boolean startsWith(byte[] data, byte[] prefix) {
@@ -181,6 +233,18 @@ public final class AvatarImageProcessor {
             }
         }
         return true;
+    }
+
+    private static BufferedImage toArgb(BufferedImage image) {
+        if (image.getType() == BufferedImage.TYPE_INT_ARGB) {
+            return image;
+        }
+        BufferedImage argb = new BufferedImage(image.getWidth(), image.getHeight(),
+                BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = argb.createGraphics();
+        graphics.drawImage(image, 0, 0, null);
+        graphics.dispose();
+        return argb;
     }
 
     /** 带 alpha 的 PNG 铺白底再转 RGB，避免透明区被编码成黑块 */

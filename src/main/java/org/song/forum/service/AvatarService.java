@@ -10,18 +10,24 @@ import org.song.forum.util.AvatarImageProcessor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
- * 头像编排：校验 → 转码 → 落盘 → 更新 users.avatar_url → 清旧文件。
- * <p>文件一定被重编码为 JPEG，文件名是服务端生成的 UUID，
- * 客户端文件名不参与路径拼接。</p>
+ * 头像编排：校验 → 转码 → 临时文件 → 原子改名 → 更新 users.avatar_url → 提交后清旧文件。
+ * <p>文件名是服务端生成的 UUID，客户端文件名不参与路径拼接；提交前不删旧文件，
+ * 数据库回滚时旧头像仍可用。</p>
  */
 @Slf4j
 @Service
@@ -30,6 +36,9 @@ public class AvatarService {
 
     private static final long MAX_BYTES = 2L * 1024 * 1024;
     private static final String AVATAR_URL_PREFIX = "/uploads/avatars/";
+    /** 只有服务端生成的 UUID 文件名才允许删除，历史用户自填 URL 一律不动 */
+    private static final Pattern SERVER_FILE_NAME = Pattern.compile(
+            "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.jpg$");
 
     private final UserRepository userRepository;
 
@@ -55,22 +64,36 @@ public class AvatarService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("用户不存在"));
+        String oldUrl = user.getAvatarUrl();
+        // 旧文件是否仍被其他用户引用必须在本事务内查完；提交回调里不再访问数据库
+        boolean oldFileDeletable = isServerGenerated(oldUrl)
+                && !userRepository.existsByAvatarUrlAndIdNot(oldUrl, userId);
+
         Path avatarDir = avatarDir();
         String filename = UUID.randomUUID() + ".jpg";
+        Path target = avatarDir.resolve(filename);
         try {
             Files.createDirectories(avatarDir);
-            Files.write(avatarDir.resolve(filename), jpeg);
+            writeAtomically(avatarDir, target, jpeg);
         } catch (IOException e) {
             log.error("保存头像失败: dir={}", avatarDir, e);
+            deleteQuietly(target);
             throw new BusinessException("保存头像失败");
         }
 
-        String oldUrl = user.getAvatarUrl();
         user.setAvatarUrl(AVATAR_URL_PREFIX + filename);
-        user = userRepository.save(user);
-        deleteAvatarFile(oldUrl);
+        try {
+            user = userRepository.save(user);
+        } catch (RuntimeException e) {
+            // 数据库没提交成功，刚写入的新文件不能留下
+            deleteQuietly(target);
+            throw e;
+        }
+        if (oldFileDeletable) {
+            deleteAfterCommit(oldUrl);
+        }
         log.info("用户 {} 更新头像: {}", user.getUsername(), user.getAvatarUrl());
-        return toUserResponse(user);
+        return UserResponse.from(user);
     }
 
     /** 幂等：没有头像时直接返回当前用户 */
@@ -80,27 +103,58 @@ public class AvatarService {
                 .orElseThrow(() -> new BusinessException("用户不存在"));
         String oldUrl = user.getAvatarUrl();
         if (oldUrl == null) {
-            return toUserResponse(user);
+            return UserResponse.from(user);
         }
+        boolean oldFileDeletable = isServerGenerated(oldUrl)
+                && !userRepository.existsByAvatarUrlAndIdNot(oldUrl, userId);
         user.setAvatarUrl(null);
         user = userRepository.save(user);
-        deleteAvatarFile(oldUrl);
-        return toUserResponse(user);
+        if (oldFileDeletable) {
+            deleteAfterCommit(oldUrl);
+        }
+        return UserResponse.from(user);
     }
 
     private Path avatarDir() {
         return Paths.get(uploadDir, "avatars");
     }
 
-    /** 只删除自己目录里、由本服务命名的文件；路径穿越/外链一律跳过 */
+    /** 同目录内临时文件写完再原子改名，静态资源不会读到写了一半的文件 */
+    private void writeAtomically(Path dir, Path target, byte[] jpeg) throws IOException {
+        Path tmp = Files.createTempFile(dir, "avatar-", ".tmp");
+        try {
+            Files.write(tmp, jpeg);
+            try {
+                Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(tmp);
+        }
+    }
+
+    /** 事务提交后再删旧文件；没有事务（如直接调用）时立即删 */
+    private void deleteAfterCommit(String avatarUrl) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            deleteAvatarFile(avatarUrl);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                deleteAvatarFile(avatarUrl);
+            }
+        });
+    }
+
+    /** 只删除服务端命名的文件，且调用方已确认没有其他用户引用它 */
     private void deleteAvatarFile(String avatarUrl) {
-        if (avatarUrl == null || !avatarUrl.startsWith(AVATAR_URL_PREFIX)) {
+        if (!isServerGenerated(avatarUrl)) {
             return;
         }
         String filename = avatarUrl.substring(AVATAR_URL_PREFIX.length());
-        if (filename.isBlank() || filename.contains("/") || filename.contains("..")) {
-            return;
-        }
         Path dir = avatarDir();
         try {
             Path target = dir.resolve(filename).toRealPath();
@@ -108,19 +162,26 @@ public class AvatarService {
                 return;
             }
             Files.deleteIfExists(target);
+        } catch (NoSuchFileException e) {
+            log.debug("旧头像文件已不存在: {}", avatarUrl);
         } catch (IOException e) {
             log.warn("删除旧头像失败: {}", avatarUrl, e);
         }
     }
 
-    private UserResponse toUserResponse(User user) {
-        return UserResponse.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .nickname(user.getNickname())
-                .avatarUrl(user.getAvatarUrl())
-                .bio(user.getBio())
-                .createTime(user.getCreateTime())
-                .build();
+    private static boolean isServerGenerated(String avatarUrl) {
+        if (avatarUrl == null || !avatarUrl.startsWith(AVATAR_URL_PREFIX)) {
+            return false;
+        }
+        String filename = avatarUrl.substring(AVATAR_URL_PREFIX.length());
+        return !filename.contains("/") && SERVER_FILE_NAME.matcher(filename).matches();
+    }
+
+    private static void deleteQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException e) {
+            log.warn("清理临时头像文件失败: {}", path, e);
+        }
     }
 }

@@ -11,6 +11,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.song.forum.util.Result;
@@ -92,6 +94,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleMaxUploadSize(MaxUploadSizeExceededException e) {
         log.warn("上传文件超过上限: {}", e.getMessage());
         return ResponseEntity.badRequest().body(Result.fail("图片不能超过 2MB"));
+    }
+
+    /**
+     * 缺少文件 part（字段名写错、只传普通字段、空 multipart）→ 400。
+     * <p>原先落到 Exception 兜底返回 500，把客户端错误报成了服务端错误。</p>
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Result<Void>> handleMissingPart(MissingServletRequestPartException e) {
+        log.warn("缺少上传文件 part: {}", e.getRequestPartName());
+        return ResponseEntity.badRequest().body(Result.fail("缺少图片文件"));
+    }
+
+    /** 请求不是 multipart/form-data → 400，直接告诉客户端正确的提交方式 */
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<Result<Void>> handleMultipart(MultipartException e) {
+        log.warn("非 multipart 上传请求: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(Result.fail("请使用 multipart/form-data 上传图片"));
     }
 
     /** 已登录但无权限 → 403 */

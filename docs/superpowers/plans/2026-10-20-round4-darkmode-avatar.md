@@ -3407,3 +3407,15 @@ Expected: 推送成功（会再触发一次 Jenkins 构建，属预期；该次�
 - `highlight.js` 由 `^11.12.0` 钉为 `11.12.0` 并同步 lockfile；`highlight-dark.css` 头注释改为 11.12.0 手工同步说明（调色板未改）。
 - 补充测试：Storage 读写抛错、`initTheme()` 幂等/返回值、系统暗→亮、显式模式回切 system、旧版 `addListener` 环境。
 - 小项：`useTheme()` 的 `mode` 改为 `readonly`；`ThemeToggle` 合并重复 `find`、激活项加 `aria-current`。
+
+### Task 2 质量修复记录（实施偏差）
+
+- 解压炸弹：`ImageInputStream` + `ImageReader` 解码前读头部，单边 >4096 或总像素 >16,777,216 抛 400「图片尺寸过大」；炸弹测试只伪造 IHDR，不分配真实像素。
+- 透明 PNG：方向变换/裁剪/缩放改用 `TYPE_INT_ARGB`，只在 JPEG 编码前 `toRgb` 铺白底；透明角落变白、红方块保留。
+- 畸形上传：新增 `MissingServletRequestPartException`→400「缺少图片文件」、`MultipartException`→400「请使用 multipart/form-data 上传图片」；缺 part/错名/非 multipart 各一例。
+- 原子性：同目录临时文件 → `ATOMIC_MOVE` 改名 → 保存 DB；保存失败删新文件，旧文件在 `afterCommit` 删除（无事务时立即删）；`remove()` 同序。
+- 跨用户误删：仅删服务端 UUID 文件名且 `existsByAvatarUrlAndIdNot` 为假；两用户共享 URL 时文件保留、另一用户 URL 仍有效。
+- 测试卫生：去掉 `@TestMethodOrder`/静态 token，每例注册唯一用户；上传目录静态建一次并在 `@AfterAll` 清理，`resolveUploadDir()` 保留。
+- 补测：WEBP/GIF 拒绝、2.1MB→400、真实 EXIF 方向 6、透明 PNG、炸弹、共享 URL；`AvatarServiceTest` 模拟保存失败覆盖文件/DB 顺序。
+- 小项：旋转双线性、降采样分步减半；EXIF 失败 `log.debug`；`UserResponse.from` 合并 mapper；`PUBLIC_GET` 收窄为 `/uploads/avatars/**`；no-op 删除不再打 warn 栈。
+- 偏差：计划 §「同一逻辑两处实现」原接受理由随 mapper 抽出失效，保留原文不改，仅在此记录；其余按计划执行，无功能延期。
