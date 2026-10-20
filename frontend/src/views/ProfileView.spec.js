@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
+const { uploadAvatar, removeAvatar, warning, success } = vi.hoisted(() => ({
+  uploadAvatar: vi.fn(),
+  removeAvatar: vi.fn(),
+  warning: vi.fn(),
+  success: vi.fn()
+}))
+
 const push = vi.fn()
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {}, name: 'profile', fullPath: '/profile', path: '/profile' }),
@@ -13,8 +20,11 @@ vi.mock('@/api', () => ({
     mine: vi.fn(),
     myFavorites: vi.fn(),
     remove: vi.fn()
-  }
+  },
+  userApi: { uploadAvatar, removeAvatar }
 }))
+
+vi.mock('element-plus', () => ({ ElMessage: { success, warning, error: vi.fn() } }))
 
 import ProfileView from './ProfileView.vue'
 import { postApi } from '@/api'
@@ -34,7 +44,8 @@ const stubs = {
   'el-input': { template: '<input />' },
   'el-button': { template: '<button><slot /></button>' },
   'el-pagination': { template: '<div class="pager-stub" />' },
-  'el-empty': { template: '<div class="empty-stub" />' }
+  'el-empty': { template: '<div class="empty-stub" />' },
+  'el-avatar': { props: ['size', 'src'], template: '<div class="avatar-stub" />' }
 }
 
 let pinia
@@ -133,5 +144,79 @@ describe('ProfileView 我的收藏', () => {
     await flush()
 
     expect(favPane(wrapper).find('.pager-stub').exists()).toBe(true)
+  })
+})
+
+describe('ProfileView 头像上传', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    pinia = createPinia()
+    setActivePinia(pinia)
+    const auth = useAuthStore()
+    auth.user = {
+      id: 1,
+      username: 'alice',
+      nickname: '爱丽丝',
+      avatarUrl: '/uploads/avatars/old.jpg',
+      roles: ['USER']
+    }
+    auth.fetchMe = vi.fn().mockResolvedValue()
+    postApi.mine.mockResolvedValue(page([]))
+    postApi.myFavorites.mockResolvedValue(page([]))
+    uploadAvatar.mockResolvedValue({ avatarUrl: '/uploads/avatars/new.jpg' })
+    removeAvatar.mockResolvedValue({ avatarUrl: null })
+  })
+
+  async function pick(wrapper, file) {
+    const input = wrapper.find('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+    await flush()
+  }
+
+  it('上传合法 JPEG 调用 userApi.uploadAvatar 并刷新用户', async () => {
+    const wrapper = mountProfile()
+    await flush()
+    const file = new File(['x'], 'me.jpg', { type: 'image/jpeg' })
+
+    await pick(wrapper, file)
+
+    expect(uploadAvatar).toHaveBeenCalledWith(file)
+    expect(useAuthStore().fetchMe).toHaveBeenCalled()
+    expect(success).toHaveBeenCalledWith('头像已更新')
+  })
+
+  it('非法类型不发请求并提示', async () => {
+    const wrapper = mountProfile()
+    await flush()
+
+    await pick(wrapper, new File(['x'], 'me.gif', { type: 'image/gif' }))
+
+    expect(uploadAvatar).not.toHaveBeenCalled()
+    expect(warning).toHaveBeenCalledWith('仅支持 JPEG/PNG 图片')
+  })
+
+  it('超过 2MB 不发请求并提示', async () => {
+    const wrapper = mountProfile()
+    await flush()
+    const big = new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'big.jpg', { type: 'image/jpeg' })
+
+    await pick(wrapper, big)
+
+    expect(uploadAvatar).not.toHaveBeenCalled()
+    expect(warning).toHaveBeenCalledWith('图片不能超过 2MB')
+  })
+
+  it('移除头像调用 userApi.removeAvatar 并刷新用户', async () => {
+    const wrapper = mountProfile()
+    await flush()
+
+    await wrapper.find('.avatar-remove').trigger('click')
+    await flush()
+
+    expect(removeAvatar).toHaveBeenCalled()
+    expect(useAuthStore().fetchMe).toHaveBeenCalled()
+    expect(success).toHaveBeenCalledWith('头像已移除')
   })
 })

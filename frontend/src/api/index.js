@@ -78,6 +78,16 @@ export const authApi = {
   publicProfile: (id) => api.get(`/auth/users/${id}`)
 }
 
+// ========== 用户（头像） ==========
+export const userApi = {
+  uploadAvatar: (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return api.post('/users/me/avatar', fd)
+  },
+  removeAvatar: () => api.delete('/users/me/avatar')
+}
+
 // ========== 板块 ==========
 export const boardApi = {
   list: () => api.get('/boards'),

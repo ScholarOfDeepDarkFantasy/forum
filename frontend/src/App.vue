@@ -6,6 +6,7 @@ import { Bell, User, SwitchButton, Connection, Setting } from '@element-plus/ico
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -59,7 +60,11 @@ onMounted(() => {
             </el-badge>
             <el-dropdown @command="handleUserCommand">
               <span class="user-chip">
-                <el-avatar :size="28">{{ (auth.user?.nickname || auth.user?.username || '?').slice(0, 1) }}</el-avatar>
+                <UserAvatar
+                  :url="auth.user?.avatarUrl"
+                  :name="auth.user?.nickname || auth.user?.username"
+                  :size="28"
+                />
                 <span class="username">{{ auth.user?.nickname || auth.user?.username }}</span>
               </span>
               <template #dropdown>

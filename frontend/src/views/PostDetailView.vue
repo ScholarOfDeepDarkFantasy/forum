@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePostActions } from '@/composables/usePostActions'
 import { useNotificationStore } from '@/stores/notifications'
 import { formatDateTime } from '@/utils/format'
+import UserAvatar from '@/components/UserAvatar.vue'
 import { renderMarkdown } from '@/utils/markdown'
 
 const route = useRoute()
@@ -276,7 +277,11 @@ onMounted(async () => {
       <template v-if="comments.length">
         <div v-for="c in comments" :key="c.id" :id="`comment-${c.id}`" class="comment">
           <div class="comment-head">
-            <el-avatar :size="26">{{ (c.authorNickname || c.authorUsername || '?').slice(0, 1) }}</el-avatar>
+            <UserAvatar
+              :url="c.authorAvatar"
+              :name="c.authorNickname || c.authorUsername"
+              :size="26"
+            />
             <span class="comment-author">{{ c.authorNickname || c.authorUsername }}</span>
             <span class="comment-time">{{ formatDateTime(c.createTime) }}</span>
           </div>
@@ -290,7 +295,11 @@ onMounted(async () => {
           <div v-if="c.replies?.length" class="replies">
             <div v-for="r in c.replies" :key="r.id" :id="`comment-${r.id}`" class="reply">
               <div class="comment-head">
-                <el-avatar :size="22">{{ (r.authorNickname || r.authorUsername || '?').slice(0, 1) }}</el-avatar>
+                <UserAvatar
+                  :url="r.authorAvatar"
+                  :name="r.authorNickname || r.authorUsername"
+                  :size="22"
+                />
                 <span class="comment-author">{{ r.authorNickname || r.authorUsername }}</span>
                 <span class="comment-time">{{ formatDateTime(r.createTime) }}</span>
               </div>

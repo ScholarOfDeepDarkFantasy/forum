@@ -2,9 +2,10 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { postApi } from '@/api'
+import { postApi, userApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/format'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -12,10 +13,16 @@ const auth = useAuthStore()
 const tab = ref('profile')
 const profileForm = reactive({
   nickname: '',
-  avatarUrl: '',
   bio: ''
 })
 const savingProfile = ref(false)
+
+const avatarInput = ref(null)
+const uploadingAvatar = ref(false)
+const removingAvatar = ref(false)
+
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+const AVATAR_TYPES = ['image/jpeg', 'image/png']
 
 const myPosts = ref({ content: [], totalElements: 0, totalPages: 0 })
 const myPostPage = ref(0)
@@ -27,7 +34,6 @@ const myFavoritePage = ref(0)
 
 async function loadProfile() {
   profileForm.nickname = auth.user?.nickname || ''
-  profileForm.avatarUrl = auth.user?.avatarUrl || ''
   profileForm.bio = auth.user?.bio || ''
 }
 
@@ -36,12 +42,49 @@ async function saveProfile() {
   try {
     await auth.updateProfile({
       nickname: profileForm.nickname || undefined,
-      avatarUrl: profileForm.avatarUrl || undefined,
       bio: profileForm.bio || undefined
     })
     ElMessage.success('资料已保存')
   } finally {
     savingProfile.value = false
+  }
+}
+
+function pickAvatar() {
+  avatarInput.value?.click()
+}
+
+async function onAvatarChange(event) {
+  const file = event.target.files?.[0]
+  // 清空 value，允许连续选择同一个文件
+  event.target.value = ''
+  if (!file) return
+  if (!AVATAR_TYPES.includes(file.type)) {
+    ElMessage.warning('仅支持 JPEG/PNG 图片')
+    return
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    ElMessage.warning('图片不能超过 2MB')
+    return
+  }
+  uploadingAvatar.value = true
+  try {
+    await userApi.uploadAvatar(file)
+    await auth.fetchMe()
+    ElMessage.success('头像已更新')
+  } finally {
+    uploadingAvatar.value = false
+  }
+}
+
+async function removeAvatar() {
+  removingAvatar.value = true
+  try {
+    await userApi.removeAvatar()
+    await auth.fetchMe()
+    ElMessage.success('头像已移除')
+  } finally {
+    removingAvatar.value = false
   }
 }
 
@@ -84,8 +127,33 @@ onMounted(() => {
           <el-form-item label="昵称">
             <el-input v-model="profileForm.nickname" placeholder="昵称" />
           </el-form-item>
-          <el-form-item label="头像 URL">
-            <el-input v-model="profileForm.avatarUrl" placeholder="https://…" />
+          <el-form-item label="头像">
+            <div class="avatar-block">
+              <UserAvatar
+                :url="auth.user?.avatarUrl"
+                :name="auth.user?.nickname || auth.user?.username"
+                :size="64"
+              />
+              <div class="avatar-actions">
+                <el-button :loading="uploadingAvatar" @click="pickAvatar">选择图片</el-button>
+                <el-button
+                  v-if="auth.user?.avatarUrl"
+                  class="avatar-remove"
+                  text
+                  type="danger"
+                  :loading="removingAvatar"
+                  @click="removeAvatar"
+                >移除头像</el-button>
+              </div>
+              <input
+                ref="avatarInput"
+                class="avatar-input"
+                type="file"
+                accept="image/jpeg,image/png"
+                @change="onAvatarChange"
+              />
+              <p class="avatar-hint">支持 JPEG/PNG，不超过 2MB；服务端会居中裁剪为 256×256。</p>
+            </div>
           </el-form-item>
           <el-form-item label="个人简介">
             <el-input v-model="profileForm.bio" type="textarea" :rows="3" placeholder="介绍一下自己…" />
@@ -165,5 +233,23 @@ onMounted(() => {
   color: var(--jf-color-text-3);
   font-size: var(--jf-font-meta);
   flex-shrink: 0;
+}
+.avatar-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jf-space-2);
+}
+.avatar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--jf-space-2);
+}
+.avatar-input {
+  display: none;
+}
+.avatar-hint {
+  margin: 0;
+  color: var(--jf-color-text-3);
+  font-size: var(--jf-font-small);
 }
 </style>
