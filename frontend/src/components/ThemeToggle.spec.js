@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import { Moon, MoonNight, Sunny } from '@element-plus/icons-vue'
 import ThemeToggle from './ThemeToggle.vue'
-import { useTheme } from '@/composables/useTheme'
+import { STORAGE_KEY, useTheme } from '@/composables/useTheme'
 
 const stubs = {
   'el-dropdown': {
@@ -41,13 +41,17 @@ beforeEach(async () => {
 })
 
 describe('ThemeToggle', () => {
-  it('渲染三个菜单项，触发按钮带 aria-label', () => {
+  it('渲染三个菜单项，触发按钮带 aria-label 与当前主题 title', () => {
     const wrapper = mountToggle()
     expect(wrapper.findAll('.menu-item')).toHaveLength(3)
     expect(wrapper.text()).toContain('跟随系统')
     expect(wrapper.text()).toContain('浅色')
     expect(wrapper.text()).toContain('深色')
-    expect(wrapper.find('button').attributes('aria-label')).toBe('切换主题')
+    const trigger = wrapper.find('button')
+    expect(trigger.attributes('aria-label')).toBe('切换主题')
+    expect(trigger.attributes('title')).toBe('主题：跟随系统')
+    expect(wrapper.findAll('.is-active')).toHaveLength(1)
+    expect(wrapper.find('.is-active').attributes('aria-current')).toBe('true')
   })
 
   it('默认为 system：当前项打勾，按钮图标是 MoonNight', () => {
@@ -60,7 +64,7 @@ describe('ThemeToggle', () => {
     const wrapper = mountToggle()
     wrapper.findComponent({ name: 'ElDropdown' }).vm.$emit('command', 'dark')
     await nextTick()
-    expect(localStorage.getItem('jf_theme')).toBe('dark')
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('dark')
     expect(document.documentElement.classList.contains('dark')).toBe(true)
     expect(wrapper.find('.is-active').text()).toBe('深色')
     expect(wrapper.findComponent({ name: 'ElButton' }).props('icon')).toBe(Moon)
@@ -72,7 +76,7 @@ describe('ThemeToggle', () => {
     await nextTick()
     wrapper.findComponent({ name: 'ElDropdown' }).vm.$emit('command', 'light')
     await nextTick()
-    expect(localStorage.getItem('jf_theme')).toBe('light')
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('light')
     expect(document.documentElement.classList.contains('dark')).toBe(false)
     expect(wrapper.findComponent({ name: 'ElButton' }).props('icon')).toBe(Sunny)
   })
@@ -83,7 +87,7 @@ describe('ThemeToggle', () => {
     await nextTick()
     wrapper.findComponent({ name: 'ElDropdown' }).vm.$emit('command', 'system')
     await nextTick()
-    expect(localStorage.getItem('jf_theme')).toBeNull()
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
     expect(wrapper.find('.is-active').text()).toBe('跟随系统')
   })
 })

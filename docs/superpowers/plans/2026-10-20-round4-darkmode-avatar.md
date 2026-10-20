@@ -3399,3 +3399,11 @@ Expected: 推送成功（会再触发一次 Jenkins 构建，属预期；该次�
 - **回滚口径**：本轮没有数据库迁移，回滚只需 `IMAGE_TAG=<上一个 BUILD_NUMBER>` 重建容器 + 用旧 frontend dist 覆盖；`uploads/` 目录里的文件不会被回滚删除，旧版本前端不认识 `avatarUrl` 时会退回首字母头像，无数据损失。
 
 
+## Task 1 质量修复记录（实施偏差）
+
+- 监听绑定改为能力检测：优先 `addEventListener`，旧版 Safari 回退 `addListener`/`removeListener`，模块初始化不再抛错白屏。
+- 切回 `system` 时先用 `query.matches` 刷新系统偏好再绑定；`watchEffect` 内先同步监听、后读 `isDark`，避免晚一帧才上类。
+- `STORAGE_KEY` 仅由 `frontend/src/composables/useTheme.js` 导出，两个 spec 改为导入；`index.html` 内联脚本保留字面量并加注释，由 spec 断言键与 `dark` 类一致。
+- `highlight.js` 由 `^11.12.0` 钉为 `11.12.0` 并同步 lockfile；`highlight-dark.css` 头注释改为 11.12.0 手工同步说明（调色板未改）。
+- 补充测试：Storage 读写抛错、`initTheme()` 幂等/返回值、系统暗→亮、显式模式回切 system、旧版 `addListener` 环境。
+- 小项：`useTheme()` 的 `mode` 改为 `readonly`；`ThemeToggle` 合并重复 `find`、激活项加 `aria-current`。

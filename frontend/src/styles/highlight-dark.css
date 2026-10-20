@@ -1,5 +1,7 @@
 /**
- * 来自 highlight.js 11.12 github-dark 主题（MIT），由构建期手工同步。
+ * 手工同步自 highlight.js 11.12.0 的 styles/github-dark.css（MIT），非构建期自动生成。
+ * 升级 highlight.js 时必须按 node_modules/highlight.js/styles/github-dark.css 逐条比对重抄；
+ * package.json 已把版本钉死为 11.12.0，避免 minor 升级悄悄换掉上游调色板。
  * 与亮色 github.css 并存：所有规则加 html.dark 前缀，只在暗色生效，
  * 因此切换主题不需要换 <link>，也没有闪烁。
  * 背景统一交给容器（.markdown-body pre 用 --jf-color-code-bg），

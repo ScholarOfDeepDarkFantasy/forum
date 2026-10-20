@@ -11,11 +11,8 @@ const MODE_ITEMS = [
   { value: 'dark', label: '深色', icon: Moon }
 ]
 
-const currentIcon = computed(
-  () => (MODE_ITEMS.find((item) => item.value === mode.value) || MODE_ITEMS[0]).icon
-)
-const currentLabel = computed(
-  () => (MODE_ITEMS.find((item) => item.value === mode.value) || MODE_ITEMS[0]).label
+const currentItem = computed(
+  () => MODE_ITEMS.find((item) => item.value === mode.value) || MODE_ITEMS[0]
 )
 
 function handleCommand(command) {
@@ -28,14 +25,18 @@ function handleCommand(command) {
     <el-button
       circle
       text
-      :icon="currentIcon"
+      :icon="currentItem.icon"
       aria-label="切换主题"
-      :title="`主题：${currentLabel}`"
+      :title="`主题：${currentItem.label}`"
     />
     <template #dropdown>
       <el-dropdown-menu>
         <el-dropdown-item v-for="item in MODE_ITEMS" :key="item.value" :command="item.value">
-          <span class="theme-item" :class="{ 'is-active': mode === item.value }">
+          <span
+            class="theme-item"
+            :class="{ 'is-active': mode === item.value }"
+            :aria-current="mode === item.value ? 'true' : undefined"
+          >
             <el-icon>
               <Check v-if="mode === item.value" />
               <component :is="item.icon" v-else />

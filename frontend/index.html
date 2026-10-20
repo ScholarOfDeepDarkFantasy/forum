@@ -5,6 +5,11 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JavaForum - Java 技术论坛</title>
+    <!--
+      首屏防闪烁引导：内联脚本必须与 frontend/src/composables/useTheme.js 保持一致。
+      该文件是存储键（STORAGE_KEY）与暗色类名（dark）的唯一来源；这里无法 import 模块，
+      改名时须同步本脚本，tokens.spec.js 会断言两者一致。
+    -->
     <script>
       ;(function () {
         try {

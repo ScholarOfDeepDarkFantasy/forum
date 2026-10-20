@@ -1,9 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+// 存储键的唯一来源；index.html 内联脚本无法 import，只能靠断言与注释保持同步。
+import { STORAGE_KEY } from '../composables/useTheme.js'
 
 const SRC_DIR = resolve(process.cwd(), 'src')
 const TOKENS_FILE = join(SRC_DIR, 'styles', 'tokens.css')
+
+if (!existsSync(join(SRC_DIR, 'composables', 'useTheme.js'))) {
+  throw new Error(
+    `主题令牌用例需以 frontend/ 为工作目录运行（当前 cwd=${process.cwd()}，解析出的 src=${SRC_DIR}）`
+  )
+}
 
 const EXPECTED_COLOR_TOKENS = [
   '--jf-color-primary',
@@ -20,11 +28,21 @@ const EXPECTED_COLOR_TOKENS = [
 ]
 
 function blockOf(css, selector) {
-  const start = css.indexOf(`${selector} {`)
+  // 先剥离 /* */ 注释，避免注释里的花括号/选择器字面量干扰；
+  // 再按花括号深度配对，兼容块内嵌套 @media/@supports（当前没有，但解析不依赖这一点）。
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const start = source.indexOf(`${selector} {`)
   if (start === -1) return ''
-  const from = css.indexOf('{', start)
-  const to = css.indexOf('}', from)
-  return css.slice(from + 1, to)
+  const open = source.indexOf('{', start)
+  let depth = 0
+  for (let i = open; i < source.length; i += 1) {
+    if (source[i] === '{') depth += 1
+    else if (source[i] === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(open + 1, i)
+    }
+  }
+  return ''
 }
 
 function colorTokens(block) {
@@ -110,8 +128,8 @@ describe('main.js 样式导入顺序', () => {
 describe('index.html 防闪烁引导脚本', () => {
   const html = readFileSync(INDEX_HTML, 'utf8')
 
-  it('在第一个模块脚本之前读取 jf_theme', () => {
-    const inline = html.indexOf("localStorage.getItem('jf_theme')")
+  it('在第一个模块脚本之前读取 useTheme.js 导出的存储键', () => {
+    const inline = html.indexOf(`localStorage.getItem('${STORAGE_KEY}')`)
     const moduleScript = html.indexOf('type="module"')
     expect(inline).toBeGreaterThan(-1)
     expect(moduleScript).toBeGreaterThan(-1)
@@ -121,6 +139,11 @@ describe('index.html 防闪烁引导脚本', () => {
   it('暗色时添加 dark 类并设置 colorScheme', () => {
     expect(html).toContain("classList.add('dark')")
     expect(html).toContain('style.colorScheme')
+  })
+
+  it('注释标明 useTheme.js 为键与类名的唯一来源', () => {
+    expect(html).toContain('src/composables/useTheme.js')
+    expect(html).toContain('STORAGE_KEY')
   })
 })
 
@@ -133,10 +156,10 @@ describe('深色模式字面量清理', () => {
   const banned = ['#f6f8fa', '#c0c4cc', '#f0f7ff', '#fff8e6']
 
   for (const [label, file] of Object.entries(files)) {
-    it(`${label} 不再出现一次性语义色`, () => {
+    it(`${label} 不再出现一次性语义色（大小写不敏感）`, () => {
       const source = readFileSync(file, 'utf8')
       for (const hex of banned) {
-        expect(source.includes(hex), `${label} 仍含 ${hex}`).toBe(false)
+        expect(new RegExp(hex, 'i').test(source), `${label} 仍含 ${hex}`).toBe(false)
       }
     })
   }
