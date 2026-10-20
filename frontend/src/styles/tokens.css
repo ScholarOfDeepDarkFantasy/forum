@@ -11,6 +11,10 @@
   --jf-color-bg-page: #f5f6f8;
   --jf-color-bg-card: #ffffff;
   --jf-color-bg-hover: #f8f9fb;
+  --jf-color-code-bg: #f6f8fa;
+  --jf-color-text-weak: #c0c4cc;
+  --jf-color-unread-bg: #f0f7ff;
+  --jf-color-anchor-bg: #fff8e6;
 
   /* 间距阶梯 4/8/12/16/24/32 */
   --jf-space-1: 4px;
@@ -50,4 +54,23 @@
      7≈70%、8≈80%、9≈90%），dark-2 为与黑色混合（≈20%）。可用
      color-mix(in srgb, var(--jf-color-primary) 70%, #fff) 等形式覆盖。 */
   --el-color-primary: var(--jf-color-primary);
+}
+
+/* 深色模式：html.dark 由 useTheme / index.html 内联脚本挂到 <html> 上。
+   令牌集合必须与 :root 完全一致，tokens.spec.js 会守卫。
+   取值对齐 Element Plus 暗色调色板（--el-bg-color-page:#0a0a0a、
+   --el-bg-color-overlay:#1d1e1f、--el-text-color-primary:#e5eaf3 等），
+   避免自研区域与 EP 组件出现两套灰阶。 */
+html.dark {
+  --jf-color-primary: #409eff;
+  --jf-color-text-1: #e5eaf3;
+  --jf-color-text-3: #a3a6ad;
+  --jf-color-border: #4c4d4f;
+  --jf-color-bg-page: #0a0a0a;
+  --jf-color-bg-card: #1d1e1f;
+  --jf-color-bg-hover: #262727;
+  --jf-color-code-bg: #161b22;
+  --jf-color-text-weak: #8d9095;
+  --jf-color-unread-bg: #1b2b3d;
+  --jf-color-anchor-bg: #2f2a1a;
 }

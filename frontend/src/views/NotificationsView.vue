@@ -134,12 +134,10 @@ onMounted(() => {
 .notif:last-of-type {
   border-bottom: none;
 }
-/* #f0f7ff：未读行的淡蓝底，是一次性语义色，tokens.css 无对应令牌。
-   最接近的 --jf-color-bg-hover(#f8f9fb) 几乎看不出颜色，换上后「未读」
-   与「可点击行的 hover」两种状态将无法区分，故保留字面量。
-   （与 PostDetailView.vue 的 #fff8e6 同一处理方式。） */
+/* 未读行的淡蓝底使用 --jf-color-unread-bg（暗色下自动换成深蓝），
+   与「可点击行的 hover 底」--jf-color-bg-hover 区分开。 */
 .notif.unread {
-  background: #f0f7ff;
+  background: var(--jf-color-unread-bg);
 }
 .notif.clickable {
   cursor: pointer;
@@ -151,11 +149,10 @@ onMounted(() => {
   flex: 1;
   font-size: var(--jf-font-body);
 }
-/* #c0c4cc：时间等次要信息的浅灰，语义比 --jf-color-text-3(#909399) 更弱，
-   tokens.css 未提供对应令牌，保留字面量；若将来补令牌，
-   应与 PostDetailView.vue 的 .comment-time / .comment-content.deleted 一并替换。 */
+/* 时间等次要信息使用 --jf-color-text-weak，语义比 --jf-color-text-3 更弱，
+   暗色下随令牌自动提亮。 */
 .notif-time {
-  color: #c0c4cc;
+  color: var(--jf-color-text-weak);
   font-size: var(--jf-font-small);
   flex-shrink: 0;
 }

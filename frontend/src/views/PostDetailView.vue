@@ -385,10 +385,9 @@ onMounted(async () => {
   font-weight: 600;
   font-size: var(--jf-font-body);
 }
-/* #c0c4cc：占位/失效态浅灰，tokens.css 未提供对应令牌，保留字面量。
-   若将来补令牌，应与 NotificationsView.vue 的 .notif-time 一并替换。 */
+/* 弱化文字统一使用 --jf-color-text-weak，暗色下随令牌自动提亮。 */
 .comment-time {
-  color: #c0c4cc;
+  color: var(--jf-color-text-weak);
   font-size: var(--jf-font-small);
 }
 .comment-content {
@@ -397,7 +396,7 @@ onMounted(async () => {
   white-space: pre-wrap;
 }
 .comment-content.deleted {
-  color: #c0c4cc;
+  color: var(--jf-color-text-weak);
   font-style: italic;
 }
 .comment-actions {
@@ -411,11 +410,9 @@ onMounted(async () => {
 .reply {
   padding: var(--jf-space-2) 0;
 }
-/* #fff8e6：锚点高亮的暖黄底，是一次性语义色，tokens.css 无对应令牌。
-   已用 --jf-color-bg-hover(#f8f9fb) 等现有令牌替代会让高亮几乎不可见，
-   故保留字面量并在此说明，避免后续「去字面量」清扫误换。 */
+/* 锚点暖黄底使用 --jf-color-anchor-bg（暗色下自动换成深棕）。 */
 .anchor-highlight {
-  background: #fff8e6;
+  background: var(--jf-color-anchor-bg);
   transition: background 0.4s ease;
 }
 

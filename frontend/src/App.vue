@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { Bell, User, SwitchButton, Connection, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -51,6 +52,7 @@ onMounted(() => {
         <router-link to="/tags" class="nav-link">标签</router-link>
 
         <div class="nav-actions">
+          <ThemeToggle />
           <template v-if="auth.isLoggedIn">
             <el-badge :value="notifications.unreadCount" :hidden="notifications.unreadCount === 0" class="bell-badge">
               <el-button :icon="Bell" circle text @click="router.push('/notifications')" />
