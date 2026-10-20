@@ -108,7 +108,7 @@
 - Modify: `frontend/src/views/NotificationsView.vue:141,159`
 - Modify: `frontend/src/App.vue:5-8,53`
 
-- [ ] **Step 1: 写令牌守卫 spec（此时应失败）**
+- [x] **Step 1: 写令牌守卫 spec（此时应失败）**
 
 Create `frontend/src/styles/tokens.spec.js`：
 
@@ -198,12 +198,12 @@ describe('颜色令牌', () => {
 })
 ```
 
-- [ ] **Step 2: 运行 spec，确认失败**
+- [x] **Step 2: 运行 spec，确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/styles/tokens.spec.js`
 Expected: FAIL —— `html.dark` 块还不存在，第一个用例报 `expected [] to deeply equal [...]`；第 2 个用例报缺少 4 个新令牌。
 
-- [ ] **Step 3: 在 `tokens.css` 里补齐双套令牌**
+- [x] **Step 3: 在 `tokens.css` 里补齐双套令牌**
 
 在 `frontend/src/styles/tokens.css` 的 `:root` 中，`--jf-color-bg-hover: #f8f9fb;`（第 13 行）之后插入 4 行：
 
@@ -237,12 +237,12 @@ html.dark {
 }
 ```
 
-- [ ] **Step 4: 运行 spec，确认通过**
+- [x] **Step 4: 运行 spec，确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/styles/tokens.spec.js`
 Expected: PASS（5 个用例）。
 
-- [ ] **Step 5: 写 `useTheme` 的失败测试**
+- [x] **Step 5: 写 `useTheme` 的失败测试**
 
 Create `frontend/src/composables/useTheme.spec.js`：
 
@@ -379,12 +379,12 @@ describe('useTheme', () => {
 })
 ```
 
-- [ ] **Step 6: 运行测试，确认失败**
+- [x] **Step 6: 运行测试，确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/composables/useTheme.spec.js`
 Expected: FAIL —— `Failed to resolve import "./useTheme.js"`。
 
-- [ ] **Step 7: 实现 `useTheme.js`**
+- [x] **Step 7: 实现 `useTheme.js`**
 
 Create `frontend/src/composables/useTheme.js`：
 
@@ -473,12 +473,12 @@ export function useTheme() {
 }
 ```
 
-- [ ] **Step 8: 运行测试，确认通过**
+- [x] **Step 8: 运行测试，确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/composables/useTheme.spec.js`
 Expected: PASS（10 个用例）。
 
-- [ ] **Step 9: 写 `ThemeToggle` 的失败测试**
+- [x] **Step 9: 写 `ThemeToggle` 的失败测试**
 
 Create `frontend/src/components/ThemeToggle.spec.js`：
 
@@ -574,12 +574,12 @@ describe('ThemeToggle', () => {
 })
 ```
 
-- [ ] **Step 10: 运行测试，确认失败**
+- [x] **Step 10: 运行测试，确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/components/ThemeToggle.spec.js`
 Expected: FAIL —— `Failed to resolve import "./ThemeToggle.vue"`。
 
-- [ ] **Step 11: 实现 `ThemeToggle.vue`**
+- [x] **Step 11: 实现 `ThemeToggle.vue`**
 
 Create `frontend/src/components/ThemeToggle.vue`：
 
@@ -646,12 +646,12 @@ function handleCommand(command) {
 </style>
 ```
 
-- [ ] **Step 12: 运行测试，确认通过**
+- [x] **Step 12: 运行测试，确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/components/ThemeToggle.spec.js`
 Expected: PASS（5 个用例）。
 
-- [ ] **Step 13: 追加 `main.js` 导入顺序与 `index.html` 引导脚本的失败断言**
+- [x] **Step 13: 追加 `main.js` 导入顺序与 `index.html` 引导脚本的失败断言**
 
 在 `frontend/src/styles/tokens.spec.js` 末尾追加：
 
@@ -699,12 +699,12 @@ describe('index.html 防闪烁引导脚本', () => {
 })
 ```
 
-- [ ] **Step 14: 运行测试，确认新增断言失败**
+- [x] **Step 14: 运行测试，确认新增断言失败**
 
 Run: `cd frontend && pnpm exec vitest run src/styles/tokens.spec.js`
 Expected: FAIL —— `element-plus/theme-chalk/dark/css-vars.css 未导入` 与 `expected -1 to be greater than -1`（`index.html` 里没有脚本）。
 
-- [ ] **Step 15: 改 `main.js` 与 `index.html`**
+- [x] **Step 15: 改 `main.js` 与 `index.html`**
 
 `frontend/src/main.js` 全文替换为：
 
@@ -753,12 +753,12 @@ app.mount('#app')
     </script>
 ```
 
-- [ ] **Step 16: 运行测试，确认通过**
+- [x] **Step 16: 运行测试，确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/styles/tokens.spec.js`
 Expected: PASS（8 个用例：令牌 5 + 导入顺序/首屏脚本/暗色应用 3）。
 
-- [ ] **Step 17: 写「4 处字面量已令牌化」的失败断言**
+- [x] **Step 17: 写「4 处字面量已令牌化」的失败断言**
 
 在 `frontend/src/styles/tokens.spec.js` 末尾追加：
 
@@ -782,12 +782,12 @@ describe('深色模式字面量清理', () => {
 })
 ```
 
-- [ ] **Step 18: 运行测试，确认失败**
+- [x] **Step 18: 运行测试，确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/styles/tokens.spec.js`
 Expected: FAIL —— `styles/markdown.css 仍含 #f6f8fa`、`views/PostDetailView.vue 仍含 #c0c4cc` 等 3 个用例。
 
-- [ ] **Step 19: 替换 4 处字面量**
+- [x] **Step 19: 替换 4 处字面量**
 
 `frontend/src/styles/markdown.css` 第 53-63 行改为：
 
@@ -849,12 +849,12 @@ Expected: FAIL —— `styles/markdown.css 仍含 #f6f8fa`、`views/PostDetailVi
 
 （这三处原有的「一次性语义色」注释一并删除或改写为令牌说明；只删注释、不改声明外的其它规则。）
 
-- [ ] **Step 20: 运行测试，确认通过**
+- [x] **Step 20: 运行测试，确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/styles/tokens.spec.js`
 Expected: PASS（11 个用例：8 + 字面量清理 3）。
 
-- [ ] **Step 21: 新增 `highlight-dark.css` 并接线**
+- [x] **Step 21: 新增 `highlight-dark.css` 并接线**
 
 Create `frontend/src/styles/highlight-dark.css`：
 
@@ -946,7 +946,7 @@ html.dark .hljs-deletion {
 
 `frontend/src/main.js` 的导入已在 Step 15 加好（`./styles/highlight-dark.css` 紧跟 `github.css`），本步只需确认文件存在。
 
-- [ ] **Step 22: 在顶栏接入开关**
+- [x] **Step 22: 在顶栏接入开关**
 
 `frontend/src/App.vue` 第 7 行（`import { useNotificationStore } from '@/stores/notifications'`）之后插入一行导入：
 
@@ -960,12 +960,12 @@ import ThemeToggle from '@/components/ThemeToggle.vue'
           <ThemeToggle />
 ```
 
-- [ ] **Step 23: 跑前端全量测试**
+- [x] **Step 23: 跑前端全量测试**
 
 Run: `cd frontend && pnpm test`
 Expected: 全绿（20 个既有文件 + 3 个新文件；既有 143 例不回归）。若 `breakpoint.spec.js` 报断点数不对，说明误加了 `@media`，删掉新断点而不是改断言。
 
-- [ ] **Step 24: 提交**
+- [x] **Step 24: 提交**
 
 ```bash
 git add frontend/index.html frontend/src/App.vue frontend/src/main.js \
@@ -995,7 +995,7 @@ git commit -m "feat: 新增深色模式与主题切换"
 - Modify: `src/main/java/org/song/forum/dto/user/UpdateProfileRequest.java:16-17`
 - Modify: `src/main/java/org/song/forum/service/AuthService.java:91`
 
-- [ ] **Step 1: 写图片处理的失败测试**
+- [x] **Step 1: 写图片处理的失败测试**
 
 Create `src/test/java/org/song/forum/util/AvatarImageProcessorTest.java`：
 
@@ -1231,12 +1231,12 @@ class AvatarImageProcessorTest {
 }
 ```
 
-- [ ] **Step 2: 运行测试，确认编译失败**
+- [x] **Step 2: 运行测试，确认编译失败**
 
 Run: `cd /e/JavaSpace/forum && mvn -B -q -Dtest=AvatarImageProcessorTest test`
 Expected: 编译失败 —— `cannot find symbol: class AvatarImageProcessor`。
 
-- [ ] **Step 3: 加依赖并实现 `AvatarImageProcessor`**
+- [x] **Step 3: 加依赖并实现 `AvatarImageProcessor`**
 
 在 `pom.xml` 的 Flyway 依赖块（第 78 行 `</dependency>`）之后插入：
 
@@ -1454,12 +1454,12 @@ public final class AvatarImageProcessor {
 }
 ```
 
-- [ ] **Step 4: 运行处理器测试，确认通过**
+- [x] **Step 4: 运行处理器测试，确认通过**
 
 Run: `cd /e/JavaSpace/forum && mvn -B -q -Dtest=AvatarImageProcessorTest test`
 Expected: BUILD SUCCESS；方向 7 个参数化用例 + 其它用例全部通过（`Tests run:` 无 failures）。
 
-- [ ] **Step 5: 写头像接口集成测试**
+- [x] **Step 5: 写头像接口集成测试**
 
 Create `src/test/java/org/song/forum/controller/AvatarFlowIntegrationTest.java`：
 
@@ -1755,12 +1755,12 @@ class AvatarFlowIntegrationTest {
 }
 ```
 
-- [ ] **Step 6: 运行集成测试，确认编译失败**
+- [x] **Step 6: 运行集成测试，确认编译失败**
 
 Run: `cd /e/JavaSpace/forum && mvn -B -q -Dtest=AvatarFlowIntegrationTest test`
 Expected: 编译失败 —— `cannot find symbol: class UserController`（以及 `AvatarService`）。
 
-- [ ] **Step 7: 实现 `AvatarService`、`UserController`、`WebConfig`**
+- [x] **Step 7: 实现 `AvatarService`、`UserController`、`WebConfig`**
 
 Create `src/main/java/org/song/forum/service/AvatarService.java`：
 
@@ -1966,7 +1966,7 @@ public class WebConfig implements WebMvcConfigurer {
 }
 ```
 
-- [ ] **Step 8: 接线：配置、安全、异常、DTO**
+- [x] **Step 8: 接线：配置、安全、异常、DTO**
 
 `src/main/resources/application.yml` 在 `hikari.minimum-idle: 2`（第 15 行）之后插入：
 
@@ -2021,17 +2021,17 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
         if (req.getAvatarUrl() != null) user.setAvatarUrl(req.getAvatarUrl());
 ```
 
-- [ ] **Step 9: 运行集成测试，确认通过**
+- [x] **Step 9: 运行集成测试，确认通过**
 
 Run: `cd /e/JavaSpace/forum && mvn -B -q -Dtest=AvatarFlowIntegrationTest test`
 Expected: BUILD SUCCESS，`Tests run: 10, Failures: 0, Errors: 0`。
 
-- [ ] **Step 10: 跑后端全量测试**
+- [x] **Step 10: 跑后端全量测试**
 
 Run: `cd /e/JavaSpace/forum && mvn -B test`
 Expected: BUILD SUCCESS，0 failures（既有 9 类 39 例 + 新增 2 类；`UpdateProfileRequest` 删字段不影响既有用例，因为它们都没有引用 `avatarUrl`）。
 
-- [ ] **Step 11: 提交**
+- [x] **Step 11: 提交**
 
 ```bash
 git add pom.xml src/main/resources/application.yml \
@@ -2064,7 +2064,7 @@ git commit -m "feat: 新增头像上传后端接口与图片处理"
 - Modify: `frontend/src/App.vue:8,60`
 - Modify: `frontend/src/views/PostDetailView.vue:1-11,279,293`
 
-- [ ] **Step 1: 写 `resolveAvatarUrl` 的失败测试**
+- [x] **Step 1: 写 `resolveAvatarUrl` 的失败测试**
 
 Create `frontend/src/utils/avatar.spec.js`：
 
@@ -2101,12 +2101,12 @@ describe('resolveAvatarUrl', () => {
 })
 ```
 
-- [ ] **Step 2: 运行测试，确认失败**
+- [x] **Step 2: 运行测试，确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/utils/avatar.spec.js`
 Expected: FAIL —— `Failed to resolve import "./avatar.js"`。
 
-- [ ] **Step 3: 实现 `avatar.js`**
+- [x] **Step 3: 实现 `avatar.js`**
 
 Create `frontend/src/utils/avatar.js`：
 
@@ -2123,12 +2123,12 @@ export function resolveAvatarUrl(url) {
 }
 ```
 
-- [ ] **Step 4: 运行测试，确认通过**
+- [x] **Step 4: 运行测试，确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/utils/avatar.spec.js`
 Expected: PASS（5 个用例）。
 
-- [ ] **Step 5: 写 `UserAvatar` 的失败测试**
+- [x] **Step 5: 写 `UserAvatar` 的失败测试**
 
 Create `frontend/src/components/UserAvatar.spec.js`：
 
@@ -2195,12 +2195,12 @@ describe('UserAvatar', () => {
 })
 ```
 
-- [ ] **Step 6: 运行测试，确认失败**
+- [x] **Step 6: 运行测试，确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/components/UserAvatar.spec.js`
 Expected: FAIL —— `Failed to resolve import "./UserAvatar.vue"`。
 
-- [ ] **Step 7: 实现 `UserAvatar.vue`**
+- [x] **Step 7: 实现 `UserAvatar.vue`**
 
 Create `frontend/src/components/UserAvatar.vue`：
 
@@ -2236,12 +2236,12 @@ watch(
 </template>
 ```
 
-- [ ] **Step 8: 运行测试，确认通过**
+- [x] **Step 8: 运行测试，确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/components/UserAvatar.spec.js`
 Expected: PASS（6 个用例）。
 
-- [ ] **Step 9: 写 `userApi` 的失败断言**
+- [x] **Step 9: 写 `userApi` 的失败断言**
 
 `frontend/src/api/index.spec.js` 第 49 行改为：
 
@@ -2277,12 +2277,12 @@ describe('userApi 请求路径', () => {
 })
 ```
 
-- [ ] **Step 10: 运行测试，确认失败**
+- [x] **Step 10: 运行测试，确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/api/index.spec.js`
 Expected: FAIL —— `userApi is not a function` / `Cannot read properties of undefined`。
 
-- [ ] **Step 11: 实现 `userApi`**
+- [x] **Step 11: 实现 `userApi`**
 
 `frontend/src/api/index.js` 在 `authApi` 块（第 79 行 `}`）之后插入：
 
@@ -2298,12 +2298,12 @@ export const userApi = {
 }
 ```
 
-- [ ] **Step 12: 运行测试，确认通过**
+- [x] **Step 12: 运行测试，确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/api/index.spec.js`
 Expected: PASS（9 个既有 + 2 个新增 = 11 个用例）。
 
-- [ ] **Step 13: 写 `ProfileView` 头像交互的失败测试**
+- [x] **Step 13: 写 `ProfileView` 头像交互的失败测试**
 
 `frontend/src/views/ProfileView.spec.js` 第 1-17 行（三个 import + `vue-router` mock + `@/api` mock）改为下面这段；第 19-21 行的 `import ProfileView` / `import { postApi }` / `import { useAuthStore }` 保持不变：
 
@@ -2421,12 +2421,12 @@ describe('ProfileView 头像上传', () => {
 })
 ```
 
-- [ ] **Step 14: 运行测试，确认失败**
+- [x] **Step 14: 运行测试，确认失败**
 
 Run: `cd frontend && pnpm exec vitest run src/views/ProfileView.spec.js`
 Expected: FAIL —— `Cannot call trigger on an empty DOMWrapper`（页面还没有 `input[type=file]` 与 `.avatar-remove`）。
 
-- [ ] **Step 15: 改造 `ProfileView.vue`**
+- [x] **Step 15: 改造 `ProfileView.vue`**
 
 `frontend/src/views/ProfileView.vue` 第 1-46 行的脚本替换为：
 
@@ -2580,12 +2580,12 @@ async function removeAvatar() {
 }
 ```
 
-- [ ] **Step 16: 运行测试，确认通过**
+- [x] **Step 16: 运行测试，确认通过**
 
 Run: `cd frontend && pnpm exec vitest run src/views/ProfileView.spec.js`
 Expected: PASS（6 个既有收藏用例 + 4 个新增头像用例 = 10 个）。
 
-- [ ] **Step 17: 全站头像替换**
+- [x] **Step 17: 全站头像替换**
 
 `frontend/src/App.vue` 在第 8 行 `import ThemeToggle from '@/components/ThemeToggle.vue'` 之后加：
 
@@ -2631,12 +2631,12 @@ import UserAvatar from '@/components/UserAvatar.vue'
 
 （`CommentResponse` 的头像字段名是 `authorAvatar`，已由 Task 2 之外的后端现状提供，无需改动。）
 
-- [ ] **Step 18: 跑前端全量测试与构建**
+- [x] **Step 18: 跑前端全量测试与构建**
 
 Run: `cd frontend && pnpm test && VITE_BASE_PATH=/forum/ pnpm build`
 Expected: 全绿（25 个 spec 文件），构建成功，`dist/index.html` 引用 `/forum/assets/...`。
 
-- [ ] **Step 19: 提交**
+- [x] **Step 19: 提交**
 
 ```bash
 git add frontend/src/api/index.js frontend/src/api/index.spec.js \
@@ -2659,7 +2659,7 @@ git commit -m "feat: 新增头像上传前端交互与全站头像展示"
 - Modify: `.gitignore:28-34`
 - Modify: `.env.example:32-39`
 
-- [ ] **Step 1: 镜像内建上传目录并声明默认值**
+- [x] **Step 1: 镜像内建上传目录并声明默认值**
 
 `Dockerfile` 第 16-20 行的 ENV 块改为（新增 `UPLOAD_DIR` 一行）：
 
@@ -2678,7 +2678,7 @@ ENV TZ=Asia/Shanghai \
 RUN mkdir -p /app/logs /app/uploads && chown -R 1001:1001 /app
 ```
 
-- [ ] **Step 2: compose 挂卷并传目录**
+- [x] **Step 2: compose 挂卷并传目录**
 
 `docker-compose.yml` 第 23-38 行的 `environment` / `ports` / `restart` 段改为：
 
@@ -2705,7 +2705,7 @@ RUN mkdir -p /app/logs /app/uploads && chown -R 1001:1001 /app
     restart: unless-stopped
 ```
 
-- [ ] **Step 3: nginx 直出 `/forum/uploads/`（必须排在 `/forum/` 之前）**
+- [x] **Step 3: nginx 直出 `/forum/uploads/`（必须排在 `/forum/` 之前）**
 
 `deploy/nginx/forum.conf` 第 14-26 行现在是：
 
@@ -2753,7 +2753,7 @@ location /forum/ {
 
 > 顺序是关键：若把 uploads 放到 `/forum/` 之后，nginx 会用前缀更长的 `/forum/` 命中并回退 `index.html`，未命中的头像会返回 200 的 HTML 而不是 404，Task 4 Step 5 的冒烟守卫正是用来抓这个错误。
 
-- [ ] **Step 4: 部署脚本创建目录、改属主、写 `.env`**
+- [x] **Step 4: 部署脚本创建目录、改属主、写 `.env`**
 
 `deploy/deploy.sh` 第 39-45 行（`IMAGE_TAG` upsert 与 `chmod 600`）之后插入：
 
@@ -2773,7 +2773,7 @@ else
 fi
 ```
 
-- [ ] **Step 5: 冒烟加「上传目录返回 404」守卫**
+- [x] **Step 5: 冒烟加「上传目录返回 404」守卫**
 
 `deploy/deploy.sh` 第 92-93 行（`/forum/api/posts` 冒烟）之后插入：
 
@@ -2787,7 +2787,7 @@ uploads_code="$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: raspi' \
     || die "/forum/uploads/ 未直出（返回 $uploads_code，应为 404；检查 nginx snippet 是否已 reload）"
 ```
 
-- [ ] **Step 6: 忽略本地上传目录**
+- [x] **Step 6: 忽略本地上传目录**
 
 `.gitignore` 第 28-34 段的「# 环境变量」之后插入一段：
 
@@ -2796,7 +2796,7 @@ uploads_code="$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: raspi' \
 /uploads/
 ```
 
-- [ ] **Step 7: 环境变量模板补充 `UPLOAD_HOST_DIR`**
+- [x] **Step 7: 环境变量模板补充 `UPLOAD_HOST_DIR`**
 
 `.env.example` 第 36-39 行的 raspi 段，在 `# IMAGE_TAG=latest` 之后插入：
 
@@ -2805,7 +2805,7 @@ uploads_code="$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: raspi' \
 #   ↑ 容器内固定 /app/uploads；宿主目录由 deploy.sh mkdir + podman unshare chown 1001:1001
 ```
 
-- [ ] **Step 8: 校验脚本语法与改动范围**
+- [x] **Step 8: 校验脚本语法与改动范围**
 
 Run:
 
@@ -2820,7 +2820,7 @@ Expected:
 - grep 命中 `^~ /forum/uploads/`、`UPLOAD_HOST_DIR`、`/app/uploads` 等行
 - `git diff --stat` 只含 `Dockerfile`、`docker-compose.yml`、`deploy/deploy.sh`、`deploy/nginx/forum.conf`、`.gitignore`、`.env.example` 六个文件
 
-- [ ] **Step 9: 提交**
+- [x] **Step 9: 提交**
 
 ```bash
 git add Dockerfile docker-compose.yml deploy/deploy.sh deploy/nginx/forum.conf .gitignore .env.example
@@ -2836,7 +2836,7 @@ git commit -m "chore: 部署支持头像上传目录"
 - Modify: `docs/DEVELOPMENT.md:116-122`、`docs/DEVELOPMENT.md:126-151`、`docs/DEVELOPMENT.md:163-182`、`docs/DEVELOPMENT.md:373`（新增 §4.9）、`docs/DEVELOPMENT.md:390`（新增 T11/T12）、`docs/DEVELOPMENT.md:398-405`、`docs/DEVELOPMENT.md:454-457`
 - Modify: `docs/deployment/README.md:8-19`、`docs/deployment/README.md:30-44`、`docs/deployment/README.md:89-98`、`docs/deployment/README.md:110-115`、`docs/deployment/README.md:117-121`
 
-- [ ] **Step 1: README 功能列表**
+- [x] **Step 1: README 功能列表**
 
 第 15 行改为：
 
@@ -2851,7 +2851,7 @@ git commit -m "chore: 部署支持头像上传目录"
 - **头像上传**：资料页选择 JPEG/PNG（≤2MB），服务端按 EXIF 方向校正后居中裁剪为 256×256 JPEG，落盘到宿主机 `/pd/Program/forum/uploads/avatars/` 并由 nginx 直出；支持移除，图片缺失时回退首字母
 ```
 
-- [ ] **Step 2: README 部署章节**
+- [x] **Step 2: README 部署章节**
 
 第 138-147 行的「相关文件」表格之后插入：
 
@@ -2859,7 +2859,7 @@ git commit -m "chore: 部署支持头像上传目录"
 头像文件不在镜像里：`/pd/Program/forum/uploads/` 以卷挂载进容器（`.env` 的 `UPLOAD_HOST_DIR`，容器内固定 `/app/uploads`），再由 nginx 的 `location ^~ /forum/uploads/` 直出。`deploy/deploy.sh` 每次部署都会创建该目录并用 `podman unshare chown -R 1001:1001` 调整属主（rootless podman 下容器 UID 1001 映射到宿主 subuid，宿主直接 `chown 1001` 是错的用户）。
 ```
 
-- [ ] **Step 3: README 测试章节**
+- [x] **Step 3: README 测试章节**
 
 第 225 行改为：
 
@@ -2880,7 +2880,7 @@ git commit -m "chore: 部署支持头像上传目录"
 - 头像（`src/utils/avatar.js`、`src/components/UserAvatar.vue`、`src/views/ProfileView.spec.js`）：站内 `/uploads/` 前缀拼 `BASE_URL`、外链与 data URL 原样透传、加载失败回退首字母、上传成功调用 `userApi` 并刷新用户、非法类型与超过 2MB 的客户端校验、移除头像
 ```
 
-- [ ] **Step 4: README 样式与设计令牌**
+- [x] **Step 4: README 样式与设计令牌**
 
 第 263 行末（「新增令牌时应连同首个消费方一起加。」之后）追加：
 
@@ -2888,7 +2888,7 @@ git commit -m "chore: 部署支持头像上传目录"
 第四轮起令牌分两套：`:root` 为亮色、`html.dark` 为暗色，两套的 `--jf-color-*` 名称必须完全一致。`styles/tokens.spec.js` 守卫四件事：两套集合相等、每个颜色都是 6 位小写十六进制、每个颜色令牌在 `src` 下至少有一处 `var()` 消费、页面底与卡片底在两套中取值不同（否则切换主题看不出变化）。`html.dark` 由 `composables/useTheme.js` 与 `index.html` 的内联脚本共同维护；代码块底色走 `--jf-color-code-bg`，暗色语法高亮在 `styles/highlight-dark.css` 里以 `html.dark` 前缀叠加。
 ```
 
-- [ ] **Step 5: README 目录结构**
+- [x] **Step 5: README 目录结构**
 
 第 283-291 行改为：
 
@@ -2910,7 +2910,7 @@ frontend/src/
 uploads/             # 本地开发的头像落盘目录（运行时生成，已 gitignore；生产在 /pd/Program/forum/uploads）
 ```
 
-- [ ] **Step 6: DEVELOPMENT 进度与快照**
+- [x] **Step 6: DEVELOPMENT 进度与快照**
 
 第 120 行（`部署工程化` 那行）之后插入：
 
@@ -2956,7 +2956,7 @@ git ls-files 'frontend/src/**/*.spec.js' | xargs wc -l | tail -1
 
 （分布之和为 186，须与上表一致；若 Task 6 实测不等，先改这两处再 push。）
 
-- [ ] **Step 7: DEVELOPMENT 接口清单**
+- [x] **Step 7: DEVELOPMENT 接口清单**
 
 第 163 行标题改为 `### 3.4 接口清单（35 个端点）`。
 
@@ -2979,7 +2979,7 @@ git ls-files 'frontend/src/**/*.spec.js' | xargs wc -l | tail -1
 `GET /uploads/**` 是公开静态资源（`SecurityConfig` 的 `PUBLIC_GET` 与 `WebConfig` 的 `ResourceHandler`），生产实际由 nginx 直出，不经过后端。
 ```
 
-- [ ] **Step 8: DEVELOPMENT 新增 §4.9**
+- [x] **Step 8: DEVELOPMENT 新增 §4.9**
 
 第 373 行（§4.8 结尾的 `---`）之前插入：
 
@@ -3039,7 +3039,7 @@ git ls-files 'frontend/src/**/*.spec.js' | xargs wc -l | tail -1
 - **头像文件无备份与清理**：`/pd/Program/forum/uploads/avatars/` 不在数据库备份范围内；删除用户不会级联删文件，长期运行会留下孤儿文件。
 ```
 
-- [ ] **Step 9: DEVELOPMENT 技术债与候选功能**
+- [x] **Step 9: DEVELOPMENT 技术债与候选功能**
 
 第 390 行（T10 那行）之后插入两行：
 
@@ -3061,7 +3061,7 @@ git ls-files 'frontend/src/**/*.spec.js' | xargs wc -l | tail -1
 前两轮候选已全部交付（第三轮 Markdown 渲染与标签检索见 §4.8，第四轮深色模式与头像上传见 §4.9）；其余候选留待后续轮次，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
 ```
 
-- [ ] **Step 10: DEVELOPMENT 变更日志**
+- [x] **Step 10: DEVELOPMENT 变更日志**
 
 第 456 行（`2026-10-19 feat 第三轮功能` 那行）之前插入五行（提交列先按 §0 约定写 `本次提交`，Task 6 回填前四行）：
 
@@ -3073,7 +3073,7 @@ git ls-files 'frontend/src/**/*.spec.js' | xargs wc -l | tail -1
 | 2026-10-20 | feat | 深色模式与主题切换 | 本次提交 |
 ```
 
-- [ ] **Step 11: 部署手册更新**
+- [x] **Step 11: 部署手册更新**
 
 `docs/deployment/README.md` 第 8-17 行的形态图，在 `/forum/` 那行之后插入一行：
 
@@ -3125,7 +3125,7 @@ curl -fsS -H 'Host: raspi' -H "Authorization: Bearer $TOKEN" \
 - **头像文件不在数据库备份里**：`/pd/Program/forum/uploads/avatars/` 与本机其它业务数据一样只存在于 `/pd` 盘；整机重装需连同该目录一起迁移，否则头像全部 404（前端会回退首字母，不影响其它功能）。
 ```
 
-- [ ] **Step 12: 校验文档改动**
+- [x] **Step 12: 校验文档改动**
 
 Run:
 
@@ -3142,7 +3142,7 @@ Expected:
 - uploads 命中形态图、引导、冒烟、排障四处
 - `git diff --stat` 只含 `README.md`、`docs/DEVELOPMENT.md`、`docs/deployment/README.md` 三个文件
 
-- [ ] **Step 13: 提交**
+- [x] **Step 13: 提交**
 
 ```bash
 git add README.md docs/DEVELOPMENT.md docs/deployment/README.md
@@ -3156,7 +3156,7 @@ git commit -m "docs: 记录第四轮深色模式与头像上传功能"
 **Files:**
 - Modify: `docs/DEVELOPMENT.md:454-460`（§8 变更日志回填哈希）
 
-- [ ] **Step 1: 后端全量测试**
+- [x] **Step 1: 后端全量测试**
 
 Run:
 
@@ -3167,7 +3167,7 @@ grep -h 'Tests run' target/surefire-reports/*.txt
 
 Expected: `BUILD SUCCESS`；逐类汇总 `Tests run: 70, Failures: 0, Errors: 0, Skipped: 0`（11 个测试类）。
 
-- [ ] **Step 2: 前端全量测试与子路径构建**
+- [x] **Step 2: 前端全量测试与子路径构建**
 
 Run:
 
@@ -3178,12 +3178,12 @@ cd /e/JavaSpace/forum/frontend && VITE_BASE_PATH=/forum/ pnpm build
 
 Expected: `Test Files 25 passed`、`Tests 186 passed`；构建成功，`dist/index.html` 里是 `/forum/assets/...`。
 
-- [ ] **Step 3: 产物打包**
+- [x] **Step 3: 产物打包**
 
 Run: `cd /e/JavaSpace/forum && mvn -B -DskipTests package`
 Expected: `BUILD SUCCESS`，生成 `target/forum-0.0.1-SNAPSHOT.jar`。
 
-- [ ] **Step 4: 核对文档数字（不一致先修）**
+- [x] **Step 4: 核对文档数字（不一致先修）**
 
 比对 Step 1/2 的实测与 Task 5 写进 `docs/DEVELOPMENT.md` §3.2 的数字（70 / 11、186 / 25）：
 
@@ -3197,7 +3197,7 @@ git commit -m "docs: 校正第四轮测试基线数字"
 
 **判据：** 任何用例失败都必须在这里修掉（红的就是红的，不许 `-DskipTests` 上线）。修不动且确认是计划错误时，回退对应任务重做，不带病发布。
 
-- [ ] **Step 5: 确认工作区干净并推送**
+- [x] **Step 5: 确认工作区干净并推送**
 
 Run:
 
@@ -3208,7 +3208,7 @@ git push origin master
 
 Expected: `git status --short` 无输出；`git log --oneline -6` 能看到 4 个功能提交 + 2 个文档提交；`git push` 成功。
 
-- [ ] **Step 6: 等待 Jenkins（≤5 分钟轮询）**
+- [x] **Step 6: 等待 Jenkins（≤5 分钟轮询）**
 
 Run（每 15 秒查一次，最多 20 次）：
 
@@ -3233,7 +3233,7 @@ ssh raspi 'sudo tail -n 80 "$(sudo ls -1t /var/lib/jenkins/jobs/javaforum/builds
 
 失败处理：先看是「测试红 / 构建失败 / deploy.sh 冒烟守卫失败」哪一段。`deploy.sh` 的冒烟守卫报 `/forum/uploads/ 未直出` 时，检查 snippet 是否随镜像提交一起发布（`sudo nginx -T | grep -A2 uploads`）后手动 Build 一次；其余失败按日志修代码，重新提交并重复 Step 6。
 
-- [ ] **Step 7: raspi 冒烟（API / 前端 / uploads）**
+- [x] **Step 7: raspi 冒烟（API / 前端 / uploads）**
 
 Run:
 
@@ -3246,7 +3246,7 @@ ssh raspi "curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' http://127.
 
 Expected: 健康检查返回 `"success":true`；两个 `grep -c` 都 ≥1；最后一个输出 `404`（**不能**是 200 —— 200 说明请求被 SPA 回退吃掉了）。
 
-- [ ] **Step 8: raspi 头像上传全链路**
+- [x] **Step 8: raspi 头像上传全链路**
 
 Run:
 
@@ -3277,7 +3277,7 @@ REMOTE
 
 Expected: 上传响应里 `avatarUrl` 形如 `/uploads/avatars/<uuid>.jpg`；`nginx 取回头像: 200 image/jpeg`；`ls` 看到新文件；`删除后取回: 404`。
 
-- [ ] **Step 9: 容器重建后头像仍在**
+- [x] **Step 9: 容器重建后头像仍在**
 
 Run:
 
@@ -3290,7 +3290,7 @@ ssh raspi 'sudo -u pi podman ps --filter name=forum-backend --format "{{.Names}}
 
 Expected: 后端重新就绪（`"success":true`），容器 `Up`；此时再执行一次 Step 8 的上传并确认宿主 `/pd/Program/forum/uploads/avatars/` 里的文件在容器重建后仍能被 nginx 200 取回（文件在卷里，不在容器写层）。
 
-- [ ] **Step 10: 回填变更日志哈希**
+- [x] **Step 10: 回填变更日志哈希**
 
 Run:
 
@@ -3306,7 +3306,7 @@ grep -n '^| 2026-10-20' docs/DEVELOPMENT.md
 
 Expected: 5 行里 4 行带真实短哈希，1 行仍是 `本次提交`。
 
-- [ ] **Step 11: 提交哈希回填并推送**
+- [x] **Step 11: 提交哈希回填并推送**
 
 ```bash
 git add docs/DEVELOPMENT.md
@@ -3450,3 +3450,11 @@ Expected: 推送成功（会再触发一次 Jenkins 构建，属预期；该次�
 - `grep -c '本次提交'` 为 4 而非任务预期的 6：原有 3 处（§0 正文 1 处 + 表格 2 行），第四轮 4 个已发生提交用真实短哈希，仅 docs 行写 `本次提交`。
 - 「保存头像失败」实际返回 400（`BusinessException` 统一映射 400），不是 500；部署手册排障行按 400 记录。
 - nginx snippet 未设 `client_max_body_size`（默认 1m），超过 1MB 的头像会在 nginx 层直接 413 —— Task 6 上线前需在 raspi 的 server 块调大并 reload。
+
+### Task 6 实施偏差记录
+
+- 实测数字按 Task 5 修正后的基线：后端 12 类 / 90 例（1 例 POSIX 权限用例在 Windows 跳过）、前端 25 spec / 211 例；本任务 Step 1/2 的预期数字（70/186）以实测为准，未再单独校正。
+- 推送包含 Task 1–5 的功能与修复提交共 15 个（计划按「4 功能 + 2 文档」估算）；首次 `git push` 因 GitHub 连接重置失败，改用 `git -c http.version=HTTP/1.1 push` 成功。
+- 上线前补了一个计划外修复 `65b44bb`：`deploy/nginx/forum.conf` 的 `/forum/api/` 增加 `client_max_body_size 3m`（nginx 默认 1m，>1MB 头像会先于后端返回 413）；该提交随推送一起发布，snippet 由 `deploy.sh` 覆盖后 `nginx -t` 通过并 reload。
+- Build #6 SUCCESS（约 2.5 分钟完成，非 5 分钟）；镜像 `localhost/forum-backend:6`。Step 7/8/9 冒烟全部通过，并补测：2.98MB → 400「图片不能超过 2MB」、3.2MB → 413、重启容器后头像仍在、删除后文件立即 404。
+- 计划 Step 6 的轮询脚本在 Jenkins 还没结束时会误判（`build.xml` 里可能已有上一份 `<result>`）；实际以 `builds/N/log` 出现 `Finished: SUCCESS` 为准。

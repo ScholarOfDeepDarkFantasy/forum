@@ -418,6 +418,7 @@ cd frontend && pnpm test --run
 - 后端 `mvn -B clean test`：12 个测试类、90 个用例全绿（1 例 POSIX 权限用例在 Windows 上跳过）。新增 `AvatarImageProcessorTest` 27 例、`AvatarFlowIntegrationTest` 20 例、`AvatarServiceTest` 4 例。
 - 前端 `pnpm test`：25 个 spec、211 个用例全绿。新增 `useTheme` 17 例、`tokens` 12 例、`UserAvatar` 10 例、`avatar` 9 例、`ThemeToggle` 5 例；`ProfileView` 由 6 例增至 18 例（含头像上传/移除）。
 - 构建：`VITE_BASE_PATH=/forum/ pnpm build` 通过（index chunk 约 874kB，仍有 >500kB 警告）。
+- 上线验收（2026-10-20）：推送 `65b44bb` 后 Jenkins Build #6 **SUCCESS**（镜像 `localhost/forum-backend:6`），`forum-backend` Up (healthy) 仅监听 `127.0.0.1:8086`；随构建发布的 nginx snippet 含 `^~ /forum/uploads/`（`nosniff`）与 `/forum/api/` 的 `client_max_body_size 3m`，`nginx -t` 通过并 reload；宿主 `/pd/Program/forum/uploads/{,avatars}` 已建（属主为 rootless 容器的 subuid `101000`，`chmod -R a+rX` 后 `drwxr-sr-x`）；`/forum/`、`/forum/api/health`、`/forum/api/tags` 均 200；`/forum/uploads/__probe__/missing.jpg` 为 **404**（未被 SPA 回退吃掉）；实测上传 8.7KB 与 1.8MB JPEG 均 200（后者证明 nginx 1m 默认限制已放开）、取回 `200 image/jpeg` 且文件 `-rw-r--r--`；2.98MB 返回 400「图片不能超过 2MB」、3.2MB 由 nginx 返回 413；重启容器后 `avatarUrl` 与头像文件仍在（bind mount），删除接口返回 200 且旧文件即刻 404、目录清空。
 
 已知限制：
 
@@ -509,7 +510,8 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-20 | docs | 记录第四轮深色模式与头像上传功能（README、开发记录、部署手册） | 本次提交 |
+| 2026-10-20 | docs | 第四轮上线验收记录（Build #6 成功、头像全链路实测）与变更日志回填 | 本次提交 |
+| 2026-10-20 | docs | 记录第四轮深色模式与头像上传功能（README、开发记录、部署手册） | `dc961a5` |
 | 2026-10-20 | chore | 部署支持头像上传目录：`UPLOAD_HOST_DIR` 卷、目录创建与属主/权限修正、nginx `/forum/uploads/` 直出 | `85940c3` |
 | 2026-10-20 | feat | 第四轮头像上传前端：资料页上传/移除、全站 `UserAvatar`、站内 URL 拼接与失败回退 | `c171279` |
 | 2026-10-20 | feat | 第四轮头像上传后端：`POST/DELETE /api/users/me/avatar`、魔数校验 + EXIF 校正 + 256×256 裁剪、原子落盘 | `6fad63c` |
