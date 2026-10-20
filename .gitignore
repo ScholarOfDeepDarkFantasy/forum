@@ -29,6 +29,9 @@ frontend/dist/
 .env
 .env.local
 
+# 上传文件（本地开发头像落盘目录）
+/uploads/
+
 # 工具
 .xcodemap/
 .superpowers/

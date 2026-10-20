@@ -17,13 +17,16 @@ ENV TZ=Asia/Shanghai \
     SERVER_PORT=8080 \
     SPRING_PROFILES_ACTIVE=prod \
     LOG_FILE=/app/logs/javaforum.log \
+    UPLOAD_DIR=/app/uploads \
     JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError"
 
 # 用数字 UID/GID 而不是 useradd：精简基础镜像不一定带 passwd 包，数字形式最稳。
 # 1001 只存在于容器内，raspi 宿主上没有对应用户。
 WORKDIR /app
 COPY --chown=1001:1001 target/forum-0.0.1-SNAPSHOT.jar /app/app.jar
-RUN mkdir -p /app/logs && chown -R 1001:1001 /app
+# /app/uploads 在生产环境是 bind mount：头像文件落在宿主机目录，不进镜像，
+# 容器重建也不丢；这里只负责建目录并给属主，保证不挂卷时同样可写。
+RUN mkdir -p /app/logs /app/uploads && chown -R 1001:1001 /app
 USER 1001:1001
 
 EXPOSE 8080

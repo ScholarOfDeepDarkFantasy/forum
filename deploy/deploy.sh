@@ -44,6 +44,20 @@ else
 fi
 chmod 600 "$ENV_FILE"
 
+# 头像目录在宿主机上，容器内 UID 1001 需要卷写权限：
+# rootless podman 把容器 1001 映射到宿主的 subuid（100000+1000），
+# 因此必须在 podman 的 user namespace 里 chown；宿主上直接 chown 1001:1001 是错的用户。
+log "准备头像目录 $ROOT/uploads"
+mkdir -p "$ROOT/uploads/avatars"
+podman unshare chown -R 1001:1001 "$ROOT/uploads"
+
+# 卷的宿主目录路径写进 .env，compose 每次 up 都从这里读
+if grep -q '^UPLOAD_HOST_DIR=' "$ENV_FILE"; then
+    sed -i "s|^UPLOAD_HOST_DIR=.*|UPLOAD_HOST_DIR=$ROOT/uploads|" "$ENV_FILE"
+else
+    printf 'UPLOAD_HOST_DIR=%s\n' "$ROOT/uploads" >> "$ENV_FILE"
+fi
+
 HOST_PORT="$(grep -E '^HOST_PORT=' "$ENV_FILE" | tail -1 | cut -d= -f2 | tr -d "'\"")"
 HOST_PORT="${HOST_PORT:-8086}"
 
@@ -91,6 +105,14 @@ curl -fsS -H 'Host: raspi' "http://127.0.0.1/forum/posts/1" | grep -q 'id="app"'
     || die "SPA 路由回退失败（try_files / index.html）"
 curl -fsS -H 'Host: raspi' "http://127.0.0.1/forum/api/posts?page=0&size=1" >/dev/null \
     || die "经 nginx 访问 /forum/api/posts 失败（检查反代与数据库连通性）"
+
+# 上传目录必须由 nginx 的 ^~ /forum/uploads/ 直出：
+# 命中 alias 时，不存在的文件是 404；若配置没生效，请求会落到 SPA 的
+# try_files 而返回 200 + index.html —— 这正是要抓的静默错误
+uploads_code="$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: raspi' \
+    "http://127.0.0.1/forum/uploads/__probe__/missing.jpg")"
+[ "$uploads_code" = "404" ] \
+    || die "/forum/uploads/ 未直出（返回 $uploads_code，应为 404；检查 nginx snippet 是否已 reload）"
 
 log "清理旧镜像（保留最近 2 个数字 tag，绝不做全局 prune）"
 podman images --format '{{.Tag}}' localhost/forum-backend 2>/dev/null \
