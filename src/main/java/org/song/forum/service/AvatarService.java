@@ -163,8 +163,11 @@ public class AvatarService {
     private static void makeWorldReadable(Path target) {
         try {
             Files.setPosixFilePermissions(target, PosixFilePermissions.fromString("rw-r--r--"));
-        } catch (UnsupportedOperationException | IOException ignored) {
-            // 非 POSIX 文件系统或权限被策略拒绝：上传本身已成功，保持静默
+        } catch (UnsupportedOperationException e) {
+            // 非 POSIX 文件系统（Windows 本地开发）：权限模型不同，无需处理
+        } catch (IOException e) {
+            // POSIX 上失败意味着 nginx 可能 403，留痕便于排查
+            log.warn("头像文件权限设置失败，nginx 可能无法读取: {} ({})", target, e.toString());
         }
     }
 

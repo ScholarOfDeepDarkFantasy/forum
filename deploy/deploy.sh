@@ -53,6 +53,10 @@ log "准备头像目录 $ROOT/uploads"
 mkdir -p "$ROOT/uploads/avatars"
 podman unshare chown -R 1001:1001 "$ROOT/uploads" \
     || die "调整 $ROOT/uploads 属主失败（需要 pi 的 rootless podman user namespace；见 docs/deployment/README.md）"
+# 目录权限固定为 0755、文件至少对 nginx worker 可读：既挡住 umask 差异，
+# 也顺手治愈历史上以 0600 写入（nginx 403）的头像文件
+podman unshare chmod -R a+rX "$ROOT/uploads" \
+    || die "调整 $ROOT/uploads 权限失败（nginx worker 需要可读权限）"
 
 # 卷的宿主目录路径写进 .env，compose 每次 up 都从这里读
 if grep -q '^UPLOAD_HOST_DIR=' "$ENV_FILE"; then
