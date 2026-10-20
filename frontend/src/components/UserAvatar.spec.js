@@ -5,9 +5,9 @@ import UserAvatar from './UserAvatar.vue'
 const stubs = {
   'el-avatar': {
     name: 'ElAvatar',
-    props: ['size', 'src'],
+    props: ['size', 'src', 'alt'],
     emits: ['error'],
-    template: '<div class="avatar-stub" :data-src="src"><slot /></div>'
+    template: '<div class="avatar-stub" :data-src="src" :data-alt="alt"><slot /></div>'
   }
 }
 
@@ -20,6 +20,8 @@ describe('UserAvatar', () => {
     const wrapper = mountAvatar({ url: '/uploads/avatars/a.jpg', name: '爱丽丝' })
 
     expect(wrapper.find('.avatar-stub').attributes('data-src')).toBe('/uploads/avatars/a.jpg')
+    // 图片与字母回退共用同一套读屏名称，避免同一用户在不同状态下播报不一致
+    expect(wrapper.find('.avatar-stub').attributes('data-alt')).toBe('爱丽丝的头像')
     expect(wrapper.findComponent({ name: 'ElAvatar' }).props('size')).toBe(28)
   })
 

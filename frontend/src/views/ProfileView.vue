@@ -30,7 +30,7 @@ const AVATAR_EXTENSIONS = ['.jpg', '.jpeg', '.png']
  * 此时按扩展名回退。真正的图片内容由后端按 magic bytes 校验，前端这一步只做早筛。
  */
 function isAvatarFile(file) {
-  if (AVATAR_TYPES.includes(file.type)) return true
+  if (file.type) return AVATAR_TYPES.includes(file.type)
   const filename = (file.name || '').toLowerCase()
   return AVATAR_EXTENSIONS.some((ext) => filename.endsWith(ext))
 }

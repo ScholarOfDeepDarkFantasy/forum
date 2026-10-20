@@ -28,7 +28,7 @@ watch(
   <el-avatar
     :size="size"
     :src="showImage ? src : undefined"
-    :alt="showImage ? name || '用户头像' : ''"
+    :alt="showImage ? (name ? `${name}的头像` : '用户头像') : ''"
     @error="failed = true"
   >
     <!-- 字母头像本身作为一个有名称的 img 角色；字母与 aria-label 重复，对读屏隐藏 -->
