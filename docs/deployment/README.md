@@ -135,7 +135,7 @@ curl -fsSI -H 'Host: raspi' "http://127.0.0.1/forum$AVATAR" | grep -Ei '^(HTTP/|
 | `/forum/` 404 | `app.conf` 是否 include snippet；`/pd/Program/forum/frontend/index.html` 是否存在 |
 | `/forum/api/` 502 | `forum-backend` 未起或未监听 8086：`sudo -u pi curl -v http://127.0.0.1:8086/api/health` |
 | `/forum/uploads/xxx` 返回 200 HTML | nginx 的 `^~ /forum/uploads/` 必须排在 `location /forum/`（SPA 回退）之前，否则 `try_files` 把请求兜到 `index.html`；确认 snippet 顺序后 `sudo nginx -t && sudo systemctl reload nginx` |
-| 上传返回 `413` 或 `400 图片不能超过 2MB` | 413 来自 nginx（默认 `client_max_body_size 1m`，2MB 上限需在 server 块调大后 reload）；400 来自后端（超过 2MB 或 multipart 上限），响应体里带 `图片不能超过 2MB` |
+| 上传返回 `413` 或 `400 图片不能超过 2MB` | 413 来自 nginx：snippet 的 `/forum/api/` 已设 `client_max_body_size 3m`，若仍出现说明服务器上是旧版 snippet（重新发布或手工 `cp` 后 reload）；400 来自后端（超过 2MB 或 multipart 上限），响应体里带 `图片不能超过 2MB` |
 | 上传返回 `400 保存头像失败` | 容器内写 `/app/uploads` 失败：多为宿主目录属主/权限不对，重跑 `deploy.sh`（`podman unshare chown -R 1001:1001` + `chmod -R a+rX`），并确认 `uploads` 不是符号链接 |
 | 取头像 `403` | 文件对 nginx worker 不可读（历史 0600 或属主错）：重跑 `deploy.sh` 由 `chmod -R a+rX` 治愈；仍失败则 `ls -ln /pd/Program/forum/uploads/avatars` 检查权限 |
 | Jenkins 起不来 | `sudo journalctl -u jenkins -n 100 --no-pager`；job config.xml 写坏时先移走 `/var/lib/jenkins/jobs/javaforum` 再重启 |
