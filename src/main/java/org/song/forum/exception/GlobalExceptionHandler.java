@@ -10,6 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.song.forum.util.Result;
@@ -84,6 +85,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         log.warn("请求参数格式不正确: {}={}", e.getName(), e.getValue());
         return ResponseEntity.badRequest().body(Result.fail("参数格式不正确: " + e.getName()));
+    }
+
+    /** 上传文件超过上限 → 400（Spring 在进入 Controller 前由 multipart 解析器抛出） */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Result<Void>> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        log.warn("上传文件超过上限: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(Result.fail("图片不能超过 2MB"));
     }
 
     /** 已登录但无权限 → 403 */

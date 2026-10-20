@@ -77,6 +77,13 @@
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
+        <!-- 图片元数据：读取头像 JPEG 的 EXIF Orientation -->
+        <dependency>
+            <groupId>com.drewnoakes</groupId>
+            <artifactId>metadata-extractor</artifactId>
+            <version>2.19.0</version>
+        </dependency>
+
         <!-- springdoc-openapi (Swagger UI: /swagger-ui.html) -->
         <dependency>
             <groupId>org.springdoc</groupId>

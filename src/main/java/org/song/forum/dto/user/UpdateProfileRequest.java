@@ -13,9 +13,6 @@ public class UpdateProfileRequest {
     @Size(max = 50, message = "昵称过长")
     private String nickname;
 
-    @Size(max = 255, message = "头像地址过长")
-    private String avatarUrl;
-
     @Size(max = 500, message = "个人简介过长")
     private String bio;
 

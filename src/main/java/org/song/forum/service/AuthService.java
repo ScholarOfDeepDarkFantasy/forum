@@ -88,7 +88,6 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException("用户不存在"));
         if (req.getNickname() != null) user.setNickname(req.getNickname());
-        if (req.getAvatarUrl() != null) user.setAvatarUrl(req.getAvatarUrl());
         if (req.getBio() != null) user.setBio(req.getBio());
         user = userRepository.save(user);
         return toUserResponse(user);
