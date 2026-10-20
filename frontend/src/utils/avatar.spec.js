@@ -14,6 +14,25 @@ describe('resolveAvatarUrl', () => {
     )
   })
 
+  it('子路径部署（/forum/）拼出 /forum/uploads/...（固定基址，避免用同一个 BASE_URL 自证）', () => {
+    expect(resolveAvatarUrl('/uploads/avatars/x.png', '/forum/')).toBe('/forum/uploads/avatars/x.png')
+  })
+
+  it('根路径部署（/）拼出 /uploads/...', () => {
+    expect(resolveAvatarUrl('/uploads/avatars/x.png', '/')).toBe('/uploads/avatars/x.png')
+  })
+
+  it('首尾空白先裁掉，避免拼出带空格的 404 地址', () => {
+    expect(resolveAvatarUrl(' /uploads/x.jpg ', '/forum/')).toBe('/forum/uploads/x.jpg')
+    expect(resolveAvatarUrl('   ', '/forum/')).toBe('')
+  })
+
+  it('只有 /uploads 或 /uploads/ 而没有文件段时返回空串，且不误伤 /uploadsx', () => {
+    expect(resolveAvatarUrl('/uploads', '/forum/')).toBe('')
+    expect(resolveAvatarUrl('/uploads/', '/forum/')).toBe('')
+    expect(resolveAvatarUrl('/uploadsx/a.png', '/forum/')).toBe('/uploadsx/a.png')
+  })
+
   it('外链 http(s) 原样返回', () => {
     expect(resolveAvatarUrl('https://cdn.example.com/a.png')).toBe('https://cdn.example.com/a.png')
     expect(resolveAvatarUrl('http://cdn.example.com/a.png')).toBe('http://cdn.example.com/a.png')

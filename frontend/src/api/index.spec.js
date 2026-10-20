@@ -180,6 +180,16 @@ describe('userApi 请求路径', () => {
     expect(body.get('file')).toBe(file)
   })
 
+  it('uploadAvatar 单独放宽超时（2MB 图片慢上行 15s 不够，超时会给通用提示但请求仍在继续）', () => {
+    const file = new File(['x'], 'me.jpg', { type: 'image/jpeg' })
+
+    userApi.uploadAvatar(file)
+
+    const [url, , config] = apiPost.mock.calls[0]
+    expect(url).toBe('/users/me/avatar')
+    expect(config).toEqual({ timeout: 60000 })
+  })
+
   it('removeAvatar 请求 DELETE /users/me/avatar', () => {
     userApi.removeAvatar()
 

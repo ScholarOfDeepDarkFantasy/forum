@@ -23,6 +23,17 @@ const removingAvatar = ref(false)
 
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024
 const AVATAR_TYPES = ['image/jpeg', 'image/png']
+const AVATAR_EXTENSIONS = ['.jpg', '.jpeg', '.png']
+
+/**
+ * 图片类型优先看 MIME；某些环境（拖拽、旧浏览器、部分移动端）给出的 file.type 为空，
+ * 此时按扩展名回退。真正的图片内容由后端按 magic bytes 校验，前端这一步只做早筛。
+ */
+function isAvatarFile(file) {
+  if (AVATAR_TYPES.includes(file.type)) return true
+  const filename = (file.name || '').toLowerCase()
+  return AVATAR_EXTENSIONS.some((ext) => filename.endsWith(ext))
+}
 
 const myPosts = ref({ content: [], totalElements: 0, totalPages: 0 })
 const myPostPage = ref(0)
@@ -59,7 +70,7 @@ async function onAvatarChange(event) {
   // 清空 value，允许连续选择同一个文件
   event.target.value = ''
   if (!file) return
-  if (!AVATAR_TYPES.includes(file.type)) {
+  if (!isAvatarFile(file)) {
     ElMessage.warning('仅支持 JPEG/PNG 图片')
     return
   }
@@ -72,6 +83,8 @@ async function onAvatarChange(event) {
     await userApi.uploadAvatar(file)
     await auth.fetchMe()
     ElMessage.success('头像已更新')
+  } catch {
+    // 错误已由 axios 拦截器统一提示，这里只负责复位状态，避免二次 toast
   } finally {
     uploadingAvatar.value = false
   }
@@ -83,6 +96,8 @@ async function removeAvatar() {
     await userApi.removeAvatar()
     await auth.fetchMe()
     ElMessage.success('头像已移除')
+  } catch {
+    // 同上：错误已由拦截器统一提示
   } finally {
     removingAvatar.value = false
   }
@@ -135,13 +150,14 @@ onMounted(() => {
                 :size="64"
               />
               <div class="avatar-actions">
-                <el-button :loading="uploadingAvatar" @click="pickAvatar">选择图片</el-button>
+                <el-button :loading="uploadingAvatar" :disabled="removingAvatar" @click="pickAvatar">选择图片</el-button>
                 <el-button
                   v-if="auth.user?.avatarUrl"
                   class="avatar-remove"
                   text
                   type="danger"
                   :loading="removingAvatar"
+                  :disabled="uploadingAvatar"
                   @click="removeAvatar"
                 >移除头像</el-button>
               </div>

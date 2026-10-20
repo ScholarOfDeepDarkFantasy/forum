@@ -3419,3 +3419,15 @@ Expected: 推送成功（会再触发一次 Jenkins 构建，属预期；该次�
 - 补测：WEBP/GIF 拒绝、2.1MB→400、真实 EXIF 方向 6、透明 PNG、炸弹、共享 URL；`AvatarServiceTest` 模拟保存失败覆盖文件/DB 顺序。
 - 小项：旋转双线性、降采样分步减半；EXIF 失败 `log.debug`；`UserResponse.from` 合并 mapper；`PUBLIC_GET` 收窄为 `/uploads/avatars/**`；no-op 删除不再打 warn 栈。
 - 偏差：计划 §「同一逻辑两处实现」原接受理由随 mapper 抽出失效，保留原文不改，仅在此记录；其余按计划执行，无功能延期。
+
+### Task 3 质量修复记录（实施偏差）
+- 上传超时：仅 `uploadAvatar` 传 `{ timeout: 60000 }`，其余接口仍用实例默认 15s；`api/index.spec.js` 断言第三参。
+- 并发互斥：选择按钮加 `:disabled="removingAvatar"`、移除按钮加 `:disabled="uploadingAvatar"`，与 loading 并存；补「上传中禁移除 / 移除中禁选择」两例。
+- 头像解析：`resolveAvatarUrl(url, base = import.meta.env.BASE_URL)` 支持显式基址，补 `/forum/`→`/forum/uploads/...` 与 `/`→`/uploads/...` 两例，不再用同一个 BASE_URL 自证。
+- 错误处理：上传/移除补 `catch {}`（拦截器已统一提示，避免二次 toast）；失败用例断言 Vue `errorHandler` 未被触发、不提示成功。
+- 注释纠偏：`UserAvatar` 本地 `failed` 保留为防御，注释改为「el-avatar 的 hasLoadError 在 src 变化时会自行重置」。
+- 可访问性：字母头像外层 `role="img"` + `aria-label="<昵称>的头像"`（name 为空回退「用户头像」），字母 `aria-hidden="true"`；补 3 例断言。
+- 空白/残缺路径：`String(url).trim()` 后再判断；`/uploads`、`/uploads/` 无文件段返回空串，`/uploadsx/...` 不误伤。
+- MIME 回退：`file.type` 为空时按 `.jpg/.jpeg/.png` 扩展名判断（内容仍由后端 magic bytes 校验），2MB 检查保持不变；补 2 例。
+- 代理对：首字母改用 `Array.from(name)[0]`，emoji 昵称不再被切成半个字符。
+- 补测：同一文件校验失败后再选仍触发 change、无头像不渲染移除按钮、url 变更清除 failed 状态（ElAvatar 重新拿到 src）。

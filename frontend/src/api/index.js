@@ -83,7 +83,9 @@ export const userApi = {
   uploadAvatar: (file) => {
     const fd = new FormData()
     fd.append('file', file)
-    return api.post('/users/me/avatar', fd)
+    // 头像最大 2MB：慢上行时统一 15s 超时会给用户一个「请求超时」的假失败，
+    // 而此时请求其实还在继续。只给这个接口单独放宽到 60s，其它接口保持原超时。
+    return api.post('/users/me/avatar', fd, { timeout: 60000 })
   },
   removeAvatar: () => api.delete('/users/me/avatar')
 }

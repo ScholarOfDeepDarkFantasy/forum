@@ -57,4 +57,37 @@ describe('UserAvatar', () => {
 
     expect(wrapper.text()).toBe('?')
   })
+
+  it('字母头像整体带 img 角色与名称，字母本身对读屏隐藏（避免与 aria-label 重复播报）', () => {
+    const wrapper = mountAvatar({ url: '', name: '爱丽丝' })
+
+    const fallback = wrapper.find('[role="img"]')
+    expect(fallback.attributes('aria-label')).toBe('爱丽丝的头像')
+    expect(fallback.text()).toBe('爱')
+    expect(wrapper.find('[aria-hidden="true"]').text()).toBe('爱')
+  })
+
+  it('name 为空时 aria-label 回退为「用户头像」', () => {
+    const wrapper = mountAvatar({ url: '', name: '' })
+
+    expect(wrapper.find('[role="img"]').attributes('aria-label')).toBe('用户头像')
+  })
+
+  it('代理对（emoji）昵称只取一个完整码点，不切出半个字符', () => {
+    const wrapper = mountAvatar({ url: '', name: '😀小张' })
+
+    expect(wrapper.text()).toBe('😀')
+  })
+
+  it('url 变化后清除失败状态，重新尝试显示图片', async () => {
+    const wrapper = mountAvatar({ url: '/uploads/avatars/a.jpg', name: 'bob' })
+
+    wrapper.findComponent({ name: 'ElAvatar' }).vm.$emit('error')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.avatar-stub').attributes('data-src')).toBeUndefined()
+
+    await wrapper.setProps({ url: '/uploads/avatars/b.jpg' })
+
+    expect(wrapper.find('.avatar-stub').attributes('data-src')).toBe('/uploads/avatars/b.jpg')
+  })
 })

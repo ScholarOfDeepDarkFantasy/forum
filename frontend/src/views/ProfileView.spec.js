@@ -42,7 +42,10 @@ const stubs = {
   'el-form': { template: '<form><slot /></form>' },
   'el-form-item': { template: '<div><slot /></div>' },
   'el-input': { template: '<input />' },
-  'el-button': { template: '<button><slot /></button>' },
+  'el-button': {
+    props: ['loading', 'disabled', 'text', 'type'],
+    template: '<button :disabled="disabled" :data-loading="loading"><slot /></button>'
+  },
   'el-pagination': { template: '<div class="pager-stub" />' },
   'el-empty': { template: '<div class="empty-stub" />' },
   'el-avatar': { props: ['size', 'src'], template: '<div class="avatar-stub" />' }
@@ -50,9 +53,14 @@ const stubs = {
 
 let pinia
 
-function mountProfile() {
+function mountProfile(options = {}) {
   return mount(ProfileView, {
-    global: { plugins: [pinia], stubs, directives: { loading: () => {} } }
+    global: {
+      plugins: [pinia],
+      stubs,
+      directives: { loading: () => {} },
+      config: options.onError ? { errorHandler: options.onError } : {}
+    }
   })
 }
 
@@ -218,5 +226,113 @@ describe('ProfileView 头像上传', () => {
     expect(removeAvatar).toHaveBeenCalled()
     expect(useAuthStore().fetchMe).toHaveBeenCalled()
     expect(success).toHaveBeenCalledWith('头像已移除')
+  })
+
+  it('没有头像时不渲染移除按钮', async () => {
+    useAuthStore().user = { id: 1, username: 'alice', nickname: '爱丽丝', roles: ['USER'] }
+    const wrapper = mountProfile()
+    await flush()
+
+    expect(wrapper.find('.avatar-remove').exists()).toBe(false)
+  })
+
+  it('校验失败后清空 input.value，同一文件可以再次触发 change', async () => {
+    const wrapper = mountProfile()
+    await flush()
+    const gif = new File(['x'], 'me.gif', { type: 'image/gif' })
+
+    await pick(wrapper, gif)
+    expect(warning).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('input[type="file"]').element.value).toBe('')
+
+    // 若 value 没清空，浏览器第二次选同一个文件不会派发 change，用户会以为没反应
+    await pick(wrapper, gif)
+    expect(warning).toHaveBeenCalledTimes(2)
+    expect(uploadAvatar).not.toHaveBeenCalled()
+  })
+
+  it('file.type 为空时按扩展名回退，不误杀合法 PNG（后端按 magic bytes 校验）', async () => {
+    const wrapper = mountProfile()
+    await flush()
+
+    await pick(wrapper, new File(['x'], 'ME.PNG', { type: '' }))
+
+    expect(uploadAvatar).toHaveBeenCalled()
+    expect(warning).not.toHaveBeenCalled()
+  })
+
+  it('file.type 为空且扩展名不是图片时仍然拒绝', async () => {
+    const wrapper = mountProfile()
+    await flush()
+
+    await pick(wrapper, new File(['x'], 'me.gif', { type: '' }))
+
+    expect(uploadAvatar).not.toHaveBeenCalled()
+    expect(warning).toHaveBeenCalledWith('仅支持 JPEG/PNG 图片')
+  })
+
+  it('上传失败时不提示成功、复位 loading，且异常被就地捕获（不抛给 Vue）', async () => {
+    const errors = []
+    uploadAvatar.mockRejectedValue(new Error('超时'))
+    const wrapper = mountProfile({ onError: (err) => errors.push(err) })
+    await flush()
+
+    await pick(wrapper, new File(['x'], 'me.jpg', { type: 'image/jpeg' }))
+
+    expect(errors).toEqual([])
+    expect(success).not.toHaveBeenCalledWith('头像已更新')
+    expect(wrapper.find('.avatar-actions button').attributes('data-loading')).toBe('false')
+    expect(useAuthStore().fetchMe).not.toHaveBeenCalled()
+  })
+
+  it('移除失败时不提示成功、复位状态，且异常被就地捕获（不抛给 Vue）', async () => {
+    const errors = []
+    removeAvatar.mockRejectedValue(new Error('boom'))
+    const wrapper = mountProfile({ onError: (err) => errors.push(err) })
+    await flush()
+
+    await wrapper.find('.avatar-remove').trigger('click')
+    await flush()
+
+    expect(errors).toEqual([])
+    expect(success).not.toHaveBeenCalledWith('头像已移除')
+    expect(wrapper.find('.avatar-remove').attributes('data-loading')).toBe('false')
+  })
+
+  it('上传进行中禁用移除按钮，避免并发请求把刚更新的头像又移掉', async () => {
+    let resolveUpload
+    uploadAvatar.mockReturnValue(new Promise((resolve) => { resolveUpload = resolve }))
+    const wrapper = mountProfile()
+    await flush()
+
+    const input = wrapper.find('input[type="file"]')
+    Object.defineProperty(input.element, 'files', {
+      value: [new File(['x'], 'me.jpg', { type: 'image/jpeg' })],
+      configurable: true
+    })
+    await input.trigger('change')
+
+    expect(uploadAvatar).toHaveBeenCalled()
+    expect(wrapper.find('.avatar-remove').attributes('disabled')).toBeDefined()
+
+    resolveUpload({})
+    await flush()
+    expect(wrapper.find('.avatar-remove').attributes('disabled')).toBeUndefined()
+  })
+
+  it('移除进行中禁用选择按钮，避免并发上传与移除互相回滚', async () => {
+    let resolveRemove
+    removeAvatar.mockReturnValue(new Promise((resolve) => { resolveRemove = resolve }))
+    const wrapper = mountProfile()
+    await flush()
+
+    await wrapper.find('.avatar-remove').trigger('click')
+
+    expect(removeAvatar).toHaveBeenCalled()
+    expect(wrapper.find('.avatar-actions button').attributes('disabled')).toBeDefined()
+
+    resolveRemove({})
+    await flush()
+    expect(wrapper.find('.avatar-actions button').attributes('disabled')).toBeUndefined()
   })
 })
