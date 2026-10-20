@@ -3431,3 +3431,13 @@ Expected: 推送成功（会再触发一次 Jenkins 构建，属预期；该次�
 - MIME 回退：`file.type` 为空时按 `.jpg/.jpeg/.png` 扩展名判断（内容仍由后端 magic bytes 校验），2MB 检查保持不变；补 2 例。
 - 代理对：首字母改用 `Array.from(name)[0]`，emoji 昵称不再被切成半个字符。
 - 补测：同一文件校验失败后再选仍触发 change、无头像不渲染移除按钮、url 变更清除 failed 状态（ElAvatar 重新拿到 src）。
+
+### Task 4 质量修复记录（实施偏差）
+- 头像权限：临时文件按 0644（`PosixFilePermissions.asFileAttribute`）创建，非 POSIX 文件系统回退默认权限；`ATOMIC_MOVE` 后再 `setPosixFilePermissions` 兜底，失败静默，绝不因改权限丢上传。
+- 原因：nginx worker 与后端不是同一 uid，JDK 17 `createTempFile` 默认 0600 且被 `ATOMIC_MOVE` 原样保留，线上每个头像都会 403；目录权限不变（仍 0755）。
+- 补测：`AvatarFlowIntegrationTest` 新增 POSIX 用例（`assumeTrue` 在非 POSIX 平台跳过），断言换图后新文件组/其他可读且内容完整。
+- `deploy.sh`：`UPLOAD_HOST_DIR` upsert 后再 `chmod 600 "$ENV_FILE"`，把 .env 权限不变量写死（GNU sed 虽保留模式）。
+- `deploy.sh`：上传守卫 `curl` 加 `--max-time 5`，失败信息同时覆盖「snippet 未 reload」与「/pd/Program/forum/uploads 不可读」。
+- `deploy.sh`：`mkdir -p uploads/avatars` 前拒绝 `uploads` 为符号链接，避免 `chown -R` 跟随到链接目标。
+- `deploy.sh`：`podman unshare chown` 失败转 `die`，提示需要 pi 的 rootless podman user namespace 并指向部署文档。
+- 验证：`mvn -B clean test` 12 个测试类 / 90 例全绿（1 例因 Windows 无 POSIX 权限跳过）；`bash -n deploy/deploy.sh` OK。

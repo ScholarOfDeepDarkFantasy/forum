@@ -16,11 +16,16 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -36,6 +41,9 @@ public class AvatarService {
 
     private static final long MAX_BYTES = 2L * 1024 * 1024;
     private static final String AVATAR_URL_PREFIX = "/uploads/avatars/";
+    /** 头像文件由 nginx worker（不同 uid）直接读取，必须是 0644 */
+    private static final FileAttribute<Set<PosixFilePermission>> AVATAR_FILE_ATTRIBUTE =
+            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-r--r--"));
     /** 只有服务端生成的 UUID 文件名才允许删除，历史用户自填 URL 一律不动 */
     private static final Pattern SERVER_FILE_NAME = Pattern.compile(
             "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.jpg$");
@@ -121,7 +129,7 @@ public class AvatarService {
 
     /** 同目录内临时文件写完再原子改名，静态资源不会读到写了一半的文件 */
     private void writeAtomically(Path dir, Path target, byte[] jpeg) throws IOException {
-        Path tmp = Files.createTempFile(dir, "avatar-", ".tmp");
+        Path tmp = createTempFile(dir);
         try {
             Files.write(tmp, jpeg);
             try {
@@ -132,6 +140,31 @@ public class AvatarService {
             }
         } finally {
             Files.deleteIfExists(tmp);
+        }
+        // ATOMIC_MOVE 保留临时文件的权限位，JDK 17 的 createTempFile 默认是 0600；
+        // 改名后再兜一次，确保目标文件一定是 0644（目录仍由 mkdir 决定，保持 0755）
+        makeWorldReadable(target);
+    }
+
+    /**
+     * 临时文件按 0644 创建：nginx worker（www-data）与后端不是同一个 uid，
+     * 0600 的文件它读不到，头像会 403；改名后权限随之保留，所以创建时就要给对。
+     * 非 POSIX 文件系统（如 Windows/NTFS）不支持属性创建，退回默认权限即可。
+     */
+    private static Path createTempFile(Path dir) throws IOException {
+        try {
+            return Files.createTempFile(dir, "avatar-", ".tmp", AVATAR_FILE_ATTRIBUTE);
+        } catch (UnsupportedOperationException | FileSystemException e) {
+            return Files.createTempFile(dir, "avatar-", ".tmp");
+        }
+    }
+
+    /** 权限设置失败不能连累上传：文件已经原子落盘，最坏只是 nginx 读不到，需人工修权限 */
+    private static void makeWorldReadable(Path target) {
+        try {
+            Files.setPosixFilePermissions(target, PosixFilePermissions.fromString("rw-r--r--"));
+        } catch (UnsupportedOperationException | IOException ignored) {
+            // 非 POSIX 文件系统或权限被策略拒绝：上传本身已成功，保持静默
         }
     }
 

@@ -48,8 +48,11 @@ chmod 600 "$ENV_FILE"
 # rootless podman 把容器 1001 映射到宿主的 subuid（100000+1000），
 # 因此必须在 podman 的 user namespace 里 chown；宿主上直接 chown 1001:1001 是错的用户。
 log "准备头像目录 $ROOT/uploads"
+# 符号链接会让下面的 chown -R 跟到链接目标（可能是系统目录），因此拒绝
+[ ! -L "$ROOT/uploads" ] || die "$ROOT/uploads 是符号链接，拒绝 chown -R（请改成真实目录）"
 mkdir -p "$ROOT/uploads/avatars"
-podman unshare chown -R 1001:1001 "$ROOT/uploads"
+podman unshare chown -R 1001:1001 "$ROOT/uploads" \
+    || die "调整 $ROOT/uploads 属主失败（需要 pi 的 rootless podman user namespace；见 docs/deployment/README.md）"
 
 # 卷的宿主目录路径写进 .env，compose 每次 up 都从这里读
 if grep -q '^UPLOAD_HOST_DIR=' "$ENV_FILE"; then
@@ -57,6 +60,8 @@ if grep -q '^UPLOAD_HOST_DIR=' "$ENV_FILE"; then
 else
     printf 'UPLOAD_HOST_DIR=%s\n' "$ROOT/uploads" >> "$ENV_FILE"
 fi
+# GNU sed 会保留原权限，但 .env 含数据库口令，这里把 600 显式重申一次
+chmod 600 "$ENV_FILE"
 
 HOST_PORT="$(grep -E '^HOST_PORT=' "$ENV_FILE" | tail -1 | cut -d= -f2 | tr -d "'\"")"
 HOST_PORT="${HOST_PORT:-8086}"
@@ -109,10 +114,10 @@ curl -fsS -H 'Host: raspi' "http://127.0.0.1/forum/api/posts?page=0&size=1" >/de
 # 上传目录必须由 nginx 的 ^~ /forum/uploads/ 直出：
 # 命中 alias 时，不存在的文件是 404；若配置没生效，请求会落到 SPA 的
 # try_files 而返回 200 + index.html —— 这正是要抓的静默错误
-uploads_code="$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: raspi' \
+uploads_code="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Host: raspi' \
     "http://127.0.0.1/forum/uploads/__probe__/missing.jpg")"
 [ "$uploads_code" = "404" ] \
-    || die "/forum/uploads/ 未直出（返回 $uploads_code，应为 404；检查 nginx snippet 是否已 reload）"
+    || die "/forum/uploads/ 未直出（返回 $uploads_code，应为 404；检查 nginx snippet 是否已 reload 且 /pd/Program/forum/uploads 可读）"
 
 log "清理旧镜像（保留最近 2 个数字 tag，绝不做全局 prune）"
 podman images --format '{{.Tag}}' localhost/forum-backend 2>/dev/null \

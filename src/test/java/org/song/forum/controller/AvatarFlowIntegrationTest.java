@@ -34,13 +34,16 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.Comparator;
 import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * 头像全链路：上传 → 换图删旧 → 非法/超限被拒 → 静态直出 → 删除幂等 → 多人共享旧 URL。
@@ -221,6 +224,31 @@ class AvatarFlowIntegrationTest {
 
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody().getData().getAvatarUrl()).startsWith(AVATAR_PREFIX);
+    }
+
+    @Test
+    void uploadedAvatarIsWorldReadableForNginxWorker() throws IOException {
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"),
+                "POSIX 权限只在类 Unix 文件系统上可断言");
+
+        String token = freshToken();
+        String first = upload(token, jpegBytes(300, 300, Color.ORANGE), "perm.jpg")
+                .getBody().getData().getAvatarUrl();
+
+        Path firstFile = uploadedFile(first);
+        assertThat(firstFile).exists();
+        assertThat(Files.getPosixFilePermissions(firstFile))
+                .as("nginx worker 与后端不是同一 uid，头像必须组/其他可读")
+                .contains(PosixFilePermission.GROUP_READ, PosixFilePermission.OTHERS_READ);
+
+        // 换图走同一条落盘路径：补设权限不能让上传丢文件，新文件同样要可读
+        String second = upload(token, jpegBytes(320, 320, Color.GREEN), "perm2.jpg")
+                .getBody().getData().getAvatarUrl();
+        Path secondFile = uploadedFile(second);
+        assertThat(secondFile).exists();
+        assertThat(Files.readAllBytes(secondFile)).isNotEmpty();
+        assertThat(Files.getPosixFilePermissions(secondFile))
+                .contains(PosixFilePermission.GROUP_READ, PosixFilePermission.OTHERS_READ);
     }
 
     @Test
