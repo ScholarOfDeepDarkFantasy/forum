@@ -157,6 +157,31 @@ public class PostService {
         return PageResponse.of(mapSummaries(hydrate(skeletons)));
     }
 
+    /**
+     * 全文搜索：标题命中优先，同档按创建时间倒序。
+     * <p>关键词去首尾空白后必须是 1~50 个 code point；page 负数按 0，size 夹到 1~50。
+     * 这里再夹取一次 size 是防御性的：controller 也夹了一次，service 作为公开方法
+     * 不依赖调用方已经处理过。</p>
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<PostSummaryResponse> search(String rawKeyword, int page, int size) {
+        String keyword = normalizeSearchKeyword(rawKeyword);
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+        // 小写 + 转义都在 Java 侧做，JPQL 只拼 %...%；大小写不敏感由 SQL 的 LOWER 保证。
+        String pattern = escapeLike(keyword.toLowerCase(Locale.ROOT));
+        // pageable 必须不带 Sort：排序写在 JPQL 的 ORDER BY 里，再带 Sort 会被拼成第二个 ORDER BY。
+        Page<Post> skeletons = postRepository.searchByKeyword(pattern, PageRequest.of(safePage, safeSize));
+        Page<Post> hydrated = hydrate(skeletons);
+        Page<PostSummaryResponse> summaries = mapSummaries(hydrated);
+        // 搜索页要显示正文命中处的一行上下文，而列表 DTO 不带正文：
+        // 只为当前页附一段窗口。snippetOf 返回空串而非 null（Collectors.toMap 不接受 null 值）。
+        Map<Long, String> snippets = hydrated.getContent().stream()
+                .collect(Collectors.toMap(Post::getId, p -> snippetOf(p.getContent(), keyword)));
+        summaries.forEach(s -> s.setSnippet(snippets.get(s.getId())));
+        return PageResponse.of(summaries);
+    }
+
     /** 帖子详情：浏览量原子 +1 后返回 */
     @Transactional
     public PostDetailResponse getDetail(Long postId) {
@@ -234,6 +259,59 @@ public class PostService {
     /** 空白转空串（非 null）：PostgreSQL 下无类型 null 绑定会变 bytea */
     private String blankToEmpty(String s) {
         return (s == null || s.isBlank()) ? "" : s.trim();
+    }
+
+    /**
+     * 搜索关键词归一化：去首尾空白、限长 1~50 个 code point，保留原始大小写。
+     * 用 codePointCount 而不是 length：emoji/生僻字的 length 是 2，按 length 判长会误伤。
+     */
+    private static String normalizeSearchKeyword(String rawKeyword) {
+        String keyword = rawKeyword == null ? "" : rawKeyword.trim();
+        if (keyword.isEmpty()) {
+            throw new BusinessException("搜索关键词不能为空");
+        }
+        if (keyword.codePointCount(0, keyword.length()) > 50) {
+            throw new BusinessException("搜索关键词不能超过 50 个字符");
+        }
+        return keyword;
+    }
+
+    /**
+     * 转义 LIKE 通配符：'!' 是 JPQL 里 ESCAPE 指定的转义符，所以它自己也要先转义。
+     * 不转义时 '%'（如「100%完成」）会被当成任意串，搜「100%」会误命中「1000完成」。
+     */
+    private static String escapeLike(String keyword) {
+        StringBuilder sb = new StringBuilder(keyword.length() + 8);
+        for (int i = 0; i < keyword.length(); i++) {
+            char c = keyword.charAt(i);
+            if (c == '!' || c == '%' || c == '_') {
+                sb.append('!');
+            }
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    /** 搜索片段窗口半径：以正文命中位置为中心，左右各保留的字符数 */
+    private static final int SNIPPET_RADIUS = 80;
+
+    /**
+     * 取正文命中处的一段纯文本窗口。
+     * <p>这里只截窗口：不清洗 Markdown、不加省略号——清洗、省略号与高亮统一由前端
+     * {@code utils/search.js} 的 {@code buildSnippet} 完成，避免同一套规则在两种语言里各写一遍。
+     * 正文不含关键词（标题命中）时返回空串。</p>
+     */
+    private static String snippetOf(String content, String keyword) {
+        if (content == null || content.isEmpty() || keyword.isEmpty()) {
+            return "";
+        }
+        int index = content.toLowerCase(Locale.ROOT).indexOf(keyword.toLowerCase(Locale.ROOT));
+        if (index < 0) {
+            return "";
+        }
+        int start = Math.max(0, index - SNIPPET_RADIUS);
+        int end = Math.min(content.length(), index + keyword.length() + SNIPPET_RADIUS);
+        return content.substring(start, end);
     }
 
     private PostSummaryResponse toSummary(Post p, boolean liked, boolean favorited) {

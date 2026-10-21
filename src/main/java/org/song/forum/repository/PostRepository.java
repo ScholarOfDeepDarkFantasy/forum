@@ -35,6 +35,22 @@ public interface PostRepository extends JpaRepository<Post, Long> {
                          Pageable pageable);
 
     /**
+     * 全文搜索分页第一步：只取骨架，不 join tags 集合（原因同 {@link #searchIds}）。
+     * pattern 由 service 层做过 LIKE 通配符转义（! % _ → !x），SQL 用 ESCAPE '!'。
+     * 排序：标题命中优先（CASE 0/1），同档按 createTime 倒序；置顶不加权。
+     */
+    @Query("""
+            SELECT p FROM Post p
+            WHERE p.deleted = false
+              AND (LOWER(p.title) LIKE CONCAT('%', :pattern, '%') ESCAPE '!'
+                   OR LOWER(p.content) LIKE CONCAT('%', :pattern, '%') ESCAPE '!')
+            ORDER BY CASE WHEN LOWER(p.title) LIKE CONCAT('%', :pattern, '%') ESCAPE '!' THEN 0 ELSE 1 END,
+                     p.createTime DESC
+            """)
+    @EntityGraph(attributePaths = {"board", "author"})
+    Page<Post> searchByKeyword(@Param("pattern") String pattern, Pageable pageable);
+
+    /**
      * 分页第二步：按 id 批量抓取帖子及全部所需关联（含 tags 集合）。
      * IN 查询不保证顺序，调用方必须用第一步的结果重建顺序。
      */

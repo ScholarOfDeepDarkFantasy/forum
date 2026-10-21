@@ -26,7 +26,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:repo-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH",
         "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        // V3 迁移在 PostgreSQL 上执行 CREATE EXTENSION pg_trgm，H2 不支持；
+        // 显式关闭 Flyway，schema 完全由 ddl-auto=create-drop 生成，与其它测试类一致。
+        "spring.flyway.enabled=false"
 })
 class RepositoryTests {
 
@@ -278,5 +281,59 @@ class RepositoryTests {
         assertThat(tagRepository.findWithPostCounts(""))
                 .extracting(row -> row[1], row -> ((Number) row[2]).longValue())
                 .containsExactly(org.assertj.core.groups.Tuple.tuple("java", 1L));
+    }
+
+    /**
+     * 全文搜索第一步的 JPQL：标题命中优先（CASE 0/1），正文命中排后，软删除不出现。
+     * pattern 由 service 转义，SQL 用 ESCAPE '!'，因此 "%" 必须按字面量匹配。
+     */
+    @Test
+    void searchByKeywordRanksTitleHitsFirstAndEscapesWildcards() {
+        User author = user("searcher");
+        Board board = boardRepository.save(Board.builder().name("搜索板块").description("验证全文搜索 JPQL").build());
+
+        Post titleHit = postRepository.save(Post.builder()
+                .board(board).author(author)
+                .title("标题里有关键词").content("正文无关")
+                .build());
+        // 先建标题命中、后建正文命中：若只按 createTime 倒序，正文命中的会排第一，
+        // 因此这个顺序能区分「CASE 标题优先」是否真的生效。
+        Post contentHit = postRepository.save(Post.builder()
+                .board(board).author(author)
+                .title("正文命中示例").content("正文包含关键词，标题没有")
+                .build());
+        postRepository.save(Post.builder()
+                .board(board).author(author)
+                .title("完全无关").content("完全无关")
+                .build());
+        postRepository.save(Post.builder()
+                .board(board).author(author)
+                .title("关键词但已删除").content("正文无关").deleted(true)
+                .build());
+        em.flush();
+        em.clear();
+
+        Page<Post> page = postRepository.searchByKeyword("关键词", PageRequest.of(0, 10));
+
+        assertThat(page.getTotalElements()).isEqualTo(2);
+        assertThat(page.getContent()).extracting(Post::getId)
+                .containsExactly(titleHit.getId(), contentHit.getId());
+
+        // ESCAPE '!'：转义后 pattern 里的 "%" 是字面量，不能当通配符用
+        Post percent = postRepository.save(Post.builder()
+                .board(board).author(author)
+                .title("100%完成").content("进度")
+                .build());
+        postRepository.save(Post.builder()
+                .board(board).author(author)
+                .title("1000完成").content("进度")
+                .build());
+        em.flush();
+        em.clear();
+
+        Page<Post> escaped = postRepository.searchByKeyword("100!%", PageRequest.of(0, 10));
+
+        assertThat(escaped.getTotalElements()).isEqualTo(1);
+        assertThat(escaped.getContent().get(0).getId()).isEqualTo(percent.getId());
     }
 }

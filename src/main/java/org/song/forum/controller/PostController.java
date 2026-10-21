@@ -38,6 +38,15 @@ public class PostController {
         return Result.ok(postService.list(boardId, keyword, page, Math.min(size, 50)));
     }
 
+    /** 全文搜索：标题命中优先，其次按发帖时间倒序（游客可访问） */
+    @GetMapping("/search")
+    public Result<PageResponse<PostSummaryResponse>> search(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return Result.ok(postService.search(keyword, page, Math.min(Math.max(size, 1), 50)));
+    }
+
     /** 帖子详情：浏览量 +1（游客可访问） */
     @GetMapping("/{id}")
     public Result<PostDetailResponse> detail(@PathVariable Long id) {
