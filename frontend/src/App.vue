@@ -6,6 +6,7 @@ import { Bell, User, SwitchButton, Connection, Setting } from '@element-plus/ico
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import HeaderSearch from '@/components/HeaderSearch.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 
 const router = useRouter()
@@ -51,6 +52,8 @@ onMounted(() => {
         </router-link>
 
         <router-link to="/tags" class="nav-link">标签</router-link>
+
+        <HeaderSearch />
 
         <div class="nav-actions">
           <ThemeToggle />
@@ -110,7 +113,10 @@ onMounted(() => {
   margin: 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* 原来是 space-between（brand / 标签 / actions 三段）；插入搜索框后改成左对齐分组，
+     由 .nav-actions 的 margin-left:auto 把右侧操作区推到行尾 */
+  justify-content: flex-start;
+  gap: var(--jf-space-2);
   height: 100%;
 }
 .brand {
@@ -133,6 +139,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--jf-space-3);
+  margin-left: auto;
 }
 .user-chip {
   display: flex;

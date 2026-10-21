@@ -102,6 +102,8 @@ export const boardApi = {
 // ========== 帖子 ==========
 export const postApi = {
   list: (params) => api.get('/posts', { params }),
+  // 全文搜索：标题命中优先、时间倒序；keyword 必填（后端 400 校验）
+  search: (params) => api.get('/posts/search', { params }),
   detail: (id) => api.get(`/posts/${id}`),
   mine: (params) => api.get('/posts/mine', { params }),
   create: (data) => api.post('/posts', data),

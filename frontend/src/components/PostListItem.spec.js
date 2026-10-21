@@ -78,4 +78,28 @@ describe('PostListItem', () => {
     expect(text).toContain('12')
     expect(text).toContain('4')
   })
+
+  it('传入 keyword 时只给标题里的命中片段套 <mark>', () => {
+    const post = postPayload({ id: 11, title: '全文检索与 Java', tags: [] })
+    const wrapper = mount(PostListItem, { props: { post, keyword: 'java' }, global: { stubs } })
+
+    const marks = wrapper.findAll('mark.hit')
+    expect(marks).toHaveLength(1)
+    expect(marks[0].text()).toBe('Java')
+    expect(wrapper.find('.post-title').text()).toBe('全文检索与 Java')
+    expect(wrapper.find('.post-snippet').exists()).toBe(false)
+  })
+
+  it('传入 snippet 时在标题下渲染片段并高亮命中词', () => {
+    const post = postPayload({ id: 12, title: '标题不含关键词', tags: [] })
+    const wrapper = mount(PostListItem, {
+      props: { post, keyword: '检索', snippet: '…这里提到检索…' },
+      global: { stubs }
+    })
+
+    expect(wrapper.find('.post-snippet').text()).toContain('检索')
+    expect(wrapper.find('.post-snippet mark.hit').text()).toBe('检索')
+    // 标题没命中：标题里不应出现 mark
+    expect(wrapper.find('.post-title mark').exists()).toBe(false)
+  })
 })

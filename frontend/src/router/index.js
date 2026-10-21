@@ -8,6 +8,7 @@ const routes = [
   { path: '/posts/:id', name: 'post-detail', component: () => import('@/views/PostDetailView.vue') },
   { path: '/tags', name: 'tags', component: () => import('@/views/TagsView.vue') },
   { path: '/tags/:name', name: 'tag-posts', component: () => import('@/views/TagPostsView.vue') },
+  { path: '/search', name: 'search', component: () => import('@/views/SearchView.vue') },
   {
     path: '/posts/create',
     name: 'post-create',

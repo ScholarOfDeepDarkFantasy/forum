@@ -4,15 +4,32 @@ import { useRouter } from 'vue-router'
 import { View, ChatDotRound, Star, CaretTop, Medal } from '@element-plus/icons-vue'
 import { usePostActions } from '@/composables/usePostActions'
 import { formatRelative } from '@/utils/format'
+import { highlightSegments } from '@/utils/search'
 
 const props = defineProps({
-  post: { type: Object, required: true }
+  post: { type: Object, required: true },
+  // 搜索页传入：标题与片段里命中的关键词会被 <mark> 高亮；其它页面不传，渲染与原来一致
+  keyword: { type: String, default: '' },
+  // 搜索页传入：正文命中处的纯文本窗口（服务端截取 ±80 字符），前端 buildSnippet 再清洗
+  snippet: { type: String, default: '' }
 })
 const emit = defineEmits(['like'])
 
 const router = useRouter()
 const actions = usePostActions()
 const state = computed(() => actions.stateFor(props.post.id))
+
+/** 标题分段：没有 keyword 时退化为单段，模板结构不需要分支 */
+const titleSegments = computed(() =>
+  props.keyword
+    ? highlightSegments(props.post.title, props.keyword)
+    : [{ text: props.post.title, hit: false }]
+)
+
+/** 片段分段：snippet 为空时数组为空，模板用 v-if 直接不渲染整行 */
+const snippetSegments = computed(() =>
+  props.snippet ? highlightSegments(props.snippet, props.keyword) : []
+)
 
 function openPost() {
   router.push(`/posts/${props.post.id}`)
@@ -33,8 +50,19 @@ function openTag(tag) {
         <el-tag v-if="post.isExquisite" type="warning" size="small" class="flag">
           <el-icon><Medal /></el-icon>精华
         </el-tag>
-        <span class="post-title">{{ post.title }}</span>
+        <span class="post-title">
+          <template v-for="(seg, i) in titleSegments" :key="i">
+            <mark v-if="seg.hit" class="hit">{{ seg.text }}</mark>
+            <template v-else>{{ seg.text }}</template>
+          </template>
+        </span>
       </div>
+      <p v-if="snippet" class="post-snippet">
+        <template v-for="(seg, i) in snippetSegments" :key="i">
+          <mark v-if="seg.hit" class="hit">{{ seg.text }}</mark>
+          <template v-else>{{ seg.text }}</template>
+        </template>
+      </p>
       <div class="post-meta">
         <span>{{ post.authorNickname || post.authorUsername }}</span>
         <span>· {{ post.boardName }}</span>
@@ -99,6 +127,22 @@ function openTag(tag) {
 .post-title {
   font-size: var(--jf-font-title-md);
   font-weight: 600;
+}
+/* 命中词高亮：用浅色底 + 继承文字色，暗色令牌下也不会变成白底黑字 */
+.hit {
+  background: var(--jf-color-anchor-bg);
+  color: inherit;
+  padding: 0 1px;
+  border-radius: var(--jf-radius-sm);
+}
+/* 片段只占一行：超出用省略号，避免搜索结果行高被长正文撑开 */
+.post-snippet {
+  margin: 4px 0 0;
+  color: var(--jf-color-text-3);
+  font-size: var(--jf-font-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .post-meta {
   margin-top: 6px;

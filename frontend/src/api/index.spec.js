@@ -46,7 +46,7 @@ const elMessageError = vi.fn()
 vi.mock('element-plus', () => ({ ElMessage: { error: (...a) => elMessageError(...a) } }))
 
 // 动态 import：确保上面的 mock 在模块求值前已生效
-const { tagApi, userApi } = await import('./index.js')
+const { tagApi, userApi, postApi } = await import('./index.js')
 
 /** 构造一个 axios 错误对象，模拟后端返回 Result.fail 的响应体 */
 function httpError(status, message, url) {
@@ -159,6 +159,20 @@ describe('tagApi 请求路径', () => {
 
     expect(apiGet).toHaveBeenCalledWith('/tags/posts', {
       params: { name: 'java', page: 1 }
+    })
+  })
+})
+
+describe('postApi 搜索请求路径', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('search 请求 GET /posts/search 并透传 keyword/page/size', () => {
+    postApi.search({ keyword: 'java', page: 0, size: 10 })
+
+    expect(apiGet).toHaveBeenCalledWith('/posts/search', {
+      params: { keyword: 'java', page: 0, size: 10 }
     })
   })
 })
