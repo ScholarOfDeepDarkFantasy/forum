@@ -220,7 +220,29 @@ cd /e/JavaSpace/forum && ls src/main/resources/db/migration && grep -c 'CREATE I
 
 Expected: 迁移目录出现 `V1__init_schema.sql`、`V2__notification_comment_id.sql`、`V3__post_search_trgm_index.sql`；`grep -c` 输出 `2`。本步无 JUnit 用例可跑（H2 无法执行 `CREATE EXTENSION`，真实执行由 Task 5 的 raspi 冒烟验证）。
 
-- [ ] **Step 1-4: 写失败的搜索接口集成测试**
+- [ ] **Step 1-4: 给 PostSummaryResponse 增加可空 snippet 字段**
+
+Modify `src/main/java/org/song/forum/dto/post/PostSummaryResponse.java:37`（`favorited` 字段之后、类结束 `}` 之前）追加：
+
+```java
+    /**
+     * 正文命中处的纯文本窗口（左右各 80 字符，未清洗 Markdown、不含省略号）。
+     * <p>只有全文搜索接口会填：搜索页需要在标题下方展示「正文命中上下文」，
+     * 而列表 DTO 刻意不带完整正文（避免搜索页响应膨胀）。标题命中且正文不含
+     * 关键词时为 {@code ""}（前端据此不渲染片段行），其它列表接口保持 {@code null}。</p>
+     */
+    private String snippet;
+```
+
+Run:
+
+```bash
+cd /e/JavaSpace/forum && mvn -B test-compile
+```
+
+Expected: **PASS** —— 编译通过（`PostDetailResponse.of` 显式逐字段复制，不受新字段影响）。先加字段再写集成测试：测试里要断言 `getSnippet()`，字段不存在时测试根本编译不过，红的原因就说不清了。
+
+- [ ] **Step 1-5: 写失败的搜索接口集成测试**
 
 Create `src/test/java/org/song/forum/controller/SearchFlowIntegrationTest.java`：
 
@@ -525,28 +547,6 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=SearchFlowIntegrationTest
 ```
 
 Expected: **FAIL** —— `Tests run: 10`，第 1 例即因 `GET /api/posts/search` 返回 404 而断言失败（端点尚未实现）；第 2~4 例同样 404 而非 400。
-
-- [ ] **Step 1-5: 给 PostSummaryResponse 增加可空 snippet 字段**
-
-Modify `src/main/java/org/song/forum/dto/post/PostSummaryResponse.java:37`（`favorited` 字段之后、类结束 `}` 之前）追加：
-
-```java
-    /**
-     * 正文命中处的纯文本窗口（左右各 80 字符，未清洗 Markdown、不含省略号）。
-     * <p>只有全文搜索接口会填：搜索页需要在标题下方展示「正文命中上下文」，
-     * 而列表 DTO 刻意不带完整正文（避免搜索页响应膨胀）。标题命中且正文不含
-     * 关键词时为 {@code ""}（前端据此不渲染片段行），其它列表接口保持 {@code null}。</p>
-     */
-    private String snippet;
-```
-
-Run:
-
-```bash
-cd /e/JavaSpace/forum && mvn -B test-compile
-```
-
-Expected: **PASS** —— 编译通过（`PostDetailResponse.of` 显式逐字段复制，不受新字段影响）。
 
 - [ ] **Step 1-6: 实现 PostService.search 与三个私有工具**
 
@@ -2456,17 +2456,17 @@ Expected: 工作区干净；顶部 6 条提交依次为「回填」「文档」�
 | --- | --- |
 | §1 目标：独立搜索页 + 顶栏入口 + 公开接口 + V3 索引 + 测试/文档/验收 | Task 1（接口与索引）、Task 2（高亮/片段工具）、Task 3（入口与页面）、Task 4（文档）、Task 5（验证与上线） |
 | §1 非目标：中文分词、相关度评分、搜索建议、标签/作者/评论搜索、首页板块内过滤 | 明确不做：Task 5 Step 9 不涉及；§5.1 记 T13（首页不转义）、T14（无分词无相关度）；§3.4 只加一个 `/search` 端点 |
-| §4.1 契约（keyword 必填 1~50 code point、page/size 默认与夹取、4 类 400、`Result<PageResponse<PostSummaryResponse>>`） | Task 1 Step 1-4（用例 1~4、8）与 Step 1-6/1-7；Task 4 Step 4-4（文档契约表） |
+| §4.1 契约（keyword 必填 1~50 code point、page/size 默认与夹取、4 类 400、`Result<PageResponse<PostSummaryResponse>>`） | Task 1 Step 1-5（用例 1~4、8）与 Step 1-6/1-7；Task 4 Step 4-4（文档契约表） |
 | §4.2 `searchByKeyword`（JPQL 逐字、EntityGraph、无排序 Pageable、不 join tags） | Task 1 Step 1-2（JPQL 逐字）与 Step 1-6（`PageRequest.of(safePage, safeSize)`） |
 | §4.3 `search(...)` 与私有 static 工具（normalize/escapeLike） | Task 1 Step 1-6 |
 | §4.4 控制器（`GET /search` 放 list 之后、detail 之前；两侧夹取） | Task 1 Step 1-7（含位置说明） |
-| §4.5 V3 迁移（逐字 SQL）+ H2 测试隔离（`spring.flyway.enabled=false`） | Task 1 Step 1-3（SQL 逐字）、Step 1-1（RepositoryTests properties）；Step 1-4 的集成测试同样带该属性；Task 5 Step 5-8 验证真实执行 |
+| §4.5 V3 迁移（逐字 SQL）+ H2 测试隔离（`spring.flyway.enabled=false`） | Task 1 Step 1-3（SQL 逐字）、Step 1-1（RepositoryTests properties）；Step 1-5 的集成测试同样带该属性；Task 5 Step 5-8 验证真实执行 |
 | §5.1 `postApi.search` | Task 3 Step 3-1/3-2 |
 | §5.2 `highlightSegments` / `buildSnippet`（indexOf、无正则、Markdown 轻量清洗、窗口 + 省略号） | Task 2 Step 2-1/2-2（12 例覆盖每一条规则） |
 | §5.3 `HeaderSearch.vue`（220px、maxlength、回车/图标、同页同词不重复、窄屏图标、watch URL、App.vue 标签之后、零 @media） | Task 3 Step 3-3/3-4/3-10；样式只写固定宽度，无媒体查询 |
 | §5.4 `SearchView.vue`（`/search?q=`、replace、内部 page、计数、PostListItem、三空态、requestSeq、usePostActions） | Task 3 Step 3-5/3-6（8 例逐一对应） |
 | §5.5 `PostListItem` 可选 `keyword`/`snippet`、`<mark class="hit">`、首页/标签页行为不变 | Task 3 Step 3-8/3-9；props 默认空串，首页与标签页不传 |
-| §6.1 后端 10 例 + RepositoryTests 1 例 | Task 1 Step 1-4（10 个 `@Order` 方法）与 Step 1-1（仓库用例） |
+| §6.1 后端 10 例 + RepositoryTests 1 例 | Task 1 Step 1-5（10 个 `@Order` 方法）与 Step 1-1（仓库用例） |
 | §6.2 前端 3 个新 spec + 更新 `PostListItem`/`api` spec | Task 2 Step 2-1、Task 3 Step 3-1/3-3/3-5/3-8；期望值 28 spec / 239 例 |
 | §6.3 基线（后端 14 类/102 例、前端 28 spec/约 235 例、端点 36） | Task 4 Step 4-2/4-4（写实测 13 类/101 例、28 spec/239 例、36 端点）；差异见本记录第 4 节第 2 条 |
 | §7.1 三份文档的每一处改动 | Task 4 Step 4-1~4-8 |
@@ -2494,7 +2494,7 @@ Expected: 工作区干净；顶部 6 条提交依次为「回填」「文档」�
 | --- | --- | --- | --- |
 | `GET /api/posts/search` | Task 1 `PostController` | Task 3 `postApi.search`、Task 3 `SearchView`、Task 4 文档 §3.4、Task 5 冒烟 | ✅ |
 | `keyword` / `page` / `size` 参数名 | Task 1 Step 1-7 | Task 3 `postApi.search` 调用、Task 5 冒烟 URL | ✅ |
-| `PostSummaryResponse.snippet` | Task 1 Step 1-5 | Task 1 Step 1-6（`setSnippet`）、Task 1 Step 1-4（断言）、Task 3 `SearchView`（`p.snippet`）、Task 4 §3.4 | ✅ |
+| `PostSummaryResponse.snippet` | Task 1 Step 1-4 | Task 1 Step 1-6（`setSnippet`）、Task 1 Step 1-5（断言）、Task 3 `SearchView`（`p.snippet`）、Task 4 §3.4 | ✅ |
 | `PageResponse` 访问器 `content()/page()/size()/totalElements()/totalPages()/last()` | 既有 record | Task 1 集成测试断言 | ✅ |
 | `normalizeSearchKeyword` / `escapeLike` / `snippetOf` / `SNIPPET_RADIUS` | Task 1 Step 1-6 | 仅 `PostService.search` 内部调用 | ✅ |
 | `searchByKeyword(pattern, pageable)` | Task 1 Step 1-2 | Task 1 Step 1-6 服务调用、Step 1-1 仓库测试 | ✅ |
@@ -2503,7 +2503,7 @@ Expected: 工作区干净；顶部 6 条提交依次为「回填」「文档」�
 | `postApi.search(params)` | Task 3 Step 3-2 | Task 3 `SearchView`、`api/index.spec.js` 新用例 | ✅ |
 | 路由 `name: 'search'`、路径 `/search`、query 键 `q` | Task 3 Step 3-7 | `HeaderSearch`（push/replace）、`SearchView`（`route.query.q`）、Task 5 冒烟 | ✅ |
 | `.hit` / `.post-snippet` 类名 | Task 3 Step 3-9 样式 | 同 Step 模板与 spec 断言 | ✅ |
-| 错误文案「搜索关键词不能为空」「搜索关键词不能超过 50 个字符」 | Task 1 Step 1-6 | Task 1 Step 1-4 集成测试、Task 4 §3.4 契约表 | ✅ |
+| 错误文案「搜索关键词不能为空」「搜索关键词不能超过 50 个字符」 | Task 1 Step 1-6 | Task 1 Step 1-5 集成测试、Task 4 §3.4 契约表 | ✅ |
 | `SearchView` 三种空态文案 | Task 3 Step 3-6 模板 | Task 3 `SearchView.spec.js` 断言、Task 4 §3.5 页面说明 | ✅ |
 
 ### 4. 歧义与解决方式
