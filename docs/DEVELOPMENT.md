@@ -119,9 +119,9 @@ cd frontend && pnpm test --run
 | 第三轮 | Markdown 渲染 + 标签检索 | 7 | ✅ 已完成 | 2026-10-19 |
 | 部署工程化 | raspi：Jenkins + rootless podman + nginx 自动化部署（见 §4.7） | — | ✅ 已完成 | 2026-10-19 |
 | 第四轮 | 深色模式 + 头像上传 | 6 | ✅ 已完成 | 2026-10-20 |
-| 第五轮 | 全文搜索：搜索接口 + pg_trgm 索引 + 顶栏入口与搜索结果页 | 5 | ⏳ 待上线验收（Task 5） | — |
+| 第五轮 | 全文搜索：搜索接口 + pg_trgm 索引 + 顶栏入口与搜索结果页 | 5 | ✅ 已完成 | 2026-10-21 |
 
-**当前进度：MVP 100% ｜ 已完成 4 轮迭代，第五轮待上线验收。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 5 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
@@ -475,6 +475,14 @@ cd frontend && pnpm test --run
 - `posts.content` 没有长度上限，超长正文的片段截取与传输仍有成本（T15）。
 - 跨列 OR（标题或正文）可能让查询规划器放弃 GIN 索引；数据量继续增长时可拆成两条查询再 `UNION`（未立项）。
 
+上线验收（2026-10-21）：
+
+- 推送 `67c13a6` 后 Jenkins Build **#8** **SUCCESS**（镜像 `localhost/forum-backend:8`），`forum-backend` 重建后 `Up (healthy)`，仅监听 `127.0.0.1:8086`。
+- V3 由容器启动时的 Flyway 自动执行：`flyway_schema_history` 最新记录 `version=3 / description=post search trgm index / success=t`；`\dx pg_trgm` 显示 `pg_trgm 1.6` 已安装，`\d posts` 显示 `idx_posts_title_trgm`、`idx_posts_content_trgm` 两个 `gin` 部分索引（`WHERE deleted = false`）。`forum` 角色以非超级用户完成 `CREATE EXTENSION`（pg_trgm 为 trusted 扩展），未额外授权。
+- 冒烟：`/forum/api/health`、`/forum/api/posts/search?keyword=测试`（中文命中并返回 `snippet`，标题命中行为空串）、`/forum/search?q=Jenkins`（SPA 回退）均 200；空白关键词、缺参数、51 字符关键词均 400，返回 JSON 错误体。
+- `EXPLAIN`：在现有 17 篇帖子的数据量下走 `Seq Scan`，属预期（数据量低、关键词短，用不上 trigram 索引）。
+- 全量测试：后端 13 个测试类 / 105 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 28 个 spec / 274 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
+
 ---
 
 ## 5. 待办与后续计划
@@ -509,7 +517,7 @@ cd frontend && pnpm test --run
 | ~~标签检索页~~ ✅ 已完成 | 中 | 小 | 第三轮已交付：标签总览 + 按标签筛选帖子，两个公开 GET 接口（§4.8） |
 | ~~头像上传~~ ✅ 已完成 | 中 | 中 | 第四轮已交付：JPEG/PNG 校验 + EXIF 校正 + 256×256 裁剪、宿主机上传目录、全站头像展示与移除（§4.9） |
 | ~~深色模式~~ ✅ 已完成 | 低 | 小 | 第四轮已交付：双套设计令牌 + 跟随系统/手动切换 + 首屏防闪白（§4.9） |
-| ~~全文搜索~~ ✅ 已完成 | 中 | 中 | 第五轮已实现（代码与测试完成，待上线验收）：公开 `GET /api/posts/search` + pg_trgm GIN 部分索引、独立 `/search?q=` 结果页与顶栏入口（§4.10） |
+| ~~全文搜索~~ ✅ 已完成 | 中 | 中 | 第五轮已交付：公开 `GET /api/posts/search` + pg_trgm GIN 部分索引、独立 `/search?q=` 结果页与顶栏入口（§4.10） |
 | WebSocket 实时通知 | 中 | 大 | 目前是 120 秒轮询兜底 |
 
 第三轮已取前两项（见 §4.8），第四轮已取头像上传与深色模式（见 §4.9），第五轮已取全文搜索（见 §4.10）；其余候选（WebSocket 实时通知等）留待后续轮次，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
@@ -566,7 +574,8 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-21 | docs | 记录第五轮全文搜索功能（README、开发记录、部署手册） | 本次提交 |
+| 2026-10-21 | docs | 第五轮全文搜索上线验收（Build #8 成功、pg_trgm 索引与冒烟实测）与变更日志回填 | 本次提交 |
+| 2026-10-21 | docs | 记录第五轮全文搜索功能（README、开发记录、部署手册） | `67c13a6` |
 | 2026-10-21 | fix | 修正搜索框码点上限与同词回车短路 | `debe1d7` |
 | 2026-10-21 | fix | 修正搜索页状态清理与顶栏搜索交互细节 | `4f59db8` |
 | 2026-10-21 | feat | 第五轮搜索前端：`postApi.search`、顶栏 `HeaderSearch`、`/search` 结果页、命中词高亮与正文片段 | `aac049b` |
@@ -578,19 +587,19 @@ cd frontend && pnpm test --run
 | 2026-10-21 | feat | 第五轮全文搜索后端：`GET /api/posts/search`、标题优先排序、pg_trgm 索引与测试隔离 | `5fa2644` |
 | 2026-10-21 | docs | 新增第五轮全文搜索实现计划 | `070c3c4` |
 | 2026-10-21 | docs | 记录第五轮全文搜索设计 | `ad8ad9e` |
-| 2026-10-20 | docs | 第四轮上线验收记录（Build #6 成功、头像全链路实测）与变更日志回填 | 本次提交 |
+| 2026-10-20 | docs | 第四轮上线验收记录（Build #6 成功、头像全链路实测）与变更日志回填 | `b3533e7` |
 | 2026-10-20 | docs | 记录第四轮深色模式与头像上传功能（README、开发记录、部署手册） | `dc961a5` |
 | 2026-10-20 | chore | 部署支持头像上传目录：`UPLOAD_HOST_DIR` 卷、目录创建与属主/权限修正、nginx `/forum/uploads/` 直出 | `85940c3` |
 | 2026-10-20 | feat | 第四轮头像上传前端：资料页上传/移除、全站 `UserAvatar`、站内 URL 拼接与失败回退 | `c171279` |
 | 2026-10-20 | feat | 第四轮头像上传后端：`POST/DELETE /api/users/me/avatar`、魔数校验 + EXIF 校正 + 256×256 裁剪、原子落盘 | `6fad63c` |
 | 2026-10-20 | feat | 第四轮深色模式：双套设计令牌、跟随系统/手动切换、首屏防闪白、暗色代码高亮 | `1e3b94c` |
 | 2026-10-19 | feat | 第三轮功能：Markdown 渲染 + 标签检索（`7e0f9ab` 工具与样式、`3089446` 详情页、`936347e` 编辑页预览、`1bbd026` 标签接口、`aacc70e` 标签页与公共帖子行） | `7e0f9ab`/`3089446`/`936347e`/`1bbd026`/`aacc70e` |
-| 2026-10-19 | docs | 部署验收记录（Build #2 成功与实测结果）与变更日志回填 | 本次提交 |
+| 2026-10-19 | docs | 部署验收记录（Build #2 成功与实测结果）与变更日志回填 | `5a81f3f` |
 | 2026-10-19 | fix | 适配 raspi 无内存 cgroup：去掉 compose `mem_limit`，`JAVA_OPTS` 改显式 `-Xmx512m`，`deploy.sh` 启动后立校验容器状态 | `771990d` |
 | 2026-10-19 | feat | 部署环境化：raspi Jenkins + rootless podman + nginx 自动化部署（运行时单阶段 Dockerfile、podman-compose 兼容 compose、Jenkinsfile + deploy.sh + nginx snippet、复用主机 Postgres、子路径 `/forum/` 发布） | `1554869` |
 | 2026-10-18 | fix | 修复 `base` 非法值（Vite 静默降级为 `/`）：改为 `VITE_BASE_PATH` 可控，路由与 axios 前缀统一由 `BASE_URL` 派生，新增 `viteConfig.spec.js` 6 个守卫 | `8c687ac` |
 | 2026-10-18 | feat | 后端容器化：新增 `Dockerfile`（多阶段 + 分层 + 非 root + 健康检查）、`.dockerignore`、`docker-compose.yml`，并在 README 增加「运行（Docker）」章节 | `830651e` |
-| 2026-10-18 | docs | 补充变更日志的自引用说明与提交数同步规则 | 本次提交 |
+| 2026-10-18 | docs | 补充变更日志的自引用说明与提交数同步规则 | `cbb7cad` |
 | 2026-10-18 | docs | 补全变更日志至覆盖全部提交（原漏记 16 条） | `ddfb4e0` |
 | 2026-10-18 | docs | 回填开发记录文档的提交哈希 | `8b30458` |
 | 2026-10-18 | docs | 新增本开发记录文档，作为项目进度的单一事实来源 | `6587de6` |
