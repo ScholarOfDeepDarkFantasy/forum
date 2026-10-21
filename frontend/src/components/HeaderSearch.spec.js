@@ -65,7 +65,8 @@ describe('HeaderSearch', () => {
 
     const input = wrapper.find('input.search-input')
     expect(input.attributes('placeholder')).toBe('搜索帖子')
-    expect(input.attributes('maxlength')).toBe('50')
+    // 码元上限放宽到 100，码点上限 50 由 submit 校验（见下方码点限长用例）
+    expect(input.attributes('maxlength')).toBe('100')
 
     await input.setValue('java')
     await input.trigger('keyup.enter')

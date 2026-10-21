@@ -69,9 +69,11 @@ async function load() {
 
 function submit() {
   const q = input.value.trim()
-  // 与服务端一致：按 Unicode 码点计 1~50（maxlength 只按 UTF-16 码元截断，
-  // emoji 等代理对字符会被少算，所以这里再按码点挡一次）
+  // 与服务端一致：按 Unicode 码点计 1~50。UI 的 maxlength 按 UTF-16 码元计数，
+  // 放宽到 100 个码元（避免 25 个 emoji 就被输入框截断），真正上限由下面的码点校验兜底
   if (!q || Array.from(q).length > 50) return
+  // 关键词没变：不重复 replace，也不重新加载（与顶栏搜索保持一致）
+  if (route.query.q === q) return
   // 交给 watch(keyword) 统一触发加载：replace 不新增历史记录，连续搜索不会塞满后退按钮
   router.replace({ name: 'search', query: { q } })
 }
@@ -119,7 +121,7 @@ load()
         <el-input
           v-model="input"
           placeholder="搜索帖子标题/内容…"
-          maxlength="50"
+          maxlength="100"
           clearable
           class="search-input"
           @keyup.enter="submit"

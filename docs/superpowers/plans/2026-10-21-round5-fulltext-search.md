@@ -2472,10 +2472,10 @@ Expected: 提交成功；`git status` 干净；`git show --stat HEAD` 显示 10 
 3. **计数加载门禁**：`共 N 条结果` 的渲染条件加 `!loading`，请求中不再短暂显示「共 0 条结果」。
 4. **`@clear` 语义**：原 `@clear="submit"` 是 no-op（ElInput 先清空 model，submit 读到空白直接 return）。按「清空即回到空搜索页」的意图改为 `onClear()`：仅在 `route.name === 'search'` 时 `router.push({ name: 'search' })` 回空态，其他页面不动；Enter/图标仍走 `submit`。**偏差决策**：任务描述给的是 push 回空态，故保留 push（不 replace），并注册 HeaderSearch 的 clear 用例固化。
 5. **卫生**：更正 `HeaderSearch.vue` 中「space-between 之外」的过期注释（现为 `flex-start` + `.nav-actions` 的 `margin-left:auto`）；删除无样式的 `search-btn` class。
-6. **码点限长**：客户端按 `Array.from(q).length` 计 1–50 个 Unicode 码点（`maxlength="50"` 只数 UTF-16 码元，emoji 会被少算），与服务端 `PostService` 的 `codePointCount(0, length) > 50` 对齐；HeaderSearch 与 SearchView 的提交路径统一，超限静默忽略（不新增提示组件，与计划「失败提示保持极简」一致）。
-7. **测试补齐**：SearchView 8→18、HeaderSearch 5→9、PostListItem 4→8，共新增 16 例（空 q 清错误态/作废在途、分页与重试保草稿、加载中不渲染计数、单页不分页、空白 q、同词不重复、码点限长（51 ASCII 拒绝 / 50 emoji 通过）、快速翻页过期响应、清空跳转与非搜索页不跳转、XSS 纯文本防护、关键词未命中不高亮、窄屏 aria-label）。先写测试：隐藏实现改动后 8 例失败（push 未调用、错误态残留、loading 残留、草稿被覆盖、计数在加载中渲染），恢复实现后转绿。
+6. **码点限长**：客户端按 `Array.from(q).length` 计 1–50 个 Unicode 码点，与服务端 `PostService` 的 `codePointCount(0, length) > 50` 对齐；HeaderSearch 与 SearchView 的提交路径统一，超限静默忽略（不新增提示组件，与计划「失败提示保持极简」一致）。复核补充：`maxlength="50"` 按 UTF-16 码元截断会让 26–50 个码点的 emoji 查询在输入阶段就被截断（真实用户只能输入 25 个 emoji），故两处 `maxlength` 放宽为 `100`，1–50 码点的真正上限仍由 `submit` 的码点校验兜底。
+7. **测试补齐**：SearchView 8→18、HeaderSearch 5→9、PostListItem 6→8，共新增 16 例（空 q 清错误态/作废在途、分页与重试保草稿、加载中不渲染计数、单页不分页、空白 q、同词不重复、码点限长（51 ASCII 拒绝 / 50 emoji 通过）、快速翻页过期响应、清空跳转与非搜索页不跳转、XSS 纯文本防护、关键词未命中不高亮、窄屏 aria-label）。先写测试：隐藏实现改动后 8 例失败（push 未调用、错误态残留、loading 残留、草稿被覆盖、计数在加载中渲染），恢复实现后转绿。复核后补强：同词用例显式断言 `replace` 未被调用——由此暴露出 SearchView 的 `submit()` 原本缺少「关键词未变则短路」判断（同词回车会再 `replace` 一次），已补上与 HeaderSearch 一致的 `route.query.q === q` 短路；并补 SearchView 自身清空按钮用例。
 
-结果：`cd frontend && pnpm test` → **28 个 spec / 273 个用例**全绿；`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 成功（仅既有 >500kB chunk 警告）；`breakpoint` 仍为 6 处 `@media (max-width: 768px)`，未新增依赖、未使用 `v-html`。计划上文 Step 3-1/3-3/3-5/3-8 的 spec 片段按上述行为同步，测试计数基线统一为 273。
+结果：`cd frontend && pnpm test` → **28 个 spec / 274 个用例**全绿；`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 成功（仅既有 >500kB chunk 警告）；`breakpoint` 仍为 6 处 `@media (max-width: 768px)`，未新增依赖、未使用 `v-html`。计划上文 Step 3-1/3-3/3-5/3-8 的 spec 片段按上述行为同步，测试计数基线统一为 273。
 
 ---
 

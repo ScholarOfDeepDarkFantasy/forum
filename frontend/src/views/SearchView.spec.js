@@ -21,9 +21,10 @@ const stubs = {
   'el-card': { template: '<div><slot name="header" /><slot /></div>' },
   'el-input': {
     props: ['modelValue', 'placeholder', 'maxlength'],
-    emits: ['update:modelValue'],
+    emits: ['update:modelValue', 'clear'],
+    // 模拟 ElInput 的 clear：先清空 v-model，再 emit('clear')
     template:
-      '<div class="stub-input"><input class="search-input" :value="modelValue" :placeholder="placeholder" :maxlength="maxlength" @input="$emit(\'update:modelValue\', $event.target.value)" /><slot name="append" /></div>'
+      '<div class="stub-input"><input class="search-input" :value="modelValue" :placeholder="placeholder" :maxlength="maxlength" @input="$emit(\'update:modelValue\', $event.target.value)" /><button class="stub-clear" @click="$emit(\'update:modelValue\', \'\'); $emit(\'clear\')" /><slot name="append" /></div>'
   },
   'el-button': { template: '<button class="stub-btn"><slot /></button>' },
   'el-empty': { props: ['description'], template: '<div class="empty">{{ description }}</div>' },
@@ -397,6 +398,23 @@ describe('SearchView', () => {
     await flush()
 
     expect(postApi.search).toHaveBeenCalledTimes(1)
+    // replace mock 不会改 route.query，若 submit 继续走下去这里仍会记录一次 replace，
+    // 所以必须显式断言没跳转，否则用例在「同词重复提交」回归时仍会绿
+    expect(replace).not.toHaveBeenCalled()
+  })
+
+  it('点击输入框清空按钮回到空搜索页并去掉地址栏关键词', async () => {
+    route.query = { q: '全文' }
+    route.fullPath = '/search?q=全文'
+    postApi.search.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0 })
+
+    const wrapper = mountSearch()
+    await flush()
+
+    await wrapper.find('.stub-clear').trigger('click')
+    await flush()
+
+    expect(replace).toHaveBeenCalledWith({ name: 'search' })
   })
 
   it('关键词按 Unicode 码点限长 50：51 个 ASCII 不提交，50 个 emoji 可提交', async () => {

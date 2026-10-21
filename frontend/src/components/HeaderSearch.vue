@@ -12,8 +12,8 @@ const keyword = ref('')
 
 function submit() {
   const q = keyword.value.trim()
-  // 与服务端一致：按 Unicode 码点计 1~50（maxlength 只按 UTF-16 码元截断，
-  // emoji 等代理对字符会被少算，所以这里再按码点挡一次）
+  // 与服务端一致：按 Unicode 码点计 1~50。UI 的 maxlength 按 UTF-16 码元计数，
+  // 放宽到 100 个码元（避免 25 个 emoji 就被输入框截断），真正上限由下面的码点校验兜底
   if (!q || Array.from(q).length > 50) return
   // 已在搜索页且关键词不变：不重复 push，避免历史记录里堆同样地址
   if (route.name === 'search' && route.query.q === q) return
@@ -51,7 +51,7 @@ watch(
       v-if="!isMobile"
       v-model="keyword"
       placeholder="搜索帖子"
-      maxlength="50"
+      maxlength="100"
       clearable
       class="search-box"
       @keyup.enter="submit"
