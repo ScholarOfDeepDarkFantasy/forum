@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 第五轮全文搜索接口集成测试（H2 + 随机端口）：
  * 游客可搜 → 4 类 400 → 标题优先 → 正文命中与软删除 → 分页 → 参数夹取 → 通配符转义 → 时间倒序
+ * → 片段不劈开代理对 → 长度按 code point → 大小写不敏感 → 非搜索响应不含 snippet 键
  * <p>每个用例用自己的关键词与独立帖子，避免用例间数据互相命中。</p>
  */
 @ActiveProfiles("test")
@@ -287,5 +288,96 @@ class SearchFlowIntegrationTest {
         PageResponse<PostSummaryResponse> page = search("keyword=" + encode("时间排序词")).getBody().getData();
 
         assertThat(page.content()).extracting(PostSummaryResponse::getId).containsExactly(newer, older);
+    }
+
+    /**
+     * 片段窗口必须落在 code point 边界上：UTF-16 下标切割会把 emoji/生僻字劈成两半，
+     * 留下落单的 high/low surrogate（序列化成 JSON 会变成替换字符或直接报错）。
+     * <p>正文构造：窗口 start 正好落在 emoji 的 low surrogate 上——不吸附时片段以
+     * 半个 emoji 开头。关键词放在后面，保证 index 的计算不因 emoji 而偏移。</p>
+     */
+    @Test
+    @Order(11)
+    void snippetWindowDoesNotSplitSurrogatePairs() {
+        String content = "x".repeat(80) + "😀" + "z".repeat(79) + "KEYWORD" + "y".repeat(100);
+        Long postId = createPost(userToken, "片段边界验证", content);
+
+        PageResponse<PostSummaryResponse> page = search("keyword=KEYWORD&page=0&size=10").getBody().getData();
+        assertThat(page.content()).extracting(PostSummaryResponse::getId).contains(postId);
+
+        PostSummaryResponse hit = page.content().stream()
+                .filter(p -> postId.equals(p.getId()))
+                .findFirst()
+                .orElseThrow();
+        String snippet = hit.getSnippet();
+
+        assertThat(Character.isLowSurrogate(snippet.charAt(0)))
+                .as("片段不应以落单的 low surrogate 开头")
+                .isFalse();
+        assertThat(Character.isHighSurrogate(snippet.charAt(snippet.length() - 1)))
+                .as("片段不应以落单的 high surrogate 结尾")
+                .isFalse();
+        // 窗口 start 吸附回 emoji 起点后，片段从 emoji 开始：emoji + 79z + KEYWORD + 80y（UTF-16 长度 168）；
+        // 不吸附时片段以半个 emoji（落单 low surrogate）开头。
+        assertThat(snippet).startsWith("😀" + "z".repeat(79) + "KEYWORD");
+        assertThat(snippet).hasSize(168);
+        assertNoLoneSurrogate(snippet);
+    }
+
+    /**
+     * 长度上限按 code point 计：30 个 emoji 的 UTF-16 length 是 60，但只有 30 个字符，必须放行；
+     * 60 个 emoji 才是真的超过 50 个字符。
+     */
+    @Test
+    @Order(12)
+    void keywordLengthLimitCountsCodePointsNotUtf16Units() {
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> thirty = search("keyword=" + encode("😀".repeat(30)));
+        assertThat(thirty.getStatusCode().value()).isEqualTo(200);
+
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> sixty = search("keyword=" + encode("😀".repeat(60)));
+        assertThat(sixty.getStatusCode().value()).isEqualTo(400);
+        assertThat(sixty.getBody().getMessage()).contains("不能超过 50 个字符");
+    }
+
+    @Test
+    @Order(13)
+    void searchIsCaseInsensitiveAcrossTitleAndContent() {
+        Long postId = createPost(userToken, "java 入门", "从零开始学 Java 语法");
+
+        assertThat(search("keyword=" + encode("JAVA")).getBody().getData().content())
+                .extracting(PostSummaryResponse::getId).contains(postId);
+        assertThat(search("keyword=" + encode("Java")).getBody().getData().content())
+                .extracting(PostSummaryResponse::getId).contains(postId);
+    }
+
+    /**
+     * snippet 只属于搜索接口：既有列表/详情接口的 JSON 不能多出 "snippet": null，
+     * 否则前端契约与快照都会变。搜索接口仍显式返回空串（标题命中、正文不含关键词）。
+     */
+    @Test
+    @Order(14)
+    void snippetFieldIsAbsentFromNonSearchResponses() {
+        Long postId = createPost(userToken, "片段字段验证", "正文不含关键词");
+
+        ResponseEntity<String> list = rest.getForEntity(url("/api/posts?size=50"), String.class);
+        assertThat(list.getStatusCode().value()).isEqualTo(200);
+        assertThat(list.getBody()).doesNotContain("\"snippet\"");
+
+        ResponseEntity<String> detail = rest.getForEntity(url("/api/posts/" + postId), String.class);
+        assertThat(detail.getStatusCode().value()).isEqualTo(200);
+        assertThat(detail.getBody()).doesNotContain("\"snippet\"");
+
+        PageResponse<PostSummaryResponse> page = search("keyword=" + encode("片段字段验证")).getBody().getData();
+        assertThat(page.content().get(0).getSnippet()).isEmpty();
+        ResponseEntity<String> searchBody = rest.getForEntity(
+                URI.create(url("/api/posts/search?keyword=" + encode("片段字段验证"))), String.class);
+        assertThat(searchBody.getBody()).contains("\"snippet\":\"\"");
+    }
+
+    /** 逐 code point 检查：合法代理对会被 codePoints() 合并成 >0xFFFF 的值，只有落单代理才会落在 0xD800~0xDFFF。 */
+    private static void assertNoLoneSurrogate(String snippet) {
+        snippet.codePoints().forEach(cp -> assertThat(cp >= 0xD800 && cp <= 0xDFFF)
+                .as("片段含未配对的代理字符: U+%04X", cp)
+                .isFalse());
     }
 }

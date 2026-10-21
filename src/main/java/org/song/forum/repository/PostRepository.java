@@ -37,7 +37,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     /**
      * 全文搜索分页第一步：只取骨架，不 join tags 集合（原因同 {@link #searchIds}）。
      * pattern 由 service 层做过 LIKE 通配符转义（! % _ → !x），SQL 用 ESCAPE '!'。
-     * 排序：标题命中优先（CASE 0/1），同档按 createTime 倒序；置顶不加权。
+     * 排序：标题命中优先（CASE 0/1），同档按 createTime 倒序、id 倒序；置顶不加权。
+     * 追加 id 是兜底：createTime 相同（批量导入/同微秒）时，仅按时间排序在 PostgreSQL
+     * 下顺序不稳定，翻页会出现重复或漏行。
      */
     @Query("""
             SELECT p FROM Post p
@@ -45,7 +47,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
               AND (LOWER(p.title) LIKE CONCAT('%', :pattern, '%') ESCAPE '!'
                    OR LOWER(p.content) LIKE CONCAT('%', :pattern, '%') ESCAPE '!')
             ORDER BY CASE WHEN LOWER(p.title) LIKE CONCAT('%', :pattern, '%') ESCAPE '!' THEN 0 ELSE 1 END,
-                     p.createTime DESC
+                     p.createTime DESC, p.id DESC
             """)
     @EntityGraph(attributePaths = {"board", "author"})
     Page<Post> searchByKeyword(@Param("pattern") String pattern, Pageable pageable);

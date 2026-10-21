@@ -1,5 +1,6 @@
 package org.song.forum.dto.post;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Data;
 
@@ -41,6 +42,9 @@ public class PostSummaryResponse {
      * <p>只有全文搜索接口会填：搜索页需要在标题下方展示「正文命中上下文」，
      * 而列表 DTO 刻意不带完整正文（避免搜索页响应膨胀）。标题命中且正文不含
      * 关键词时为 {@code ""}（前端据此不渲染片段行），其它列表接口保持 {@code null}。</p>
+     * <p>NON_NULL 保证列表/我的帖子/收藏/详情等既有接口的 JSON 里不出现 {@code "snippet": null}，
+     * 这些接口的响应与加字段前保持逐字节一致。</p>
      */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String snippet;
 }

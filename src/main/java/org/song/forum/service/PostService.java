@@ -158,7 +158,7 @@ public class PostService {
     }
 
     /**
-     * 全文搜索：标题命中优先，同档按创建时间倒序。
+     * 全文搜索：标题命中优先，同档按创建时间倒序、时间相同再按 id 倒序。
      * <p>关键词去首尾空白后必须是 1~50 个 code point；page 负数按 0，size 夹到 1~50。
      * 这里再夹取一次 size 是防御性的：controller 也夹了一次，service 作为公开方法
      * 不依赖调用方已经处理过。</p>
@@ -300,6 +300,8 @@ public class PostService {
      * <p>这里只截窗口：不清洗 Markdown、不加省略号——清洗、省略号与高亮统一由前端
      * {@code utils/search.js} 的 {@code buildSnippet} 完成，避免同一套规则在两种语言里各写一遍。
      * 正文不含关键词（标题命中）时返回空串。</p>
+     * <p>窗口端点会吸附到 code point 边界：UTF-16 下标可能切在代理对中间，
+     * 留下落单的 surrogate（序列化时变替换字符）。吸附后最多多保留一个字符。</p>
      */
     private static String snippetOf(String content, String keyword) {
         if (content == null || content.isEmpty() || keyword.isEmpty()) {
@@ -311,6 +313,14 @@ public class PostService {
         }
         int start = Math.max(0, index - SNIPPET_RADIUS);
         int end = Math.min(content.length(), index + keyword.length() + SNIPPET_RADIUS);
+        // start 落在 low surrogate 上说明前一个 code point 被切开了，回退一格包含完整的代理对
+        if (start > 0 && Character.isLowSurrogate(content.charAt(start))) {
+            start--;
+        }
+        // end 的前一个字符是 high surrogate 说明最后一个 code point 被切开了，前进一格补齐
+        if (end < content.length() && Character.isHighSurrogate(content.charAt(end - 1))) {
+            end++;
+        }
         return content.substring(start, end);
     }
 

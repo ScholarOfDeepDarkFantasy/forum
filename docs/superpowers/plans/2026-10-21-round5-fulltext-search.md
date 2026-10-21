@@ -15,7 +15,7 @@
 - 不新增后端/前端依赖；不动 `Dockerfile`、`docker-compose.yml`、`deploy/nginx/`、`deploy/deploy.sh`（V3 在容器启动时由 Flyway 自动执行）。
 - 新增/修改的 `.vue`、`.css` **不得出现任何 `@media`**：`frontend/src/styles/breakpoint.spec.js` 要求全 `src` 恰好 6 处 `@media (max-width: 768px)`，且禁止 `min-width`。
 - 判空、命名、注释风格对齐既有代码（中文注释解释「为什么」，不解释「做了什么」）；所有文件 LF + UTF-8。
-- 数量为估算：后端预期 **13 个测试类 / 101 个用例**（spec §6.3 写 14 类/约 102 例，差异见 Self-Review），前端预期 **28 个 spec / 约 239 例**；**以实测为准**，实测与估算不一致时按 Task 5 Step 9 的规则先改文档。
+- 数量为估算：后端预期 **13 个测试类 / 105 个用例**（spec §6.3 写 14 类/约 102 例，差异见 Self-Review；含 Task 1 质量修复新增的 4 个搜索用例），前端预期 **28 个 spec / 约 239 例**；**以实测为准**，实测与估算不一致时按 Task 5 Step 9 的规则先改文档。
 
 **设计文档：** `docs/superpowers/specs/2026-10-21-round5-fulltext-search-design.md`
 
@@ -28,16 +28,16 @@
 | 文件 | 职责 |
 |---|---|
 | `src/main/resources/db/migration/V3__post_search_trgm_index.sql` | `CREATE EXTENSION IF NOT EXISTS pg_trgm` + 标题/正文两个 GIN 部分索引（`WHERE deleted = false`） |
-| `src/test/java/org/song/forum/controller/SearchFlowIntegrationTest.java` | `GET /api/posts/search` 的 10 个集成用例（契约 400、排序、分页、转义、软删除） |
+| `src/test/java/org/song/forum/controller/SearchFlowIntegrationTest.java` | `GET /api/posts/search` 的 14 个集成用例（契约 400、排序、分页、转义、软删除、片段 code point 边界、大小写、既有响应无 `snippet` 键） |
 
 ### 后端（修改）
 
 | 文件 | 改动 |
 |---|---|
-| `src/main/java/org/song/forum/repository/PostRepository.java` | 新增 `searchByKeyword(pattern, pageable)`：标题/正文 `LIKE ... ESCAPE '!'` + CASE 标题优先 + `createTime DESC` |
+| `src/main/java/org/song/forum/repository/PostRepository.java` | 新增 `searchByKeyword(pattern, pageable)`：标题/正文 `LIKE ... ESCAPE '!'` + CASE 标题优先 + `createTime DESC, id DESC` |
 | `src/main/java/org/song/forum/service/PostService.java` | 新增 `search(...)`、`normalizeSearchKeyword`、`escapeLike`、`snippetOf`、`SNIPPET_RADIUS` |
 | `src/main/java/org/song/forum/controller/PostController.java` | 新增 `GET /search`（插在 `list` 之后、`/{id}` 之前） |
-| `src/main/java/org/song/forum/dto/post/PostSummaryResponse.java` | 新增可空 `snippet`：仅搜索接口填充 |
+| `src/main/java/org/song/forum/dto/post/PostSummaryResponse.java` | 新增可空 `snippet`：仅搜索接口填充；`@JsonInclude(NON_NULL)` 保证其它接口 JSON 不出现该键 |
 | `src/test/java/org/song/forum/repository/RepositoryTests.java` | `@DataJpaTest` 增加 `spring.flyway.enabled=false`；新增 1 个 `searchByKeyword` 用例 |
 
 ### 前端（新增）
@@ -66,7 +66,7 @@
 
 | 文件 | 改动 |
 |---|---|
-| `README.md` | 功能清单加全文搜索、测试基线 13/101 与 28/239、已知限制加中文子串匹配、目录结构加 `HeaderSearch`/搜索工具 |
+| `README.md` | 功能清单加全文搜索、测试基线 13/105 与 28/239、已知限制加中文子串匹配、目录结构加 `HeaderSearch`/搜索工具 |
 | `docs/DEVELOPMENT.md` | §2.2 第五轮、§3.1/§3.2 基线、§3.3 加 V3、§3.4 36 个端点 + 搜索契约、§3.5 加 `/search`、新增 §4.10、§5.1 加 T13/T14/T15、§5.2 标记完成、§7 决策、§8 变更日志 |
 | `docs/deployment/README.md` | §4 回滚加 drop 索引、§5 加 V3 索引验证、§7 已知限制加「1–2 字查询顺序扫描」 |
 
@@ -172,7 +172,9 @@ Modify `src/main/java/org/song/forum/repository/PostRepository.java:33-35`（`se
     /**
      * 全文搜索分页第一步：只取骨架，不 join tags 集合（原因同 {@link #searchIds}）。
      * pattern 由 service 层做过 LIKE 通配符转义（! % _ → !x），SQL 用 ESCAPE '!'。
-     * 排序：标题命中优先（CASE 0/1），同档按 createTime 倒序；置顶不加权。
+     * 排序：标题命中优先（CASE 0/1），同档按 createTime 倒序、id 倒序；置顶不加权。
+     * 追加 id 是兜底：createTime 相同（批量导入/同微秒）时，仅按时间排序在 PostgreSQL
+     * 下顺序不稳定，翻页会出现重复或漏行。
      */
     @Query("""
             SELECT p FROM Post p
@@ -180,7 +182,7 @@ Modify `src/main/java/org/song/forum/repository/PostRepository.java:33-35`（`se
               AND (LOWER(p.title) LIKE CONCAT('%', :pattern, '%') ESCAPE '!'
                    OR LOWER(p.content) LIKE CONCAT('%', :pattern, '%') ESCAPE '!')
             ORDER BY CASE WHEN LOWER(p.title) LIKE CONCAT('%', :pattern, '%') ESCAPE '!' THEN 0 ELSE 1 END,
-                     p.createTime DESC
+                     p.createTime DESC, p.id DESC
             """)
     @EntityGraph(attributePaths = {"board", "author"})
     Page<Post> searchByKeyword(@Param("pattern") String pattern, Pageable pageable);
@@ -230,9 +232,14 @@ Modify `src/main/java/org/song/forum/dto/post/PostSummaryResponse.java:37`（`fa
      * <p>只有全文搜索接口会填：搜索页需要在标题下方展示「正文命中上下文」，
      * 而列表 DTO 刻意不带完整正文（避免搜索页响应膨胀）。标题命中且正文不含
      * 关键词时为 {@code ""}（前端据此不渲染片段行），其它列表接口保持 {@code null}。</p>
+     * <p>NON_NULL 保证列表/我的帖子/收藏/详情等既有接口的 JSON 里不出现 {@code "snippet": null}，
+     * 这些接口的响应与加字段前保持逐字节一致。</p>
      */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private String snippet;
 ```
+
+同时新增 import：`import com.fasterxml.jackson.annotation.JsonInclude;`（放在 `lombok` import 之前）。
 
 Run:
 
@@ -284,6 +291,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 第五轮全文搜索接口集成测试（H2 + 随机端口）：
  * 游客可搜 → 4 类 400 → 标题优先 → 正文命中与软删除 → 分页 → 参数夹取 → 通配符转义 → 时间倒序
+ * → 片段不劈开代理对 → 长度按 code point → 大小写不敏感 → 非搜索响应不含 snippet 键
  * <p>每个用例用自己的关键词与独立帖子，避免用例间数据互相命中。</p>
  */
 @ActiveProfiles("test")
@@ -537,6 +545,97 @@ class SearchFlowIntegrationTest {
 
         assertThat(page.content()).extracting(PostSummaryResponse::getId).containsExactly(newer, older);
     }
+
+    /**
+     * 片段窗口必须落在 code point 边界上：UTF-16 下标切割会把 emoji/生僻字劈成两半，
+     * 留下落单的 high/low surrogate（序列化成 JSON 会变成替换字符或直接报错）。
+     * <p>正文构造：窗口 start 正好落在 emoji 的 low surrogate 上——不吸附时片段以
+     * 半个 emoji 开头。关键词放在后面，保证 index 的计算不因 emoji 而偏移。</p>
+     */
+    @Test
+    @Order(11)
+    void snippetWindowDoesNotSplitSurrogatePairs() {
+        String content = "x".repeat(80) + "😀" + "z".repeat(79) + "KEYWORD" + "y".repeat(100);
+        Long postId = createPost(userToken, "片段边界验证", content);
+
+        PageResponse<PostSummaryResponse> page = search("keyword=KEYWORD&page=0&size=10").getBody().getData();
+        assertThat(page.content()).extracting(PostSummaryResponse::getId).contains(postId);
+
+        PostSummaryResponse hit = page.content().stream()
+                .filter(p -> postId.equals(p.getId()))
+                .findFirst()
+                .orElseThrow();
+        String snippet = hit.getSnippet();
+
+        assertThat(Character.isLowSurrogate(snippet.charAt(0)))
+                .as("片段不应以落单的 low surrogate 开头")
+                .isFalse();
+        assertThat(Character.isHighSurrogate(snippet.charAt(snippet.length() - 1)))
+                .as("片段不应以落单的 high surrogate 结尾")
+                .isFalse();
+        // 窗口 start 吸附回 emoji 起点后，片段从 emoji 开始：emoji + 79z + KEYWORD + 80y（UTF-16 长度 168）；
+        // 不吸附时片段以半个 emoji（落单 low surrogate）开头。
+        assertThat(snippet).startsWith("😀" + "z".repeat(79) + "KEYWORD");
+        assertThat(snippet).hasSize(168);
+        assertNoLoneSurrogate(snippet);
+    }
+
+    /**
+     * 长度上限按 code point 计：30 个 emoji 的 UTF-16 length 是 60，但只有 30 个字符，必须放行；
+     * 60 个 emoji 才是真的超过 50 个字符。
+     */
+    @Test
+    @Order(12)
+    void keywordLengthLimitCountsCodePointsNotUtf16Units() {
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> thirty = search("keyword=" + encode("😀".repeat(30)));
+        assertThat(thirty.getStatusCode().value()).isEqualTo(200);
+
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> sixty = search("keyword=" + encode("😀".repeat(60)));
+        assertThat(sixty.getStatusCode().value()).isEqualTo(400);
+        assertThat(sixty.getBody().getMessage()).contains("不能超过 50 个字符");
+    }
+
+    @Test
+    @Order(13)
+    void searchIsCaseInsensitiveAcrossTitleAndContent() {
+        Long postId = createPost(userToken, "java 入门", "从零开始学 Java 语法");
+
+        assertThat(search("keyword=" + encode("JAVA")).getBody().getData().content())
+                .extracting(PostSummaryResponse::getId).contains(postId);
+        assertThat(search("keyword=" + encode("Java")).getBody().getData().content())
+                .extracting(PostSummaryResponse::getId).contains(postId);
+    }
+
+    /**
+     * snippet 只属于搜索接口：既有列表/详情接口的 JSON 不能多出 "snippet": null，
+     * 否则前端契约与快照都会变。搜索接口仍显式返回空串（标题命中、正文不含关键词）。
+     */
+    @Test
+    @Order(14)
+    void snippetFieldIsAbsentFromNonSearchResponses() {
+        Long postId = createPost(userToken, "片段字段验证", "正文不含关键词");
+
+        ResponseEntity<String> list = rest.getForEntity(url("/api/posts?size=50"), String.class);
+        assertThat(list.getStatusCode().value()).isEqualTo(200);
+        assertThat(list.getBody()).doesNotContain("\"snippet\"");
+
+        ResponseEntity<String> detail = rest.getForEntity(url("/api/posts/" + postId), String.class);
+        assertThat(detail.getStatusCode().value()).isEqualTo(200);
+        assertThat(detail.getBody()).doesNotContain("\"snippet\"");
+
+        PageResponse<PostSummaryResponse> page = search("keyword=" + encode("片段字段验证")).getBody().getData();
+        assertThat(page.content().get(0).getSnippet()).isEmpty();
+        ResponseEntity<String> searchBody = rest.getForEntity(
+                URI.create(url("/api/posts/search?keyword=" + encode("片段字段验证"))), String.class);
+        assertThat(searchBody.getBody()).contains("\"snippet\":\"\"");
+    }
+
+    /** 逐 code point 检查：合法代理对会被 codePoints() 合并成 >0xFFFF 的值，只有落单代理才会落在 0xD800~0xDFFF。 */
+    private static void assertNoLoneSurrogate(String snippet) {
+        snippet.codePoints().forEach(cp -> assertThat(cp >= 0xD800 && cp <= 0xDFFF)
+                .as("片段含未配对的代理字符: U+%04X", cp)
+                .isFalse());
+    }
 }
 ```
 
@@ -546,7 +645,7 @@ Run:
 cd /e/JavaSpace/forum && mvn -B test -Dtest=SearchFlowIntegrationTest
 ```
 
-Expected: **FAIL** —— `Tests run: 10`，第 1 例即因 `GET /api/posts/search` 返回 404 而断言失败（端点尚未实现）；第 2~4 例同样 404 而非 400。
+Expected: **FAIL** —— `Tests run: 14`，用例普遍失败：第 1 例因 `GET /api/posts/search` 返回 404 而断言失败（端点尚未实现），第 2~4 例同样 404 而非 400，其余依赖搜索响应的用例一并失败。
 
 - [ ] **Step 1-6: 实现 PostService.search 与三个私有工具**
 
@@ -554,7 +653,7 @@ Modify `src/main/java/org/song/forum/service/PostService.java:158`（`listByTag`
 
 ```java
     /**
-     * 全文搜索：标题命中优先，同档按创建时间倒序。
+     * 全文搜索：标题命中优先，同档按创建时间倒序、时间相同再按 id 倒序。
      * <p>关键词去首尾空白后必须是 1~50 个 code point；page 负数按 0，size 夹到 1~50。
      * 这里再夹取一次 size 是防御性的：controller 也夹了一次，service 作为公开方法
      * 不依赖调用方已经处理过。</p>
@@ -621,6 +720,8 @@ Modify `src/main/java/org/song/forum/service/PostService.java:158`（`listByTag`
      * <p>这里只截窗口：不清洗 Markdown、不加省略号——清洗、省略号与高亮统一由前端
      * {@code utils/search.js} 的 {@code buildSnippet} 完成，避免同一套规则在两种语言里各写一遍。
      * 正文不含关键词（标题命中）时返回空串。</p>
+     * <p>窗口端点会吸附到 code point 边界：UTF-16 下标可能切在代理对中间，
+     * 留下落单的 surrogate（序列化时变替换字符）。吸附后最多多保留一个字符。</p>
      */
     private static String snippetOf(String content, String keyword) {
         if (content == null || content.isEmpty() || keyword.isEmpty()) {
@@ -632,6 +733,14 @@ Modify `src/main/java/org/song/forum/service/PostService.java:158`（`listByTag`
         }
         int start = Math.max(0, index - SNIPPET_RADIUS);
         int end = Math.min(content.length(), index + keyword.length() + SNIPPET_RADIUS);
+        // start 落在 low surrogate 上说明前一个 code point 被切开了，回退一格包含完整的代理对
+        if (start > 0 && Character.isLowSurrogate(content.charAt(start))) {
+            start--;
+        }
+        // end 的前一个字符是 high surrogate 说明最后一个 code point 被切开了，前进一格补齐
+        if (end < content.length() && Character.isHighSurrogate(content.charAt(end - 1))) {
+            end++;
+        }
         return content.substring(start, end);
     }
 ```
@@ -667,7 +776,7 @@ Run:
 cd /e/JavaSpace/forum && mvn -B test -Dtest=SearchFlowIntegrationTest
 ```
 
-Expected: **PASS** —— `Tests run: 10, Failures: 0, Errors: 0, Skipped: 0`。
+Expected: **PASS** —— `Tests run: 14, Failures: 0, Errors: 0, Skipped: 0`。
 
 - [ ] **Step 1-8: 后端全量回归**
 
@@ -677,7 +786,7 @@ Run:
 cd /e/JavaSpace/forum && mvn -B clean test
 ```
 
-Expected: **PASS** —— `BUILD SUCCESS`；`grep -h 'Tests run' target/surefire-reports/*.txt` 汇总为 **13 个测试类、101 个用例**，其中 1 个 POSIX 文件权限用例在 Windows 上 `Skipped`。
+Expected: **PASS** —— `BUILD SUCCESS`；`grep -h 'Tests run' target/surefire-reports/*.txt` 汇总为 **13 个测试类、105 个用例**，其中 1 个 POSIX 文件权限用例在 Windows 上 `Skipped`。
 
 - [ ] **Step 1-9: 提交后端搜索实现**
 
@@ -697,6 +806,23 @@ git commit -m "feat: 新增帖子全文搜索接口与 pg_trgm 索引"
 ```
 
 Expected: `grep -c` 输出 `1`；提交成功；`git status` 干净；`git show --stat HEAD` 显示 7 个文件。
+
+### Task 1 质量修复记录（实施偏差）
+
+Task 1 提交后评审提出 5 条质量修复，已单独一个提交落地（`fix: 加固全文搜索片段边界与排序稳定性`），本计划对应片段已同步为修复后的代码：
+
+1. **片段窗口按 code point 吸附**（`PostService.snippetOf`，`PostService.java:314-325`）：UTF-16 下标可能切在代理对中间，`start` 落在 low surrogate 时回退一格、`end` 前一个是 high surrogate 时前进一格；窗口半径 80、`Locale.ROOT` 小写搜索、正文未命中返回 `""` 均不变。新增 `@Order(11)` 用例（80 个 `x` + 😀 + 79 个 `z` + `KEYWORD` + 100 个 `y`，窗口 start 正好落在 emoji 的 low surrogate 上）。
+2. **关键词长度用例补 code point 维度**（`@Order(12)`）：`"😀".repeat(30)` 的 UTF-16 长度为 60，但只有 30 个 code point，必须 200；`"😀".repeat(60)` 才是 60 个字符，返回 400「搜索关键词不能超过 50 个字符」。原有 `"a".repeat(51)`（ASCII）用例保留。
+3. **大小写不敏感集成用例**（`@Order(13)`）：关键词 `JAVA`/`Java` 都能命中标题为 `java 入门` 的帖子（SQL `LOWER` + service 侧 `Locale.ROOT`）。
+4. **既有接口不新增 `"snippet": null` 字段**（`PostSummaryResponse.java:3,48`）：`snippet` 加 `@JsonInclude(JsonInclude.Include.NON_NULL)`，列表/我的帖子/收藏/详情 JSON 与加字段前逐字节一致；`@Order(14)` 断言 `GET /api/posts` 与 `GET /api/posts/{id}` 的原始 JSON 不含 `"snippet"`，搜索标题命中仍显式返回 `"snippet":""`。
+5. **排序稳定性**（`PostRepository.searchByKeyword`，`PostRepository.java:50`）：`ORDER BY ... p.createTime DESC, p.id DESC`；`createTime` 相同（批量导入/同微秒）时翻页不再重复或漏行。
+
+已知偏差（沿用现有技术债，不阻塞 Task 1）：
+
+- `page` 仍未设上限：`page × size` 很大时 OFFSET 扫描会变慢。与既有的 `GET /api/posts` 列表端点行为一致，属已记录的技术债，本轮不单独修。
+- V3 的 `CREATE INDEX` 没有 `CONCURRENTLY`（Flyway 在事务里执行）：建索引期间会阻塞 `posts` 写入，当前数据量与停机窗口可接受；Task 5 的部署冒烟会用 `EXPLAIN`/`\d posts` 验证两个 GIN 索引确实生效。
+
+验证：`mvn -B clean test` → **13 个测试类 / 105 个用例**，BUILD SUCCESS（1 例 POSIX 权限用例在 Windows 上 `Skipped`）；`@Order(11)` 用例在去掉吸附代码时红、加回后绿。
 
 ---
 
@@ -1943,7 +2069,7 @@ Modify `README.md` 后端测试说明，把：
 改为：
 
 ```markdown
-当前为 13 个测试类、101 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+当前为 13 个测试类、105 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 ```
 
 Modify 前端测试说明：
@@ -1974,7 +2100,7 @@ Modify `README.md`「## 已知限制」列表末尾追加：
 Run:
 
 ```bash
-cd /e/JavaSpace/forum && grep -n '101 个用例\|239 个用例\|按子串匹配' README.md
+cd /e/JavaSpace/forum && grep -n '105 个用例\|239 个用例\|按子串匹配' README.md
 ```
 
 Expected: 3 行命中。
@@ -2032,11 +2158,11 @@ Expected: 至少命中「第五轮」行、「已完成 5 轮迭代」与快照�
 Modify `docs/DEVELOPMENT.md` §3.2 表格两行：
 
 ```markdown
-| 后端 | **101** 个用例 / 13 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 后端 | **105** 个用例 / 13 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
 | 前端 | **239** 个用例 / 28 个 spec | 全绿 |
 ```
 
-后端测试类分布：把 `RepositoryTests` 的 `7` 改成 `8`，并在 `TagFlowIntegrationTest` 后追加 `SearchFlowIntegrationTest` 10（合计 101）。
+后端测试类分布：把 `RepositoryTests` 的 `7` 改成 `8`，并在 `TagFlowIntegrationTest` 后追加 `SearchFlowIntegrationTest` 14（合计 105）。
 
 前端 spec 分布：`index`（api）由 12 改 13、`PostListItem` 由 4 改 6，并追加 `search` 12、`HeaderSearch` 5、`SearchView` 8（合计 239）。
 
@@ -2063,9 +2189,9 @@ Modify §3.4 标题与 PostController 行：
 
 | 端点 | 参数 | 返回 |
 | --- | --- | --- |
-| `GET /api/posts/search` | `keyword`（必填，去首尾空白后 1~50 个 code point）、`page`（默认 0，负数按 0）、`size`（默认 10，钳制到 1~50） | `PageResponse<PostSummaryResponse>`；标题命中优先、同档按 `createTime` 倒序，软删除不出现；错误统一 400：`缺少必需参数: keyword`、`搜索关键词不能为空`、`搜索关键词不能超过 50 个字符`、`参数格式不正确: page`（`size` 同理） |
+| `GET /api/posts/search` | `keyword`（必填，去首尾空白后 1~50 个 code point）、`page`（默认 0，负数按 0）、`size`（默认 10，钳制到 1~50） | `PageResponse<PostSummaryResponse>`；标题命中优先、同档按 `createTime` 倒序（同时间再按 `id` 倒序），软删除不出现；错误统一 400：`缺少必需参数: keyword`、`搜索关键词不能为空`、`搜索关键词不能超过 50 个字符`、`参数格式不正确: page`（`size` 同理） |
 
-`PostSummaryResponse` 在搜索接口里额外带一个可空字段 `snippet`：正文命中处左右各 80 字符的纯文本窗口（**不清洗 Markdown、不含省略号**，由前端 `utils/search.js` 的 `buildSnippet` 完成清洗与省略号）；标题命中且正文不含关键词时是空串，其它列表接口为 `null`。关键词里的 `%`、`_`、`!` 按字面量匹配（服务端统一转义后 SQL 用 `ESCAPE '!'`）。
+`PostSummaryResponse` 在搜索接口里额外带一个可空字段 `snippet`：正文命中处左右各 80 字符的纯文本窗口（**不清洗 Markdown、不含省略号**，由前端 `utils/search.js` 的 `buildSnippet` 完成清洗与省略号）；窗口端点吸附到 code point 边界，不会劈开 emoji/生僻字；标题命中且正文不含关键词时是空串，其它列表接口通过 `@JsonInclude(NON_NULL)` 省略该键（而非 `null`）。关键词里的 `%`、`_`、`!` 按字面量匹配（服务端统一转义后 SQL 用 `ESCAPE '!'`）。
 ```
 
 Modify §3.5 页面表，在 `/tags/:name` 行之后追加：
@@ -2097,10 +2223,10 @@ Expected: 3 行命中。
 
 | 位置 | 文件 | 要点 |
 | --- | --- | --- |
-| 后端 | `repository/PostRepository.java` | `searchByKeyword`：`LOWER(title/content) LIKE CONCAT('%', :pattern, '%') ESCAPE '!'`，`CASE WHEN 标题命中 THEN 0 ELSE 1` + `createTime DESC`，EntityGraph 只 join `board`/`author` |
+| 后端 | `repository/PostRepository.java` | `searchByKeyword`：`LOWER(title/content) LIKE CONCAT('%', :pattern, '%') ESCAPE '!'`，`CASE WHEN 标题命中 THEN 0 ELSE 1` + `createTime DESC, id DESC`，EntityGraph 只 join `board`/`author` |
 | 后端 | `service/PostService.java` | `search(rawKeyword, page, size)`：归一化 1~50 code point、`escapeLike`（`! % _` 转义）、clamp、**无 Sort** 的 `PageRequest`、两步分页 + `snippetOf` 截正文窗口 |
 | 后端 | `controller/PostController.java` | `GET /api/posts/search`，放在 `/{id}` 之前；controller 与 service 各夹取一次 `size` |
-| 后端 | `dto/post/PostSummaryResponse.java` | 新增可空 `snippet`：仅搜索接口填充，其它列表为 `null` |
+| 后端 | `dto/post/PostSummaryResponse.java` | 新增可空 `snippet`：仅搜索接口填充，`@JsonInclude(NON_NULL)` 让其它列表的 JSON 省略该键 |
 | 后端 | `db/migration/V3__post_search_trgm_index.sql` | `CREATE EXTENSION IF NOT EXISTS pg_trgm` + 标题/正文两个 `USING gin (LOWER(...) gin_trgm_ops) WHERE deleted = false` |
 | 前端 | `utils/search.js` | `highlightSegments`（indexOf 循环、不构造正则）、`buildSnippet`（Markdown 轻量清洗 + 命中窗口 + 省略号） |
 | 前端 | `components/HeaderSearch.vue` | 桌面 220px 输入框、窄屏图标按钮，`useResponsive` + `v-if`，零新增 `@media` |
@@ -2114,10 +2240,10 @@ Expected: 3 行命中。
 - **标题优先用 CASE，不做相关度评分**：`similarity()`/`ts_rank` 的排序用户无法预期；「标题命中的排前面、同档按时间」既好解释又稳定可测。
 - **两步分页**：`@EntityGraph` 带 `tags` 集合再分页会触发 `HHH90003004`（全表加载后内存分页），与首页/标签页保持同一套 `searchByKeyword` → `hydrate` → `mapSummaries`。
 - **`ESCAPE '!'`**：`%`/`_` 是 LIKE 通配符，不转义时搜「100%」会命中「1000」；service 统一转义，repository 只拼 `%pattern%`。
-- **片段由服务端截窗口、前端清洗**：列表 DTO 不带正文（避免搜索页响应随正文膨胀），服务端只给命中位置左右各 80 字符的窗口；Markdown 清洗、省略号与高亮统一在 `buildSnippet` 一处实现。
+- **片段由服务端截窗口、前端清洗**：列表 DTO 不带正文（避免搜索页响应随正文膨胀），服务端只给命中位置左右各 80 字符的窗口，并把窗口端点吸附到 code point 边界（避免劈开 emoji/生僻字）；Markdown 清洗、省略号与高亮统一在 `buildSnippet` 一处实现。
 - **H2 测试关闭 Flyway**：V3 的 `CREATE EXTENSION` 在 H2 上无法执行，测试库统一 `spring.flyway.enabled=false` + `ddl-auto=create-drop`。
 
-测试与验证：后端新增 `SearchFlowIntegrationTest` 10 例（契约 400、标题优先、时间倒序、分页与夹取、通配符转义、软删除），`RepositoryTests` 新增 1 例覆盖 JPQL 的 CASE 排序与 `ESCAPE '!'`；前端新增 `search`/`HeaderSearch`/`SearchView` 三个 spec 并扩充 `PostListItem`/`api`。基线数字与上线验收结果见 §3.2 与下方「上线验收」段落。
+测试与验证：后端新增 `SearchFlowIntegrationTest` 14 例（契约 400、标题优先、时间倒序、分页与夹取、通配符转义、软删除、片段不劈开代理对、长度按 code point、大小写不敏感、既有响应无 `snippet` 键），`RepositoryTests` 新增 1 例覆盖 JPQL 的 CASE 排序与 `ESCAPE '!'`；前端新增 `search`/`HeaderSearch`/`SearchView` 三个 spec 并扩充 `PostListItem`/`api`。基线数字与上线验收结果见 §3.2 与下方「上线验收」段落。
 
 已知限制：
 
@@ -2291,7 +2417,7 @@ Expected: `BUILD SUCCESS`；汇总：
 cd /e/JavaSpace/forum && grep -h 'Tests run' target/surefire-reports/*.txt
 ```
 
-Expected: 合计 **101 个用例 / 13 个测试类**，1 个 `Skipped`（POSIX 文件权限用例，Windows 上跳过），无 `Failures`、无 `Errors`。
+Expected: 合计 **105 个用例 / 13 个测试类**，1 个 `Skipped`（POSIX 文件权限用例，Windows 上跳过），无 `Failures`、无 `Errors`。
 
 - [ ] **Step 5-2: 前端全量测试**
 
@@ -2399,7 +2525,7 @@ Modify `docs/DEVELOPMENT.md` §4.10 的末尾（「已知限制」三条之后�
 - 推送后 Jenkins Build **#<N>** **SUCCESS**（镜像 `localhost/forum-backend:<N>`），`forum-backend` 重建后 `Up (healthy)`，仅监听 `127.0.0.1:8086`。
 - V3 由容器启动时的 Flyway 自动执行：`flyway_schema_history` 最新记录 `version=3 / success=t`；`\dx pg_trgm` 显示扩展已安装，`\d posts` 显示 `idx_posts_title_trgm`、`idx_posts_content_trgm` 两个 `gin` 部分索引（`WHERE deleted = false`）。`forum` 角色以非超级用户身份完成 `CREATE EXTENSION`（pg_trgm 为 trusted 扩展），未额外授权。
 - 冒烟：`/forum/api/health`、`/forum/api/posts/search?keyword=Jenkins`、`/forum/search?q=Jenkins` 均 200；空白关键词、缺参数、51 字符关键词均 400；`EXPLAIN` 在十几篇帖子的数据量下走顺序扫描，属预期（短词与低数据量用不上 trigram 索引）。
-- 全量测试：后端 13 个测试类 / 101 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 28 个 spec / 239 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
+- 全量测试：后端 13 个测试类 / 105 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 28 个 spec / 239 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
 ```
 
 Modify `docs/DEVELOPMENT.md` §8 变更日志，把上一轮文档提交行的「本次提交」替换成 `git log` 里该提交的真实短哈希，并在表格最上方新增一行：
@@ -2466,9 +2592,9 @@ Expected: 工作区干净；顶部 6 条提交依次为「回填」「文档」�
 | §5.3 `HeaderSearch.vue`（220px、maxlength、回车/图标、同页同词不重复、窄屏图标、watch URL、App.vue 标签之后、零 @media） | Task 3 Step 3-3/3-4/3-10；样式只写固定宽度，无媒体查询 |
 | §5.4 `SearchView.vue`（`/search?q=`、replace、内部 page、计数、PostListItem、三空态、requestSeq、usePostActions） | Task 3 Step 3-5/3-6（8 例逐一对应） |
 | §5.5 `PostListItem` 可选 `keyword`/`snippet`、`<mark class="hit">`、首页/标签页行为不变 | Task 3 Step 3-8/3-9；props 默认空串，首页与标签页不传 |
-| §6.1 后端 10 例 + RepositoryTests 1 例 | Task 1 Step 1-5（10 个 `@Order` 方法）与 Step 1-1（仓库用例） |
+| §6.1 后端 14 例 + RepositoryTests 1 例 | Task 1 Step 1-5（14 个 `@Order` 方法）与 Step 1-1（仓库用例） |
 | §6.2 前端 3 个新 spec + 更新 `PostListItem`/`api` spec | Task 2 Step 2-1、Task 3 Step 3-1/3-3/3-5/3-8；期望值 28 spec / 239 例 |
-| §6.3 基线（后端 14 类/102 例、前端 28 spec/约 235 例、端点 36） | Task 4 Step 4-2/4-4（写实测 13 类/101 例、28 spec/239 例、36 端点）；差异见本记录第 4 节第 2 条 |
+| §6.3 基线（后端 14 类/102 例、前端 28 spec/约 235 例、端点 36） | Task 4 Step 4-2/4-4（写实测 13 类/105 例、28 spec/239 例、36 端点）；差异见本记录第 4 节第 2 条 |
 | §7.1 三份文档的每一处改动 | Task 4 Step 4-1~4-8 |
 | §7.2 上线流程（验证 → push → Jenkins → 冒烟 → 验收/哈希回填） | Task 5 Step 5-1~5-11 |
 | §8 风险表（短词不走索引、无相关度、H2/PG 差异、扩展权限、OR 弃索引、公开页） | Task 1 Step 1-1/1-3 的注释；Task 4 Step 4-5（§4.10 已知限制）与 Step 4-7（部署手册 §7）；§5.1 的 T13/T14/T15 |
@@ -2509,7 +2635,7 @@ Expected: 工作区干净；顶部 6 条提交依次为「回填」「文档」�
 ### 4. 歧义与解决方式
 
 1. **spec §4.1 说列表字段「与现有列表完全一致」，但 §5.2/§5.4/§10 要求展示「正文命中片段」——`PostSummaryResponse` 里没有 `content`。** 解决：给 `PostSummaryResponse` 增加一个**可空** `snippet` 字段，只由 `PostService.search` 填充（正文命中位置左右各 80 字符的窗口），其它列表接口保持 `null`。理由是三条替代都更差：(a) 列表 DTO 返回完整正文——搜索页一页 10 条，论坛帖正文可达数十 KB，且 T15 记录正文无长度上限，响应会随正文膨胀；(b) 前端逐条调 `/api/posts/{id}` 取正文——N+1 请求，且详情接口会把浏览量 +1；(c) 只用标题造片段——正文命中的行永远没有片段，§10 的「片段高亮」验收过不去。为把改动压到最小：服务端只截窗口，**不清洗 Markdown、不加省略号**，清洗/省略号/高亮统一在 `buildSnippet` 一处实现，避免中英两套规则漂移。
-2. **spec §6.3 估计「后端 14 类 / 约 102 例」，按本计划实际是 13 类 / 101 例。** 解决：验收以「新增 1 个测试类 + 11 个用例」为准（12→13 类，90→101 例）；spec 的 102 例多算了 1 例，且 14 类需要再新增一个测试类（本 spec 的用例都落在 `SearchFlowIntegrationTest` 与 `RepositoryTests`）。文档统一写实测值，若后续实测与估算再有出入，按 Task 5 Step 5-9 的规则「先改文档数字再提交」。
+2. **spec §6.3 估计「后端 14 类 / 约 102 例」，按本计划实际是 13 类 / 105 例。** 解决：验收以「新增 1 个测试类 + 15 个用例」为准（12→13 类，90→105 例；其中 4 例是 Task 1 质量修复补的片段边界/长度/大小写/JSON 契约用例）；spec 的 102 例估算与实测不同，且 14 类需要再新增一个测试类（本 spec 的用例都落在 `SearchFlowIntegrationTest` 与 `RepositoryTests`）。文档统一写实测值，若后续实测与估算再有出入，按 Task 5 Step 5-9 的规则「先改文档数字再提交」。
 3. **spec 只写 `escapeLike` / `normalizeSearchKeyword` 是「私有 static」，没说放哪个类。** 解决：放 `PostService`——`escapeLike` 的入参是 service 归一化后的关键词、`normalizeSearchKeyword` 抛 `BusinessException`，两者都依赖 service 的错误语义；放 `util` 反而要让 util 依赖 `exception`。
 4. **spec 没说 `page`/`size` 非数字的 400 文案从哪来。** 解决：复用 `GlobalExceptionHandler.handleTypeMismatch` 的既有文案「参数格式不正确: page」——它已由 tag 接口的回归用例固定，不新增分支；计划不重复测这条（既有 `TagFlowIntegrationTest` 已覆盖同一条处理链）。
 5. **spec §5.4 写 `:snippet="buildSnippet(...)"`，但没说 snippet 的来源。** 解决：`buildSnippet(p.snippet || '', q)`——先用服务端窗口（有则用以定位上下文），再交给同一个函数清洗/加省略号/供 `PostListItem` 高亮；`p.snippet` 为空串时返回 `''`，`PostListItem` 不渲染片段行。
