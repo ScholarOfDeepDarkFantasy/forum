@@ -15,7 +15,7 @@
 - 不新增后端/前端依赖；不动 `Dockerfile`、`docker-compose.yml`、`deploy/nginx/`、`deploy/deploy.sh`（V3 在容器启动时由 Flyway 自动执行）。
 - 新增/修改的 `.vue`、`.css` **不得出现任何 `@media`**：`frontend/src/styles/breakpoint.spec.js` 要求全 `src` 恰好 6 处 `@media (max-width: 768px)`，且禁止 `min-width`。
 - 判空、命名、注释风格对齐既有代码（中文注释解释「为什么」，不解释「做了什么」）；所有文件 LF + UTF-8。
-- 数量为估算：后端预期 **13 个测试类 / 105 个用例**（spec §6.3 写 14 类/约 102 例，差异见 Self-Review；含 Task 1 质量修复新增的 4 个搜索用例），前端预期 **28 个 spec / 约 239 例**；**以实测为准**，实测与估算不一致时按 Task 5 Step 9 的规则先改文档。
+- 数量为估算：后端预期 **13 个测试类 / 105 个用例**（spec §6.3 写 14 类/约 102 例，差异见 Self-Review；含 Task 1 质量修复新增的 4 个搜索用例），前端预期 **28 个 spec / 约 273 例**（含 Task 2/3 两轮质量修复）；**以实测为准**，实测与估算不一致时按 Task 5 Step 9 的规则先改文档。
 
 **设计文档：** `docs/superpowers/specs/2026-10-21-round5-fulltext-search-design.md`
 
@@ -47,9 +47,9 @@
 | `frontend/src/utils/search.js` | 纯函数：`highlightSegments(text, keyword)` 分段高亮、`buildSnippet(content, keyword, radius)` Markdown 轻量清洗 + 命中窗口 + 省略号 |
 | `frontend/src/utils/search.spec.js` | 上述两个纯函数的 30 个用例 |
 | `frontend/src/components/HeaderSearch.vue` | 顶栏搜索入口：桌面 `el-input`（220px）/ 窄屏图标按钮，`useResponsive` + `v-if` 切换 |
-| `frontend/src/components/HeaderSearch.spec.js` | 5 个用例：回车跳转、空白不跳、同页同词不重复、窄屏图标、URL→输入框同步 |
+| `frontend/src/components/HeaderSearch.spec.js` | 9 个用例：回车跳转、空白不跳、同页同词不重复、窄屏图标（含 aria-label）、URL→输入框同步、搜索页清空回空态、非搜索页清空不跳转、码点限长（51 字符拒绝 / 50 emoji 允许） |
 | `frontend/src/views/SearchView.vue` | `/search?q=` 搜索结果页：计数、分页、三种空态、`requestSeq` 防竞态、点赞复用共享状态 |
-| `frontend/src/views/SearchView.spec.js` | 8 个用例：空态、加载与 props、无结果、失败重试、分页、换词、过期响应、页码重置 |
+| `frontend/src/views/SearchView.spec.js` | 18 个用例：空态、加载与 props、无结果、失败重试、分页、换词、过期响应、页码重置、清空后错误/在途请求复位、分页与重试保草稿、加载中不渲染计数、单页不分页、空白 q、同词不重复、码点限长、快速翻页过期响应 |
 
 ### 前端（修改）
 
@@ -60,13 +60,13 @@
 | `frontend/src/router/index.js` | 新增 `/search` 懒加载路由，`name: 'search'` |
 | `frontend/src/App.vue` | 顶栏「标签」之后挂 `<HeaderSearch />`；`.header-inner` 改 `flex-start` + `gap`，`.nav-actions` 自动左推 |
 | `frontend/src/components/PostListItem.vue` | 可选 props `keyword`/`snippet`；标题与片段文本层 `<mark class="hit">`；新增 `.hit` / `.post-snippet` 样式（零 `@media`） |
-| `frontend/src/components/PostListItem.spec.js` | 新增 2 例（4 → 6）：标题高亮、片段渲染 |
+| `frontend/src/components/PostListItem.spec.js` | 新增 4 例（4 → 8）：标题高亮、片段渲染、HTML 纯文本（XSS）防护、关键词未命中不高亮 |
 
 ### 部署与文档
 
 | 文件 | 改动 |
 |---|---|
-| `README.md` | 功能清单加全文搜索、测试基线 13/105 与 28/239、已知限制加中文子串匹配、目录结构加 `HeaderSearch`/搜索工具 |
+| `README.md` | 功能清单加全文搜索、测试基线 13/105 与 28/273、已知限制加中文子串匹配、目录结构加 `HeaderSearch`/搜索工具 |
 | `docs/DEVELOPMENT.md` | §2.2 第五轮、§3.1/§3.2 基线、§3.3 加 V3、§3.4 36 个端点 + 搜索契约、§3.5 加 `/search`、新增 §4.10、§5.1 加 T13/T14/T15、§5.2 标记完成、§7 决策、§8 变更日志 |
 | `docs/deployment/README.md` | §4 回滚加 drop 索引、§5 加 V3 索引验证、§7 已知限制加「1–2 字查询顺序扫描」 |
 
@@ -1716,10 +1716,21 @@ const keyword = ref('')
 
 function submit() {
   const q = keyword.value.trim()
-  if (!q) return
+  // 与服务端一致：按 Unicode 码点计 1~50（maxlength 只按 UTF-16 码元截断，
+  // emoji 等代理对字符会被少算，所以这里再按码点挡一次）
+  if (!q || Array.from(q).length > 50) return
   // 已在搜索页且关键词不变：不重复 push，避免历史记录里堆同样地址
   if (route.name === 'search' && route.query.q === q) return
   router.push({ name: 'search', query: { q } })
+}
+
+/**
+ * 清空输入框：ElInput 会先清空 v-model 再 emit('clear')，此时 submit() 只会看到空串。
+ * 设计意图是「清空 = 回到搜索页的空态」：只在搜索页把地址栏的 q 去掉；其它页面不跳转。
+ */
+function onClear() {
+  if (route.name !== 'search') return
+  router.push({ name: 'search' })
 }
 
 /** 窄屏没有输入框：直接把用户送到搜索页，在页面里输入 */
@@ -1748,7 +1759,7 @@ watch(
       clearable
       class="search-box"
       @keyup.enter="submit"
-      @clear="submit"
+      @clear="onClear"
     >
       <template #append>
         <el-button :icon="Search" aria-label="搜索" @click="submit" />
@@ -1760,14 +1771,14 @@ watch(
       circle
       text
       aria-label="搜索"
-      class="search-btn"
       @click="openSearchPage"
     />
   </div>
 </template>
 
 <style scoped>
-/* 宽度固定在 220px：顶栏是 space-between 之外的 flex 行，输入框自适应会把导航挤到换行 */
+/* 宽度固定在 220px：顶栏用 flex-start + .nav-actions 的 margin-left:auto 分成左右两组，
+   输入框自适应会把导航挤到换行，固定宽度则不会随内容跳动 */
 .search-box {
   width: 220px;
 }
@@ -2042,7 +2053,6 @@ const router = useRouter()
 const auth = useAuthStore()
 const actions = usePostActions()
 
-const input = ref('')
 const pageData = ref({ content: [], totalElements: 0, totalPages: 0 })
 const page = ref(0)
 const size = 10
@@ -2054,6 +2064,13 @@ const searched = ref(false)
 const keyword = computed(() => (typeof route.query.q === 'string' ? route.query.q.trim() : ''))
 
 /**
+ * 输入框初值取地址栏（刷新 / 直达链接）。
+ * 之后只在关键词变化时同步（见文件末尾的 watch）；分页与重试只重载当前关键词，
+ * 不能覆盖用户正在编辑、尚未提交的草稿。
+ */
+const input = ref(keyword.value)
+
+/**
  * 同一路由记录内换词时组件可能被复用（App.vue 的 :key 目前会重建，这里仍防一手）：
  * 两次请求乱序返回时用自增序号丢弃过期响应，避免慢请求的旧结果覆盖新关键词。
  */
@@ -2061,9 +2078,13 @@ let requestSeq = 0
 
 async function load() {
   const q = keyword.value
-  input.value = q
   if (!q) {
+    // 清空关键词要完整复位：作废在途请求（慢响应不能写进空页面）、
+    // 关掉 loading、清掉上一次失败的 error，否则空态会被错误态/遮罩永久挡住
+    requestSeq += 1
     searched.value = false
+    loading.value = false
+    error.value = ''
     pageData.value = { content: [], totalElements: 0, totalPages: 0 }
     return
   }
@@ -2088,7 +2109,9 @@ async function load() {
 
 function submit() {
   const q = input.value.trim()
-  if (!q) return
+  // 与服务端一致：按 Unicode 码点计 1~50（maxlength 只按 UTF-16 码元截断，
+  // emoji 等代理对字符会被少算，所以这里再按码点挡一次）
+  if (!q || Array.from(q).length > 50) return
   // 交给 watch(keyword) 统一触发加载：replace 不新增历史记录，连续搜索不会塞满后退按钮
   router.replace({ name: 'search', query: { q } })
 }
@@ -2114,8 +2137,10 @@ async function toggleLike(p) {
   }
 }
 
-// 关键词变化（页面内搜索、顶栏搜索、浏览器前进后退）时回到第一页重新加载
+// 关键词变化（页面内搜索、顶栏搜索、浏览器前进后退）时回到第一页重新加载；
+// 只有这条路径把输入框拉回 URL，分页/重试不会碰用户未提交的草稿
 watch(keyword, () => {
+  input.value = keyword.value
   page.value = 0
   load()
 })
@@ -2128,7 +2153,7 @@ load()
     <template #header>
       <div class="head">
         <span class="title">搜索</span>
-        <span v-if="searched && !error" class="total">共 {{ pageData.totalElements }} 条结果</span>
+        <span v-if="searched && !error && !loading" class="total">共 {{ pageData.totalElements }} 条结果</span>
       </div>
       <div class="search-bar">
         <el-input
@@ -2410,7 +2435,7 @@ Run:
 cd /e/JavaSpace/forum/frontend && pnpm test
 ```
 
-Expected: **PASS** —— **28 个 spec、239 个用例**（25 + `search`/`HeaderSearch`/`SearchView` 三个新 spec；`api` 12→13、`PostListItem` 4→6）。`breakpoint` 仍断言 6 处 `@media`，未新增。
+Expected: **PASS** —— **28 个 spec、273 个用例**（含 Task 3 质量修复新增的 16 例；`api` 12→13、`PostListItem` 4→8、`HeaderSearch` 5→9、`SearchView` 8→18）。`breakpoint` 仍断言 6 处 `@media`，未新增。
 
 - [ ] **Step 3-11: 前端构建自检（可选但建议）**
 
@@ -2437,6 +2462,20 @@ git commit -m "feat: 新增顶栏搜索入口与搜索结果页"
 ```
 
 Expected: 提交成功；`git status` 干净；`git show --stat HEAD` 显示 10 个文件。
+
+### Task 3 质量修复记录（实施偏差）
+
+质量评审后在同一分支追加一次修复提交（`fix: 修正搜索页状态清理与顶栏搜索交互细节`），只改动 `frontend/src/views/SearchView.vue`、`frontend/src/views/SearchView.spec.js`、`frontend/src/components/HeaderSearch.vue`、`frontend/src/components/HeaderSearch.spec.js`、`frontend/src/components/PostListItem.spec.js` 与本计划文档：
+
+1. **空 q 完整复位**：`load()` 的空白关键词分支原来只清 `searched`/`pageData`，失败后的 `.error-state` 会一直留着且重试无法恢复。改为同时 `requestSeq += 1`（作废在途响应）、`loading.value = false`、`error.value = ''`。
+2. **分页/重试保草稿**：`input` 的初值改为 `keyword.value`，只在 `watch(keyword)`（页面内提交、顶栏跳转、前进后退）里同步；`load()`、`changePage()`、`retry()` 不再覆盖用户尚未回车的新草稿。
+3. **计数加载门禁**：`共 N 条结果` 的渲染条件加 `!loading`，请求中不再短暂显示「共 0 条结果」。
+4. **`@clear` 语义**：原 `@clear="submit"` 是 no-op（ElInput 先清空 model，submit 读到空白直接 return）。按「清空即回到空搜索页」的意图改为 `onClear()`：仅在 `route.name === 'search'` 时 `router.push({ name: 'search' })` 回空态，其他页面不动；Enter/图标仍走 `submit`。**偏差决策**：任务描述给的是 push 回空态，故保留 push（不 replace），并注册 HeaderSearch 的 clear 用例固化。
+5. **卫生**：更正 `HeaderSearch.vue` 中「space-between 之外」的过期注释（现为 `flex-start` + `.nav-actions` 的 `margin-left:auto`）；删除无样式的 `search-btn` class。
+6. **码点限长**：客户端按 `Array.from(q).length` 计 1–50 个 Unicode 码点（`maxlength="50"` 只数 UTF-16 码元，emoji 会被少算），与服务端 `PostService` 的 `codePointCount(0, length) > 50` 对齐；HeaderSearch 与 SearchView 的提交路径统一，超限静默忽略（不新增提示组件，与计划「失败提示保持极简」一致）。
+7. **测试补齐**：SearchView 8→18、HeaderSearch 5→9、PostListItem 4→8，共新增 16 例（空 q 清错误态/作废在途、分页与重试保草稿、加载中不渲染计数、单页不分页、空白 q、同词不重复、码点限长（51 ASCII 拒绝 / 50 emoji 通过）、快速翻页过期响应、清空跳转与非搜索页不跳转、XSS 纯文本防护、关键词未命中不高亮、窄屏 aria-label）。先写测试：隐藏实现改动后 8 例失败（push 未调用、错误态残留、loading 残留、草稿被覆盖、计数在加载中渲染），恢复实现后转绿。
+
+结果：`cd frontend && pnpm test` → **28 个 spec / 273 个用例**全绿；`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 成功（仅既有 >500kB chunk 警告）；`breakpoint` 仍为 6 处 `@media (max-width: 768px)`，未新增依赖、未使用 `v-html`。计划上文 Step 3-1/3-3/3-5/3-8 的 spec 片段按上述行为同步，测试计数基线统一为 273。
 
 ---
 
@@ -2502,7 +2541,7 @@ Modify 前端测试说明：
 改为：
 
 ```markdown
-当前为 28 个 spec、239 个用例，覆盖：
+当前为 28 个 spec、273 个用例，覆盖：
 ```
 
 并在前端覆盖清单末尾（「头像（…）」条目之后）追加两条：
@@ -2521,7 +2560,7 @@ Modify `README.md`「## 已知限制」列表末尾追加：
 Run:
 
 ```bash
-cd /e/JavaSpace/forum && grep -n '105 个用例\|239 个用例\|按子串匹配' README.md
+cd /e/JavaSpace/forum && grep -n '105 个用例\|273 个用例\|按子串匹配' README.md
 ```
 
 Expected: 3 行命中。
@@ -2580,12 +2619,12 @@ Modify `docs/DEVELOPMENT.md` §3.2 表格两行：
 
 ```markdown
 | 后端 | **105** 个用例 / 13 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
-| 前端 | **239** 个用例 / 28 个 spec | 全绿 |
+| 前端 | **273** 个用例 / 28 个 spec | 全绿 |
 ```
 
 后端测试类分布：把 `RepositoryTests` 的 `7` 改成 `8`，并在 `TagFlowIntegrationTest` 后追加 `SearchFlowIntegrationTest` 14（合计 105）。
 
-前端 spec 分布：`index`（api）由 12 改 13、`PostListItem` 由 4 改 6，并追加 `search` 12、`HeaderSearch` 5、`SearchView` 8（合计 239）。
+前端 spec 分布：`index`（api）由 12 改 13、`PostListItem` 由 4 改 8，并追加 `search` 30、`HeaderSearch` 9、`SearchView` 18（Task 2/3 两轮质量修复后的实测值，合计 273）。
 
 Modify §3.3 迁移脚本行：
 
@@ -2848,7 +2887,7 @@ Run:
 cd /e/JavaSpace/forum/frontend && pnpm test
 ```
 
-Expected: **28 个 spec、239 个用例全绿**（含 `breakpoint` 的 6 处 `@media` 门禁）。
+Expected: **28 个 spec、273 个用例全绿**（含 `breakpoint` 的 6 处 `@media` 门禁）。
 
 - [ ] **Step 5-3: 生产构建（子路径 /forum/）**
 
@@ -2946,7 +2985,7 @@ Modify `docs/DEVELOPMENT.md` §4.10 的末尾（「已知限制」三条之后�
 - 推送后 Jenkins Build **#<N>** **SUCCESS**（镜像 `localhost/forum-backend:<N>`），`forum-backend` 重建后 `Up (healthy)`，仅监听 `127.0.0.1:8086`。
 - V3 由容器启动时的 Flyway 自动执行：`flyway_schema_history` 最新记录 `version=3 / success=t`；`\dx pg_trgm` 显示扩展已安装，`\d posts` 显示 `idx_posts_title_trgm`、`idx_posts_content_trgm` 两个 `gin` 部分索引（`WHERE deleted = false`）。`forum` 角色以非超级用户身份完成 `CREATE EXTENSION`（pg_trgm 为 trusted 扩展），未额外授权。
 - 冒烟：`/forum/api/health`、`/forum/api/posts/search?keyword=Jenkins`、`/forum/search?q=Jenkins` 均 200；空白关键词、缺参数、51 字符关键词均 400；`EXPLAIN` 在十几篇帖子的数据量下走顺序扫描，属预期（短词与低数据量用不上 trigram 索引）。
-- 全量测试：后端 13 个测试类 / 105 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 28 个 spec / 239 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
+- 全量测试：后端 13 个测试类 / 105 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 28 个 spec / 273 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
 ```
 
 Modify `docs/DEVELOPMENT.md` §8 变更日志，把上一轮文档提交行的「本次提交」替换成 `git log` 里该提交的真实短哈希，并在表格最上方新增一行：
@@ -3014,8 +3053,8 @@ Expected: 工作区干净；顶部 6 条提交依次为「回填」「文档」�
 | §5.4 `SearchView.vue`（`/search?q=`、replace、内部 page、计数、PostListItem、三空态、requestSeq、usePostActions） | Task 3 Step 3-5/3-6（8 例逐一对应） |
 | §5.5 `PostListItem` 可选 `keyword`/`snippet`、`<mark class="hit">`、首页/标签页行为不变 | Task 3 Step 3-8/3-9；props 默认空串，首页与标签页不传 |
 | §6.1 后端 14 例 + RepositoryTests 1 例 | Task 1 Step 1-5（14 个 `@Order` 方法）与 Step 1-1（仓库用例） |
-| §6.2 前端 3 个新 spec + 更新 `PostListItem`/`api` spec | Task 2 Step 2-1、Task 3 Step 3-1/3-3/3-5/3-8；期望值 28 spec / 239 例 |
-| §6.3 基线（后端 14 类/102 例、前端 28 spec/约 235 例、端点 36） | Task 4 Step 4-2/4-4（写实测 13 类/105 例、28 spec/239 例、36 端点）；差异见本记录第 4 节第 2 条 |
+| §6.2 前端 3 个新 spec + 更新 `PostListItem`/`api` spec | Task 2 Step 2-1、Task 3 Step 3-1/3-3/3-5/3-8；期望值 28 spec / 273 例 |
+| §6.3 基线（后端 14 类/102 例、前端 28 spec/约 235 例、端点 36） | Task 4 Step 4-2/4-4（写实测 13 类/105 例、28 spec/273 例、36 端点）；差异见本记录第 4 节第 2 条 |
 | §7.1 三份文档的每一处改动 | Task 4 Step 4-1~4-8 |
 | §7.2 上线流程（验证 → push → Jenkins → 冒烟 → 验收/哈希回填） | Task 5 Step 5-1~5-11 |
 | §8 风险表（短词不走索引、无相关度、H2/PG 差异、扩展权限、OR 弃索引、公开页） | Task 1 Step 1-1/1-3 的注释；Task 4 Step 4-5（§4.10 已知限制）与 Step 4-7（部署手册 §7）；§5.1 的 T13/T14/T15 |

@@ -102,4 +102,31 @@ describe('PostListItem', () => {
     // 标题没命中：标题里不应出现 mark
     expect(wrapper.find('.post-title mark').exists()).toBe(false)
   })
+
+  it('标题与片段里的 HTML 只作为文本渲染，不会生成元素（XSS 防护）', () => {
+    const payload = '<img src=x onerror=alert(1)>'
+    const post = postPayload({ id: 13, title: `标题 ${payload}`, tags: [] })
+    const wrapper = mount(PostListItem, {
+      props: { post, keyword: 'img', snippet: `片段 ${payload}` },
+      global: { stubs }
+    })
+
+    // 文本层高亮走文本节点插值，不是 v-html：标签必须原样可见且不解析
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.find('.post-title').text()).toContain(payload)
+    expect(wrapper.find('.post-snippet').text()).toContain(payload)
+    expect(wrapper.find('mark.hit').exists()).toBe(true)
+  })
+
+  it('关键词不在标题与片段中时保持原文且不产生高亮', () => {
+    const post = postPayload({ id: 14, title: 'Vue 入门', tags: [] })
+    const wrapper = mount(PostListItem, {
+      props: { post, keyword: 'java', snippet: '这篇讲组件与响应式' },
+      global: { stubs }
+    })
+
+    expect(wrapper.find('mark').exists()).toBe(false)
+    expect(wrapper.find('.post-title').text()).toBe('Vue 入门')
+    expect(wrapper.find('.post-snippet').text()).toBe('这篇讲组件与响应式')
+  })
 })

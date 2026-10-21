@@ -13,7 +13,6 @@ const router = useRouter()
 const auth = useAuthStore()
 const actions = usePostActions()
 
-const input = ref('')
 const pageData = ref({ content: [], totalElements: 0, totalPages: 0 })
 const page = ref(0)
 const size = 10
@@ -25,6 +24,13 @@ const searched = ref(false)
 const keyword = computed(() => (typeof route.query.q === 'string' ? route.query.q.trim() : ''))
 
 /**
+ * 输入框初值取地址栏（刷新 / 直达链接）。
+ * 之后只在关键词变化时同步（见文件末尾的 watch）；分页与重试只重载当前关键词，
+ * 不能覆盖用户正在编辑、尚未提交的草稿。
+ */
+const input = ref(keyword.value)
+
+/**
  * 同一路由记录内换词时组件可能被复用（App.vue 的 :key 目前会重建，这里仍防一手）：
  * 两次请求乱序返回时用自增序号丢弃过期响应，避免慢请求的旧结果覆盖新关键词。
  */
@@ -32,9 +38,13 @@ let requestSeq = 0
 
 async function load() {
   const q = keyword.value
-  input.value = q
   if (!q) {
+    // 清空关键词要完整复位：作废在途请求（慢响应不能写进空页面）、
+    // 关掉 loading、清掉上一次失败的 error，否则空态会被错误态/遮罩永久挡住
+    requestSeq += 1
     searched.value = false
+    loading.value = false
+    error.value = ''
     pageData.value = { content: [], totalElements: 0, totalPages: 0 }
     return
   }
@@ -59,7 +69,9 @@ async function load() {
 
 function submit() {
   const q = input.value.trim()
-  if (!q) return
+  // 与服务端一致：按 Unicode 码点计 1~50（maxlength 只按 UTF-16 码元截断，
+  // emoji 等代理对字符会被少算，所以这里再按码点挡一次）
+  if (!q || Array.from(q).length > 50) return
   // 交给 watch(keyword) 统一触发加载：replace 不新增历史记录，连续搜索不会塞满后退按钮
   router.replace({ name: 'search', query: { q } })
 }
@@ -85,8 +97,10 @@ async function toggleLike(p) {
   }
 }
 
-// 关键词变化（页面内搜索、顶栏搜索、浏览器前进后退）时回到第一页重新加载
+// 关键词变化（页面内搜索、顶栏搜索、浏览器前进后退）时回到第一页重新加载；
+// 只有这条路径把输入框拉回 URL，分页/重试不会碰用户未提交的草稿
 watch(keyword, () => {
+  input.value = keyword.value
   page.value = 0
   load()
 })
@@ -99,7 +113,7 @@ load()
     <template #header>
       <div class="head">
         <span class="title">搜索</span>
-        <span v-if="searched && !error" class="total">共 {{ pageData.totalElements }} 条结果</span>
+        <span v-if="searched && !error && !loading" class="total">共 {{ pageData.totalElements }} 条结果</span>
       </div>
       <div class="search-bar">
         <el-input

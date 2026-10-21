@@ -28,9 +28,10 @@ function installMatchMedia(matches) {
 const stubs = {
   'el-input': {
     props: ['modelValue', 'placeholder', 'maxlength'],
-    emits: ['update:modelValue'],
+    emits: ['update:modelValue', 'clear'],
+    // 模拟 ElInput 的 clear：先清空 v-model，再 emit('clear')
     template:
-      '<div class="stub-input"><input class="search-input" :value="modelValue" :placeholder="placeholder" :maxlength="maxlength" @input="$emit(\'update:modelValue\', $event.target.value)" /><slot name="append" /></div>'
+      '<div class="stub-input"><input class="search-input" :value="modelValue" :placeholder="placeholder" :maxlength="maxlength" @input="$emit(\'update:modelValue\', $event.target.value)" /><button class="stub-clear" @click="$emit(\'update:modelValue\', \'\'); $emit(\'clear\')" /><slot name="append" /></div>'
   },
   'el-button': { template: '<button class="stub-btn"><slot /></button>' },
   'el-icon': { template: '<i><slot /></i>' }
@@ -102,6 +103,8 @@ describe('HeaderSearch', () => {
     expect(wrapper.find('input.search-input').exists()).toBe(false)
     const button = wrapper.find('.stub-btn')
     expect(button.exists()).toBe(true)
+    // 只有图标的按钮必须有无障碍名称
+    expect(button.attributes('aria-label')).toBe('搜索')
 
     await button.trigger('click')
 
@@ -121,5 +124,49 @@ describe('HeaderSearch', () => {
     await nextTick()
 
     expect(wrapper.find('input.search-input').element.value).toBe('vue')
+  })
+
+  // —— 以下用例覆盖 Task 3 质量评审的 clear 交互与码点长度 ——
+
+  it('在搜索页清空输入框会回到不带关键词的搜索页', async () => {
+    route.name = 'search'
+    route.query = { q: 'java' }
+    route.fullPath = '/search?q=java'
+    const wrapper = mountSearch()
+
+    await wrapper.find('.stub-clear').trigger('click')
+
+    expect(push).toHaveBeenCalledWith({ name: 'search' })
+  })
+
+  it('不在搜索页时清空输入框只清文字，不跳转', async () => {
+    const wrapper = mountSearch()
+
+    await wrapper.find('input.search-input').setValue('java')
+    await wrapper.find('.stub-clear').trigger('click')
+
+    expect(push).not.toHaveBeenCalled()
+    expect(wrapper.find('input.search-input').element.value).toBe('')
+  })
+
+  it('超过 50 个 Unicode 码点不跳转', async () => {
+    const wrapper = mountSearch()
+    const input = wrapper.find('input.search-input')
+
+    await input.setValue('a'.repeat(50) + 'b')
+    await input.trigger('keyup.enter')
+
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('50 个 emoji（100 个 UTF-16 码元）按码点计数仍可提交', async () => {
+    const wrapper = mountSearch()
+    const input = wrapper.find('input.search-input')
+
+    const q = '😀'.repeat(50)
+    await input.setValue(q)
+    await input.trigger('keyup.enter')
+
+    expect(push).toHaveBeenCalledWith({ name: 'search', query: { q } })
   })
 })

@@ -40,7 +40,17 @@ const stubs = {
   }
 }
 
-const directives = { loading: () => {} }
+// 把 v-loading 的绑定值写到 DOM 上，才能断言「清空关键词后加载态被复位」
+const directives = {
+  loading: {
+    mounted(el, binding) {
+      el.dataset.loading = String(binding.value)
+    },
+    updated(el, binding) {
+      el.dataset.loading = String(binding.value)
+    }
+  }
+}
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 let pinia
@@ -221,5 +231,229 @@ describe('SearchView', () => {
     await flush()
 
     expect(postApi.search).toHaveBeenLastCalledWith({ keyword: '新词', page: 0, size: 10 })
+  })
+
+  // —— 以下用例覆盖 Task 3 质量评审状态清理与输入框草稿相关的修复 ——
+
+  it('清空关键词会清掉失败残留的错误态，新关键词可重新搜索', async () => {
+    route.query = { q: '坏词' }
+    route.fullPath = '/search?q=坏词'
+    postApi.search
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce({ content: [], totalElements: 0, totalPages: 0 })
+
+    const wrapper = mountSearch()
+    await flush()
+    expect(wrapper.find('.error-state').exists()).toBe(true)
+
+    // 清空地址栏关键词：错误提示不能留在页面上，否则「重试」按钮永远指向失败请求
+    route.query = {}
+    route.fullPath = '/search'
+    await flush()
+
+    expect(wrapper.find('.error-state').exists()).toBe(false)
+    expect(wrapper.find('.empty').text()).toBe('输入关键词开始搜索')
+    expect(wrapper.text()).not.toContain('条结果')
+
+    // 重新搜索（同样的 load 路径）必须能发出新请求并恢复正常态
+    route.query = { q: '新词' }
+    route.fullPath = '/search?q=新词'
+    await flush()
+
+    expect(postApi.search).toHaveBeenLastCalledWith({ keyword: '新词', page: 0, size: 10 })
+    expect(wrapper.find('.error-state').exists()).toBe(false)
+  })
+
+  it('清空关键词会作废在途请求并复位加载态', async () => {
+    let resolveOld
+    postApi.search.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOld = resolve
+        })
+    )
+    route.query = { q: '慢词' }
+    route.fullPath = '/search?q=慢词'
+
+    const wrapper = mountSearch()
+    await flush()
+    expect(wrapper.find('[data-loading]').attributes('data-loading')).toBe('true')
+
+    route.query = {}
+    route.fullPath = '/search'
+    await flush()
+    // 在途请求不能把空页面的 loading 一直挂着（v-loading 遮罩会挡住空态）
+    expect(wrapper.find('[data-loading]').attributes('data-loading')).toBe('false')
+
+    resolveOld({ content: [postPayload({ id: 1, title: '过期结果' })], totalElements: 1, totalPages: 1 })
+    await flush()
+
+    expect(wrapper.find('.empty').text()).toBe('输入关键词开始搜索')
+    expect(wrapper.text()).not.toContain('过期结果')
+  })
+
+  it('分页不覆盖输入框里尚未提交的草稿，提交后按 URL 同步', async () => {
+    route.query = { q: '全文' }
+    route.fullPath = '/search?q=全文'
+    postApi.search.mockResolvedValue({ content: [postPayload()], totalElements: 21, totalPages: 3 })
+
+    const wrapper = mountSearch()
+    await flush()
+
+    const input = wrapper.find('input.search-input')
+    await input.setValue('  spring  ')
+    await wrapper.find('.pager-next').trigger('click')
+    await flush()
+
+    expect(postApi.search).toHaveBeenLastCalledWith({ keyword: '全文', page: 1, size: 10 })
+    expect(input.element.value).toBe('  spring  ')
+
+    // 回车才把草稿变成关键词，随后输入框按 URL 里的规范值（trim 后）同步
+    await input.trigger('keyup.enter')
+    expect(replace).toHaveBeenCalledWith({ name: 'search', query: { q: 'spring' } })
+
+    route.query = { q: 'spring' }
+    route.fullPath = '/search?q=spring'
+    await flush()
+    expect(input.element.value).toBe('spring')
+  })
+
+  it('重试不覆盖输入框里尚未提交的草稿', async () => {
+    route.query = { q: '全文' }
+    route.fullPath = '/search?q=全文'
+    postApi.search
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce({ content: [], totalElements: 0, totalPages: 0 })
+
+    const wrapper = mountSearch()
+    await flush()
+    expect(wrapper.find('.error-state').exists()).toBe(true)
+
+    const input = wrapper.find('input.search-input')
+    await input.setValue('draft')
+    await wrapper.find('.retry-btn').trigger('click')
+    await flush()
+
+    expect(input.element.value).toBe('draft')
+    expect(wrapper.find('.error-state').exists()).toBe(false)
+  })
+
+  it('加载中不渲染「共 N 条结果」', async () => {
+    let resolveSearch
+    postApi.search.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSearch = resolve
+        })
+    )
+    route.query = { q: '全文' }
+    route.fullPath = '/search?q=全文'
+
+    const wrapper = mountSearch()
+    await flush()
+
+    // 此时 totalElements 还是初始 0，渲染出来会误导成「共 0 条结果」
+    expect(wrapper.text()).not.toContain('条结果')
+
+    resolveSearch({ content: [postPayload()], totalElements: 12, totalPages: 2 })
+    await flush()
+
+    expect(wrapper.text()).toContain('共 12 条结果')
+  })
+
+  it('总页数不超过 1 时不渲染分页器', async () => {
+    route.query = { q: '全文' }
+    route.fullPath = '/search?q=全文'
+    postApi.search.mockResolvedValue({ content: [postPayload()], totalElements: 1, totalPages: 1 })
+
+    const wrapper = mountSearch()
+    await flush()
+
+    expect(wrapper.find('.pager-next').exists()).toBe(false)
+  })
+
+  it('q 只有空白时视为未搜索', async () => {
+    route.query = { q: '   ' }
+    route.fullPath = '/search?q=%20%20%20'
+
+    const wrapper = mountSearch()
+    await flush()
+
+    expect(postApi.search).not.toHaveBeenCalled()
+    expect(wrapper.find('.empty').text()).toBe('输入关键词开始搜索')
+  })
+
+  it('同一关键词再次回车不重复请求', async () => {
+    route.query = { q: '全文' }
+    route.fullPath = '/search?q=全文'
+    postApi.search.mockResolvedValue({ content: [postPayload()], totalElements: 1, totalPages: 1 })
+
+    const wrapper = mountSearch()
+    await flush()
+
+    const input = wrapper.find('input.search-input')
+    await input.setValue('全文')
+    await input.trigger('keyup.enter')
+    await flush()
+
+    expect(postApi.search).toHaveBeenCalledTimes(1)
+  })
+
+  it('关键词按 Unicode 码点限长 50：51 个 ASCII 不提交，50 个 emoji 可提交', async () => {
+    route.query = { q: '全文' }
+    route.fullPath = '/search?q=全文'
+    postApi.search.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0 })
+
+    const wrapper = mountSearch()
+    await flush()
+
+    const input = wrapper.find('input.search-input')
+    await input.setValue('a'.repeat(51))
+    await input.trigger('keyup.enter')
+    expect(replace).not.toHaveBeenCalled()
+
+    // 50 个 emoji 是 100 个 UTF-16 码元、但只有 50 个 code point，服务端口径允许
+    const q = '😀'.repeat(50)
+    await input.setValue(q)
+    await input.trigger('keyup.enter')
+    expect(replace).toHaveBeenCalledWith({ name: 'search', query: { q } })
+  })
+
+  it('快速翻页时先返回的旧页结果被序号丢弃', async () => {
+    let resolvePage2
+    let resolvePage3
+    postApi.search
+      .mockResolvedValueOnce({ content: [postPayload()], totalElements: 21, totalPages: 3 })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolvePage2 = resolve
+          })
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolvePage3 = resolve
+          })
+      )
+    route.query = { q: '全文' }
+    route.fullPath = '/search?q=全文'
+
+    const wrapper = mountSearch()
+    await flush()
+
+    await wrapper.find('.pager-next').trigger('click')
+    await flush()
+    await wrapper.find('.pager-next').trigger('click')
+    await flush()
+
+    resolvePage2({ content: [postPayload({ id: 2, title: '第二页旧' })], totalElements: 21, totalPages: 3 })
+    await flush()
+    expect(wrapper.text()).not.toContain('第二页旧')
+
+    resolvePage3({ content: [postPayload({ id: 3, title: '第三页新' })], totalElements: 21, totalPages: 3 })
+    await flush()
+    expect(wrapper.text()).toContain('第三页新')
+    expect(wrapper.find('[data-loading]').attributes('data-loading')).toBe('false')
   })
 })
