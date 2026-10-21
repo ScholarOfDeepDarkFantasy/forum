@@ -170,7 +170,8 @@ describe('buildSnippet', () => {
   })
 
   it('进一步清洗强调、分割线、表格、原始 HTML 与自动链接', () => {
-    expect(buildSnippet('**粗体** ---', '')).toBe('粗体')
+    // 分割线只按整行识别：行尾的 --- 不是分割线，按普通文本保留（与 markdown-it 一致）
+    expect(buildSnippet('**粗体** ---', '')).toBe('粗体 ---')
     expect(buildSnippet('~~删除~~ __强调__ *斜体* _倾斜_', '')).toBe('删除 强调 斜体 倾斜')
     expect(buildSnippet('前\n***\n中\n___\n后', '')).toBe('前 中 后')
     expect(buildSnippet('| 名称 | 数量 |\n| --- | --- |\n| 苹果 | 3 |', '')).toBe(
@@ -178,6 +179,55 @@ describe('buildSnippet', () => {
     )
     expect(buildSnippet('<div class="x">红色</div>文本', '')).toBe('红色 文本')
     expect(buildSnippet('<https://a.b>', '')).toBe('https://a.b')
+  })
+
+  it('行内代码优先保护，代码里的强调与管道按字面保留，下划线遵循词内规则', () => {
+    // 代码外的 _ 在词内不构成强调（CommonMark 的 intraword 规则），关键词仍可命中
+    expect(buildSnippet('示例 a_b_c 说明', 'a_b_c', 5)).toBe('示例 a_b_c 说明')
+    // 行内代码内容必须在强调/链接/HTML/管道清洗之前保护起来
+    expect(buildSnippet('示例 `a_b_c` 说明', 'a_b_c', 5)).toBe('示例 a_b_c 说明')
+    expect(buildSnippet('`a**b**c`', '')).toBe('a**b**c')
+    expect(buildSnippet('`a || b`', '')).toBe('a || b')
+    // 占位符不能泄漏到输出
+    expect(buildSnippet('`a || b`', '')).not.toContain('\u0000')
+    // 代码里的关键词在清洗后的片段里仍能被高亮
+    const snippet = buildSnippet('示例 `a_b_c` 说明', 'a_b_c', 5)
+    expect(highlightSegments(snippet, 'a_b_c').filter((s) => s.hit).map((s) => s.text)).toEqual([
+      'a_b_c'
+    ])
+  })
+
+  it('带标题的链接与图片只保留文字', () => {
+    expect(buildSnippet('[文字](https://e.com "标题")', '')).toBe('文字')
+    expect(buildSnippet("[文字](https://e.com '标题')", '')).toBe('文字')
+    expect(buildSnippet('[文字](https://e.com (标题))', '')).toBe('文字')
+    expect(buildSnippet('![图片](https://e.com/a.png "标题")', '')).toBe('图片')
+  })
+
+  it('闭合围栏不短于起始围栏，闭合后继续保留后续正文', () => {
+    expect(buildSnippet('说明\n```js\ncode\n````\n后文', '')).toBe('说明 后文')
+  })
+
+  it('反引号围栏的 info string 含反引号时按单行行内代码处理', () => {
+    // markdown-it 把 4 个反引号包住 `code` 视为行内代码，内容是字面量的 `code`
+    expect(buildSnippet('```` `code` ````', '')).toBe('`code`')
+  })
+
+  it('分割线与表格只按整行/整块识别，避免误伤普通文本', () => {
+    // 只有整行都是 - - - / *** / ___ 才是分割线
+    expect(buildSnippet('5 - - - 6', '')).toBe('5 - - - 6')
+    expect(buildSnippet('前\n- - -\n后', '')).toBe('前 后')
+    // 没有分隔行的普通文本不按表格折叠管道
+    expect(buildSnippet('前 | 中 | 后', '')).toBe('前 | 中 | 后')
+    // 有分隔行才是表格块，块内（含单列表格）才折叠管道
+    expect(buildSnippet('| 名称 | 数量 |\n| --- | --- |\n| 苹果 | 3 |', '')).toBe(
+      '名称 数量 苹果 3'
+    )
+    expect(buildSnippet('| 表头 |\n| --- |\n| 值 |', '')).toBe('表头 值')
+  })
+
+  it('邮件自动链接保留地址，不被当作原始 HTML 标签删除', () => {
+    expect(buildSnippet('<foo@bar.example.com>', '')).toBe('foo@bar.example.com')
   })
 
   it('4 个及以上反引号的围栏与未闭合围栏都整段丢弃', () => {

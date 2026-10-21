@@ -45,7 +45,7 @@
 | 文件 | 职责 |
 |---|---|
 | `frontend/src/utils/search.js` | 纯函数：`highlightSegments(text, keyword)` 分段高亮、`buildSnippet(content, keyword, radius)` Markdown 轻量清洗 + 命中窗口 + 省略号 |
-| `frontend/src/utils/search.spec.js` | 上述两个纯函数的 24 个用例 |
+| `frontend/src/utils/search.spec.js` | 上述两个纯函数的 30 个用例 |
 | `frontend/src/components/HeaderSearch.vue` | 顶栏搜索入口：桌面 `el-input`（220px）/ 窄屏图标按钮，`useResponsive` + `v-if` 切换 |
 | `frontend/src/components/HeaderSearch.spec.js` | 5 个用例：回车跳转、空白不跳、同页同词不重复、窄屏图标、URL→输入框同步 |
 | `frontend/src/views/SearchView.vue` | `/search?q=` 搜索结果页：计数、分页、三种空态、`requestSeq` 防竞态、点赞复用共享状态 |
@@ -1009,7 +1009,8 @@ describe('buildSnippet', () => {
   })
 
   it('进一步清洗强调、分割线、表格、原始 HTML 与自动链接', () => {
-    expect(buildSnippet('**粗体** ---', '')).toBe('粗体')
+    // 分割线只按整行识别：行尾的 --- 不是分割线，按普通文本保留（与 markdown-it 一致）
+    expect(buildSnippet('**粗体** ---', '')).toBe('粗体 ---')
     expect(buildSnippet('~~删除~~ __强调__ *斜体* _倾斜_', '')).toBe('删除 强调 斜体 倾斜')
     expect(buildSnippet('前\n***\n中\n___\n后', '')).toBe('前 中 后')
     expect(buildSnippet('| 名称 | 数量 |\n| --- | --- |\n| 苹果 | 3 |', '')).toBe(
@@ -1017,6 +1018,55 @@ describe('buildSnippet', () => {
     )
     expect(buildSnippet('<div class="x">红色</div>文本', '')).toBe('红色 文本')
     expect(buildSnippet('<https://a.b>', '')).toBe('https://a.b')
+  })
+
+  it('行内代码优先保护，代码里的强调与管道按字面保留，下划线遵循词内规则', () => {
+    // 代码外的 _ 在词内不构成强调（CommonMark 的 intraword 规则），关键词仍可命中
+    expect(buildSnippet('示例 a_b_c 说明', 'a_b_c', 5)).toBe('示例 a_b_c 说明')
+    // 行内代码内容必须在强调/链接/HTML/管道清洗之前保护起来
+    expect(buildSnippet('示例 `a_b_c` 说明', 'a_b_c', 5)).toBe('示例 a_b_c 说明')
+    expect(buildSnippet('`a**b**c`', '')).toBe('a**b**c')
+    expect(buildSnippet('`a || b`', '')).toBe('a || b')
+    // 占位符不能泄漏到输出
+    expect(buildSnippet('`a || b`', '')).not.toContain('\u0000')
+    // 代码里的关键词在清洗后的片段里仍能被高亮
+    const snippet = buildSnippet('示例 `a_b_c` 说明', 'a_b_c', 5)
+    expect(highlightSegments(snippet, 'a_b_c').filter((s) => s.hit).map((s) => s.text)).toEqual([
+      'a_b_c'
+    ])
+  })
+
+  it('带标题的链接与图片只保留文字', () => {
+    expect(buildSnippet('[文字](https://e.com "标题")', '')).toBe('文字')
+    expect(buildSnippet("[文字](https://e.com '标题')", '')).toBe('文字')
+    expect(buildSnippet('[文字](https://e.com (标题))', '')).toBe('文字')
+    expect(buildSnippet('![图片](https://e.com/a.png "标题")', '')).toBe('图片')
+  })
+
+  it('闭合围栏不短于起始围栏，闭合后继续保留后续正文', () => {
+    expect(buildSnippet('说明\n```js\ncode\n````\n后文', '')).toBe('说明 后文')
+  })
+
+  it('反引号围栏的 info string 含反引号时按单行行内代码处理', () => {
+    // markdown-it 把 4 个反引号包住 `code` 视为行内代码，内容是字面量的 `code`
+    expect(buildSnippet('```` `code` ````', '')).toBe('`code`')
+  })
+
+  it('分割线与表格只按整行/整块识别，避免误伤普通文本', () => {
+    // 只有整行都是 - - - / *** / ___ 才是分割线
+    expect(buildSnippet('5 - - - 6', '')).toBe('5 - - - 6')
+    expect(buildSnippet('前\n- - -\n后', '')).toBe('前 后')
+    // 没有分隔行的普通文本不按表格折叠管道
+    expect(buildSnippet('前 | 中 | 后', '')).toBe('前 | 中 | 后')
+    // 有分隔行才是表格块，块内（含单列表格）才折叠管道
+    expect(buildSnippet('| 名称 | 数量 |\n| --- | --- |\n| 苹果 | 3 |', '')).toBe(
+      '名称 数量 苹果 3'
+    )
+    expect(buildSnippet('| 表头 |\n| --- |\n| 值 |', '')).toBe('表头 值')
+  })
+
+  it('邮件自动链接保留地址，不被当作原始 HTML 标签删除', () => {
+    expect(buildSnippet('<foo@bar.example.com>', '')).toBe('foo@bar.example.com')
   })
 
   it('4 个及以上反引号的围栏与未闭合围栏都整段丢弃', () => {
@@ -1090,8 +1140,8 @@ Create `frontend/src/utils/search.js`：
  * 不能直接 `source.toLowerCase()` 后拿折叠串下标切原文：Unicode 折叠可能改变 UTF-16
  * 长度（例如 `'İ'.toLowerCase()` 是 'i' + 组合点，两个码元），长度一变下标就错位，
  * 切片会切出乱码。这里逐码点折叠，记录每个折叠码元对应的原文起止下标：`map[k]` 是
- * 该折叠码元在原文里的起点，`endMap[k]` 是它所在原文码点的终点；`map[folded.length]`
- * 等于原文长度，便于命中区间映射回原文后再切。
+ * 该折叠码元在原文里的起点，`endMap[k]` 是它所在原文码点的终点；命中区间的右端用
+ * `endMap[末位]` 回推。`map` 末尾额外压一个原文长度哨兵，当前切片不读它。
  */
 function foldWithMap(text) {
   const source = String(text ?? '')
@@ -1159,48 +1209,191 @@ export function highlightSegments(text, keyword) {
 const DEFAULT_RADIUS = 40
 const ELLIPSIS = '…'
 
+/** 行内代码占位符：正文入口先剥掉 NUL，因此 `\u0000<编号>\u0000` 不会与内容冲突 */
+const PLACEHOLDER = '\u0000'
+
+/** 围栏：3 个以上同字符、缩进不超过 3 空格；info string 只影响能否识别（见 fenceOpening） */
+const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/
+const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/
+/** 分割线：整行只有空格与 3 个以上 - / * / _（允许中间有空格） */
+const THEMATIC_BREAK = /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/
+/** 表格分隔行：[可选 |] 单元格（冒号 + 连字符）[| 单元格…] [可选 |] */
+const TABLE_SEPARATOR = /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/
+/** 图片先于链接：alt 文本保留，可选的 "标题"/'标题'/(标题) 一并丢弃 */
+const IMAGE = /!\[([^\]]*)\]\(\s*(?:[^()\s]|\([^()]*\))*(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?\s*\)/g
+/** 链接：只留文字（URL 允许一层成对括号，可选标题同样丢弃） */
+const LINK = /\[([^\]]*)\]\(\s*(?:[^()\s]|\([^()]*\))*(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?\s*\)/g
+/** 自动链接：<https://...> / <mailto:...> 与 <a@b.c>，保留链接文本 */
+const AUTOLINK_URL = /<((?:https?:\/\/|mailto:)[^>\s]+)>/gi
+const AUTOLINK_EMAIL = /<([^<>\s@]+@[^<>\s@]+\.[^<>\s@]+)>/g
+/** 原始 HTML 标签：标签名后必须是空白、/ 或 >，避免把 <foo@bar.example.com> 当成标签删掉 */
+const HTML_TAG = /<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^>]*)?\/?>/g
+
+/**
+ * 识别围栏起始行。反引号围栏的 info string 里不允许再出现反引号（CommonMark），
+ * 否则这一行不是围栏而是单行行内代码，例如 ```` `code` ````。
+ */
+function fenceOpening(line) {
+  const match = FENCE_OPEN.exec(line)
+  if (!match) return null
+  if (match[1][0] === '`' && match[2].includes('`')) return null
+  return { char: match[1][0], length: match[1].length }
+}
+
+/** 闭合围栏必须与起始围栏同字符，长度不短于起始围栏，且除缩进/尾随空白外没有内容 */
+function fenceClosing(line, opening) {
+  const match = FENCE_CLOSE.exec(line)
+  return Boolean(match) && match[1][0] === opening.char && match[1].length >= opening.length
+}
+
+/** 先按行扫围栏代码块：闭合段整段丢弃；未闭合段丢弃到文末（近似处理） */
+function stripFencedCode(lines) {
+  const kept = []
+  for (let i = 0; i < lines.length; ) {
+    const opening = fenceOpening(lines[i])
+    if (!opening) {
+      kept.push(lines[i])
+      i += 1
+      continue
+    }
+    let close = i + 1
+    while (close < lines.length && !fenceClosing(lines[close], opening)) close += 1
+    if (close >= lines.length) break
+    i = close + 1
+  }
+  return kept
+}
+
+function isTableSeparator(line) {
+  return line.includes('|') && TABLE_SEPARATOR.test(line)
+}
+
+/**
+ * 按行去掉整行分割线与表格块。
+ * 只有整行都是 - / * / _ 才是分割线，`5 - - - 6` 这种行内连字符要原样保留；
+ * 只有「表头行 + 分隔行」才进入表格块，块内管道符折叠为空格，块外管道符原样保留。
+ */
+function stripBlockMarkers(text) {
+  const lines = text.split('\n')
+  const kept = []
+  for (let i = 0; i < lines.length; ) {
+    if (THEMATIC_BREAK.test(lines[i])) {
+      i += 1
+      continue
+    }
+    if (i + 1 < lines.length && lines[i].includes('|') && isTableSeparator(lines[i + 1])) {
+      kept.push(lines[i].replace(/\|/g, ' '))
+      i += 2
+      while (i < lines.length && lines[i].includes('|')) {
+        kept.push(lines[i].replace(/\|/g, ' '))
+        i += 1
+      }
+      continue
+    }
+    kept.push(lines[i])
+    i += 1
+  }
+  return kept.join('\n')
+}
+
+/**
+ * 行内代码用占位符保护起来，避免后续的链接/HTML/强调/管道清洗误伤代码里的字面量。
+ * 返回 `{ text, codes }`，`codes[n]` 是第 n 段代码的内容（已按 CommonMark 去掉两端各
+ * 一个空格）。未闭合的反引号串原样保留；空行是段落边界，行内代码不跨段配对（近似处理）。
+ */
+function protectInlineCode(text) {
+  const codes = []
+  let out = ''
+  let i = 0
+  while (i < text.length) {
+    if (text[i] !== '`') {
+      out += text[i]
+      i += 1
+      continue
+    }
+    let width = 0
+    while (text[i + width] === '`') width += 1
+    let cursor = i + width
+    let close = -1
+    while (cursor < text.length) {
+      if (text[cursor] === '\n' && text[cursor + 1] === '\n') break
+      if (text[cursor] !== '`') {
+        cursor += 1
+        continue
+      }
+      let run = 0
+      while (text[cursor + run] === '`') run += 1
+      if (run === width) {
+        close = cursor
+        break
+      }
+      cursor += run
+    }
+    if (close === -1) {
+      out += text.slice(i, i + width)
+      i += width
+      continue
+    }
+    let inner = text.slice(i + width, close)
+    if (inner.length >= 2 && inner.startsWith(' ') && inner.endsWith(' ') && inner.trim() !== '') {
+      inner = inner.slice(1, -1)
+    }
+    out += PLACEHOLDER + codes.length + PLACEHOLDER
+    codes.push(inner)
+    i = close + width
+  }
+  return { text: out, codes }
+}
+
+/** 还原行内代码占位符；兜底剥掉任何残留的 NUL，保证占位符不泄漏到片段里 */
+function restoreInlineCode(text, codes) {
+  return text
+    .replace(/\u0000(\d+)\u0000/g, (_, index) => codes[Number(index)] ?? '')
+    .replace(/\u0000/g, '')
+}
+
 /**
  * 轻量清洗 Markdown，只保留适合「一行片段」展示的纯文本。
  *
- * 这是面向搜索片段的近似清洗，不是完整的 Markdown 解析器：嵌套、转义、setext 标题等
- * 边角写法不保证与渲染结果一致。这里刻意不走 markdown-it 的渲染流程——它已经是帖子
- * 详情页的渲染依赖，但本工具只需要纯文本；先渲染成 <p>/<strong> 再剥标签更慢，也容易
- * 漏标签。步骤顺序有依赖：围栏先于行内代码，图片先于链接，自动链接先于通用 HTML 标签。
+ * 这是面向搜索片段的近似清洗，不是完整的 Markdown 解析器：setext 标题、嵌套列表、
+ * 四空格缩进的代码块、嵌套引用（只去一层 `>`）、转义写法等边角情况不保证与渲染结果
+ * 一致。这里刻意不走 markdown-it 的渲染流程——它已经是帖子详情页的渲染依赖，但本工具
+ * 只需要纯文本；先渲染成 <p>/<strong> 再剥标签更慢，也容易漏标签。
+ *
+ * 步骤顺序有依赖：先按行扫掉围栏代码块、整行分割线与表格块；行内代码用占位符先保护
+ * 起来（避免代码里的强调/管道被误伤），图片先于链接，自动链接先于通用 HTML 标签；最后
+ * 还原代码内容并折叠空白。
  */
 function plainText(markdown) {
-  return String(markdown ?? '')
-    // 围栏代码块：闭合的整段丢弃；未闭合的从围栏行丢弃到文末（近似处理）
-    .replace(/^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?^ {0,3}\1\s*$/gm, ' ')
-    .replace(/^ {0,3}(?:`{3,}|~{3,})[^\n]*[\s\S]*/m, ' ')
-    // 行内代码：只去掉标记，保留内容
-    .replace(/`([^`]*)`/g, '$1')
-    // 水平分割线（---、***、___，允许中间有空格）
-    .replace(/(^|\s)([-*_])(?:\s*\2){2,}(?=\s|$)/g, ' ')
-    // 表格分隔行（如 | --- | :---: |），先于管道符替换
-    .replace(/^ {0,3}\|?(?:\s*:?-{3,}:?\s*\|)+(?:\s*:?-{3,}:?\s*)?$/gm, ' ')
-    // 图片先于链接：只留 alt 文本（URL 允许一层成对括号）
-    .replace(/!\[([^\]]*)\]\((?:[^()\s]|\([^()]*\))*\)/g, '$1')
+  // NUL 只用于内部占位：入口先剥掉正文里的 NUL，保证占位符不会与内容冲突
+  const source = String(markdown ?? '')
+    .replace(/\u0000/g, '')
+    .replace(/\r\n?/g, '\n')
+  const { text, codes } = protectInlineCode(stripFencedCode(source.split('\n')).join('\n'))
+  const cleaned = stripBlockMarkers(text)
+    // 图片先于链接：只留 alt 文本（URL 允许一层成对括号，可选标题一并丢弃）
+    .replace(IMAGE, '$1')
     // 链接：只留文字（URL 里的一层括号不会被截断，不留下多余的 ')'）
-    .replace(/\[([^\]]*)\]\((?:[^()\s]|\([^()]*\))*\)/g, '$1')
-    // 自动链接 <https://...>：保留 URL 文本，必须先于通用 HTML 标签剥离
-    .replace(/<((?:https?:\/\/|mailto:)[^>\s]+)>/gi, '$1')
+    .replace(LINK, '$1')
+    // 自动链接：保留链接文本，必须先于通用 HTML 标签剥离
+    .replace(AUTOLINK_URL, '$1')
+    .replace(AUTOLINK_EMAIL, '$1')
     // 原始 HTML 标签：替换为空格，保留标签之间的可见文字
-    .replace(/<\/?[a-zA-Z][^>]*>/g, ' ')
-    // 强调符号：先成对双标记，再成对单标记（粗体/斜体/删除线）
+    .replace(HTML_TAG, ' ')
+    // 强调符号：先成对双标记，再成对单标记（粗体/斜体/删除线）。
+    // 下划线遵循 CommonMark 的 intraword 规则（`a_b_c` 不是强调）；星号允许词内强调。
     .replace(/~~(?=\S)([^~]+?)(?<=\S)~~/g, '$1')
     .replace(/\*\*(?=\S)([^*]+?)(?<=\S)\*\*/g, '$1')
-    .replace(/__(?=\S)([^_]+?)(?<=\S)__/g, '$1')
+    .replace(/(?<![\p{L}\p{N}])__(?=\S)([^_]+?)(?<=\S)__(?![\p{L}\p{N}])/gu, '$1')
     .replace(/\*(?=\S)([^*\n]+?)(?<=\S)\*/g, '$1')
-    .replace(/_(?=\S)([^_\n]+?)(?<=\S)_/g, '$1')
-    // 标题 / 引用 / 无序列表 / 有序列表前缀（逐行）
+    .replace(/(?<![\p{L}\p{N}])_(?=\S)([^_\n]+?)(?<=\S)_(?![\p{L}\p{N}])/gu, '$1')
+    // 标题 / 引用 / 无序列表 / 有序列表前缀（逐行；只去一层引用，嵌套引用是近似局限）
     .replace(/^\s{0,3}#{1,6}\s+/gm, '')
     .replace(/^\s{0,3}>\s?/gm, '')
     .replace(/^\s{0,3}(?:[-*+]|\d+\.)\s+/gm, '')
-    // 表格管道符
-    .replace(/\|/g, ' ')
-    // 换行与连续空白折叠为单空格
-    .replace(/\s+/g, ' ')
-    .trim()
+  // 行内代码最后还原（强调/链接/HTML 清洗已完成，代码里的字面量不会再被误伤），
+  // 再折叠空白，保证片段始终是单行
+  return restoreInlineCode(cleaned, codes).replace(/\s+/g, ' ').trim()
 }
 
 /**
@@ -1254,7 +1447,7 @@ Run:
 cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/utils/search.spec.js
 ```
 
-Expected: **PASS** —— `24 passed`。
+Expected: **PASS** —— `30 passed`。
 
 - [ ] **Step 2-3: 提交搜索文本工具**
 
@@ -1279,6 +1472,19 @@ Expected: 提交成功；`git status` 干净。
 5. **测试与注释**：相邻命中用 `'aaaa'` + `'aa'` 覆盖；补 CRLF、大小写、代理对、radius 边界用例；删除可证明等价的多余分支（无命中时 `from` 仍为 0，末尾分支会整段返回原文）；更正文中关于 markdown-it 的说明（它已是渲染依赖，本工具只是不需要渲染流程）。
 
 结果：`frontend/src/utils/search.spec.js` 共 **24 例**；前端全量 **26 文件 / 235 例** 通过。修复测试先在旧实现上失败（`İx` 被整段高亮、`buildSnippet('İİİİİx','x',2)` 只剩 `…`），改为映射下标后转绿。
+
+### Task 2 二次质量修复记录（实施偏差）
+
+delta 复审确认上一轮三项问题已修复，但发现 `plainText` 的近似清洗仍有误伤；按「先写失败测试、再修实现」在同一分支追加一次修复提交（`fix: 修正搜索片段清洗的代码块与表格误伤`），只改动 `frontend/src/utils/search.js`、`frontend/src/utils/search.spec.js` 与本计划文档：
+
+1. **行内代码优先保护（R1）**：`plainText` 先按行扫掉围栏，随后立即用 `\u0000<编号>\u0000` 占位符把行内代码内容整体保护起来，等链接/HTML/强调清洗完再还原，因此 `` `a**b**c` ``、`` `a || b` ``、`` `a_b_c` `` 中的字面量不再被误伤；`_` 强调补上 CommonMark 的 intraword 限制（开标记前、闭标记后不能是字母/数字），`示例 a_b_c 说明` 不再变成 `示例 abc 说明`；`*` 仍允许词内强调（与 markdown-it 一致）。「只去掉标记，保留内容」的注释现在与实现一致。入口先剥掉正文里的 NUL、还原后再兜底清一次，占位符不会泄漏到片段。
+2. **带标题链接（R2）**：链接/图片正则容许目的地址后跟可选空白 + `"标题"` / `'标题'` / `(标题)`，四种写法（含图片）都只保留可见文字，不再泄漏原始 Markdown。
+3. **围栏闭合（R3/R4）**：围栏改为按行扫描，闭合行必须与起始行同字符且长度不短于起始行；输入首行 `说明`、三反引号围栏、`code`、四反引号的闭合行与 `后文` 时，只丢代码、保留 `后文`。反引号围栏的 info string 含反引号时不算围栏，4 个反引号包住 `code` 的单行写法按行内代码得到 `` `code` ``。
+4. **减少过度清洗（R5）**：分割线改为整行锚定（`5 - - - 6` 原样保留）；管道符只在「表头行 + 分隔行」的表格块内折叠（`前 | 中 | 后` 原样保留）；原始 HTML 标签名后要求空白、`/` 或 `>`，并新增邮件自动链接，`<foo@bar.example.com>` 输出 `foo@bar.example.com`。
+5. **注释（R6）**：更正 `foldWithMap` 文档中「`map[folded.length]` 用于切片」的说法（右端实际用 `endMap`，末尾哨兵不参与切片）；`plainText` 头部注释继续列出 setext 标题、嵌套列表、四空格缩进代码块、嵌套引用、转义等近似局限。
+6. **既有断言调整**：`buildSnippet('**粗体** ---', '')` 的期望由 `粗体` 改为 `粗体 ---`。整行锚定后行尾的 `---` 不是分割线，与 markdown-it 渲染一致；这是「减少过度清洗」带来的预期行为变化，已随用例固化。
+
+结果：`frontend/src/utils/search.spec.js` 共 **30 例**；前端全量 **26 文件 / 241 例** 通过。新增与调整的用例先在旧实现上失败 **7 例**（R1 行内代码与词内下划线、R2 标题链接、R3 长闭合围栏、R4 单行行内代码、R5 分割线/表格/邮件链接、调整期望的 `**粗体** ---`），修复实现后转绿。
 
 ---
 
@@ -2803,7 +3009,7 @@ Expected: 工作区干净；顶部 6 条提交依次为「回填」「文档」�
 | §4.4 控制器（`GET /search` 放 list 之后、detail 之前；两侧夹取） | Task 1 Step 1-7（含位置说明） |
 | §4.5 V3 迁移（逐字 SQL）+ H2 测试隔离（`spring.flyway.enabled=false`） | Task 1 Step 1-3（SQL 逐字）、Step 1-1（RepositoryTests properties）；Step 1-5 的集成测试同样带该属性；Task 5 Step 5-8 验证真实执行 |
 | §5.1 `postApi.search` | Task 3 Step 3-1/3-2 |
-| §5.2 `highlightSegments` / `buildSnippet`（indexOf、无正则、Markdown 轻量清洗、窗口 + 省略号） | Task 2 Step 2-1/2-2（24 例覆盖每一条规则） |
+| §5.2 `highlightSegments` / `buildSnippet`（indexOf、无正则、Markdown 轻量清洗、窗口 + 省略号） | Task 2 Step 2-1/2-2（30 例覆盖每一条规则） |
 | §5.3 `HeaderSearch.vue`（220px、maxlength、回车/图标、同页同词不重复、窄屏图标、watch URL、App.vue 标签之后、零 @media） | Task 3 Step 3-3/3-4/3-10；样式只写固定宽度，无媒体查询 |
 | §5.4 `SearchView.vue`（`/search?q=`、replace、内部 page、计数、PostListItem、三空态、requestSeq、usePostActions） | Task 3 Step 3-5/3-6（8 例逐一对应） |
 | §5.5 `PostListItem` 可选 `keyword`/`snippet`、`<mark class="hit">`、首页/标签页行为不变 | Task 3 Step 3-8/3-9；props 默认空串，首页与标签页不传 |
