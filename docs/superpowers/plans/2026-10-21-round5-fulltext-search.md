@@ -45,7 +45,7 @@
 | 文件 | 职责 |
 |---|---|
 | `frontend/src/utils/search.js` | 纯函数：`highlightSegments(text, keyword)` 分段高亮、`buildSnippet(content, keyword, radius)` Markdown 轻量清洗 + 命中窗口 + 省略号 |
-| `frontend/src/utils/search.spec.js` | 上述两个纯函数的 12 个用例 |
+| `frontend/src/utils/search.spec.js` | 上述两个纯函数的 24 个用例 |
 | `frontend/src/components/HeaderSearch.vue` | 顶栏搜索入口：桌面 `el-input`（220px）/ 窄屏图标按钮，`useResponsive` + `v-if` 切换 |
 | `frontend/src/components/HeaderSearch.spec.js` | 5 个用例：回车跳转、空白不跳、同页同词不重复、窄屏图标、URL→输入框同步 |
 | `frontend/src/views/SearchView.vue` | `/search?q=` 搜索结果页：计数、分页、三种空态、`requestSeq` 防竞态、点赞复用共享状态 |
@@ -840,6 +840,28 @@ Create `frontend/src/utils/search.spec.js`：
 import { describe, it, expect } from 'vitest'
 import { highlightSegments, buildSnippet } from './search'
 
+function isHighSurrogate(code) {
+  return code >= 0xd800 && code <= 0xdbff
+}
+
+function isLowSurrogate(code) {
+  return code >= 0xdc00 && code <= 0xdfff
+}
+
+/** 检测字符串里是否有落单的代理项（切成两半的 emoji/生僻字） */
+function hasLoneSurrogate(value) {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i)
+    if (isHighSurrogate(code)) {
+      if (!isLowSurrogate(value.charCodeAt(i + 1))) return true
+      i += 1
+    } else if (isLowSurrogate(code)) {
+      return true
+    }
+  }
+  return false
+}
+
 describe('highlightSegments', () => {
   it('空文本或空关键词返回单段，hit 为 false', () => {
     expect(highlightSegments('', 'java')).toEqual([{ text: '', hit: false }])
@@ -858,12 +880,23 @@ describe('highlightSegments', () => {
   it('大小写不敏感，命中段用原文切片而不是关键词', () => {
     const segments = highlightSegments('JAVA 与 java', 'Java')
     expect(segments.filter((s) => s.hit).map((s) => s.text)).toEqual(['JAVA', 'java'])
+    // 大小写混排的多处命中同样按原文输出
+    expect(
+      highlightSegments('Java JAVA java', 'jAvA')
+        .filter((s) => s.hit)
+        .map((s) => s.text)
+    ).toEqual(['Java', 'JAVA', 'java'])
   })
 
   it('多处命中时逐段输出，相邻命中之间不产生空段', () => {
     expect(highlightSegments('aa-aa', 'aa')).toEqual([
       { text: 'aa', hit: true },
       { text: '-', hit: false },
+      { text: 'aa', hit: true }
+    ])
+    // 相邻命中（无间隔）也要逐段输出，不能合并或漏掉第二处
+    expect(highlightSegments('aaaa', 'aa')).toEqual([
+      { text: 'aa', hit: true },
       { text: 'aa', hit: true }
     ])
   })
@@ -878,11 +911,33 @@ describe('highlightSegments', () => {
       { text: 'a+b', hit: true },
       { text: ' 与 (x)', hit: false }
     ])
+    const segments = highlightSegments('数组 [0] 越界', '[0]')
     expect(() => highlightSegments('数组 [0] 越界', '[0]')).not.toThrow()
+    expect(segments).toEqual([
+      { text: '数组 ', hit: false },
+      { text: '[0]', hit: true },
+      { text: ' 越界', hit: false }
+    ])
   })
 
   it('关键词等于整段时只有一段 hit', () => {
     expect(highlightSegments('Java', 'java')).toEqual([{ text: 'Java', hit: true }])
+  })
+
+  it('大小写折叠改变长度时仍按原文下标切片，不丢字符', () => {
+    // 'İ'.toLowerCase() === 'i̇'（两个 UTF-16 码元），用折叠串下标切原文会错位
+    expect(highlightSegments('İx', 'İ')).toEqual([
+      { text: 'İ', hit: true },
+      { text: 'x', hit: false }
+    ])
+    expect(highlightSegments('İİİİİx', 'x')).toEqual([
+      { text: 'İİİİİ', hit: false },
+      { text: 'x', hit: true }
+    ])
+    // 分段首尾相接必须还原原文，且命中段是原文而不是折叠结果
+    const segments = highlightSegments('İİİİİx', 'x')
+    expect(segments.map((s) => s.text).join('')).toBe('İİİİİx')
+    expect(segments[1].text).toBe('x')
   })
 })
 
@@ -907,6 +962,11 @@ describe('buildSnippet', () => {
 
   it('换行与连续空白折叠为单个空格', () => {
     expect(buildSnippet('第一行\n\n第二行\t\t第三段', '')).toBe('第一行 第二行 第三段')
+  })
+
+  it('CRLF 换行同样折叠为单个空格', () => {
+    expect(buildSnippet('# 标题\r\n> 引用\r\n- 列表项', '')).toBe('标题 引用 列表项')
+    expect(buildSnippet('第一行\r\n\r\n第二行', '')).toBe('第一行 第二行')
   })
 
   it('空正文返回空串', () => {
@@ -941,6 +1001,61 @@ describe('buildSnippet', () => {
 
     expect(snippet).toBe('前面 java 后面')
   })
+
+  it('大小写折叠改变长度时片段不出现乱码，窗口下标映射回原文', () => {
+    expect(buildSnippet('İİİİİx', 'x', 2)).toBe('…İİx')
+    expect(buildSnippet('İx', 'İ', 10)).toBe('İx')
+    expect(buildSnippet('İİİİİx', 'x', 2)).not.toMatch(/\uFFFD/)
+  })
+
+  it('进一步清洗强调、分割线、表格、原始 HTML 与自动链接', () => {
+    expect(buildSnippet('**粗体** ---', '')).toBe('粗体')
+    expect(buildSnippet('~~删除~~ __强调__ *斜体* _倾斜_', '')).toBe('删除 强调 斜体 倾斜')
+    expect(buildSnippet('前\n***\n中\n___\n后', '')).toBe('前 中 后')
+    expect(buildSnippet('| 名称 | 数量 |\n| --- | --- |\n| 苹果 | 3 |', '')).toBe(
+      '名称 数量 苹果 3'
+    )
+    expect(buildSnippet('<div class="x">红色</div>文本', '')).toBe('红色 文本')
+    expect(buildSnippet('<https://a.b>', '')).toBe('https://a.b')
+  })
+
+  it('4 个及以上反引号的围栏与未闭合围栏都整段丢弃', () => {
+    expect(buildSnippet('说明\n````md\n```js\ncode\n```\n````\n结尾', '')).toBe('说明 结尾')
+    expect(buildSnippet('开头\n```js\nint a = 1;', '')).toBe('开头')
+    expect(buildSnippet('开头\n````\nint a = 1;', '')).toBe('开头')
+  })
+
+  it('链接 URL 里的一层成对括号不会留下多余的右括号', () => {
+    expect(buildSnippet('[text](https://e.com/a_(b))', '')).toBe('text')
+    expect(buildSnippet('![图](https://e.com/a_(b))', '')).toBe('图')
+  })
+
+  it('radius 非有限值回退默认值，负数按 0 处理', () => {
+    const long = 'A'.repeat(100) + '关键词' + 'B'.repeat(100)
+
+    expect(buildSnippet(long, '关键词', NaN)).toBe(buildSnippet(long, '关键词'))
+    expect(buildSnippet(long, '关键词', Infinity)).toBe(buildSnippet(long, '关键词'))
+    expect(buildSnippet(long, '关键词', undefined)).toBe(buildSnippet(long, '关键词'))
+    expect(buildSnippet('前面 keyword 后面', 'keyword', -5)).toBe('…keyword…')
+  })
+
+  it('radius 为 0 时只保留关键词本身，无命中返回空串', () => {
+    expect(buildSnippet('前面 keyword 后面', 'keyword', 0)).toBe('…keyword…')
+    expect(buildSnippet('keyword 后面', 'keyword', 0)).toBe('keyword…')
+    expect(buildSnippet('x'.repeat(10), '无命中', 0)).toBe('')
+  })
+
+  it('命中在开头或结尾时窗口收敛到文本边界', () => {
+    expect(buildSnippet('关键词' + 'B'.repeat(100), '关键词', 5)).toBe('关键词BBBBB…')
+    expect(buildSnippet('A'.repeat(100) + '关键词', '关键词', 5)).toBe('…AAAAA关键词')
+  })
+
+  it('窗口边界不劈开代理对', () => {
+    const snippet = buildSnippet('a' + '😀'.repeat(5), '', 2)
+
+    expect(snippet).toBe('a😀😀…')
+    expect(hasLoneSurrogate(snippet)).toBe(false)
+  })
 })
 ```
 
@@ -969,32 +1084,73 @@ Create `frontend/src/utils/search.js`：
  * 是典型的可控输入）。
  */
 
-/** 大小写折叠：只做 toLowerCase（关键词是中文/英文混排，不需要 locale 相关折叠） */
+/**
+ * 大小写折叠并记录下标映射。
+ *
+ * 不能直接 `source.toLowerCase()` 后拿折叠串下标切原文：Unicode 折叠可能改变 UTF-16
+ * 长度（例如 `'İ'.toLowerCase()` 是 'i' + 组合点，两个码元），长度一变下标就错位，
+ * 切片会切出乱码。这里逐码点折叠，记录每个折叠码元对应的原文起止下标：`map[k]` 是
+ * 该折叠码元在原文里的起点，`endMap[k]` 是它所在原文码点的终点；`map[folded.length]`
+ * 等于原文长度，便于命中区间映射回原文后再切。
+ */
+function foldWithMap(text) {
+  const source = String(text ?? '')
+  const parts = []
+  const map = []
+  const endMap = []
+  for (let i = 0; i < source.length; ) {
+    const width = source.codePointAt(i) > 0xffff ? 2 : 1
+    const lower = source.slice(i, i + width).toLowerCase()
+    for (let k = 0; k < lower.length; k += 1) {
+      map.push(i)
+      endMap.push(i + width)
+    }
+    parts.push(lower)
+    i += width
+  }
+  map.push(source.length)
+  return { folded: parts.join(''), map, endMap }
+}
+
+/** 大小写折叠（关键词只需要折叠结果；与 foldWithMap 逐码点口径一致） */
 function fold(text) {
-  return String(text ?? '').toLowerCase()
+  return foldWithMap(text).folded
+}
+
+function isHighSurrogate(code) {
+  return code >= 0xd800 && code <= 0xdbff
+}
+
+function isLowSurrogate(code) {
+  return code >= 0xdc00 && code <= 0xdfff
 }
 
 /**
  * 把文本按关键词切成若干段，命中段 hit=true。
  * 空文本、空关键词、无命中都返回单段（hit=false），调用方不必判空。
+ * 命中区间通过 foldWithMap 的映射回到原文下标，因此 `İ` 这类折叠后变长的字符也能正确高亮。
  */
 export function highlightSegments(text, keyword) {
   const source = String(text ?? '')
   const kw = String(keyword ?? '')
   if (!source || !kw) return [{ text: source, hit: false }]
 
-  const segments = []
-  const haystack = fold(source)
+  const { folded, map, endMap } = foldWithMap(source)
   const needle = fold(kw)
+  if (!needle) return [{ text: source, hit: false }]
+
+  const segments = []
   let from = 0
-  let index = haystack.indexOf(needle)
+  let index = folded.indexOf(needle)
   while (index !== -1) {
-    if (index > from) segments.push({ text: source.slice(from, index), hit: false })
-    segments.push({ text: source.slice(index, index + needle.length), hit: true })
-    from = index + needle.length
-    index = haystack.indexOf(needle, from)
+    const start = map[index]
+    const end = endMap[index + needle.length - 1]
+    if (start > from) segments.push({ text: source.slice(from, start), hit: false })
+    segments.push({ text: source.slice(start, end), hit: true })
+    from = end
+    index = folded.indexOf(needle, index + needle.length)
   }
-  if (!segments.length) return [{ text: source, hit: false }]
+  // 无命中时 from 仍是 0，这里会把整段原文作为未命中段返回，与显式判空等价
   if (from < source.length) segments.push({ text: source.slice(from), hit: false })
   return segments
 }
@@ -1005,23 +1161,43 @@ const ELLIPSIS = '…'
 
 /**
  * 轻量清洗 Markdown，只保留适合「一行片段」展示的纯文本。
- * 刻意不引入 markdown-it：这里不需要渲染，只需要把标记符号去掉；
- * 用渲染器反而会先生成 <p>/<strong> 再剥一次标签，成本更高且可能漏标签。
+ *
+ * 这是面向搜索片段的近似清洗，不是完整的 Markdown 解析器：嵌套、转义、setext 标题等
+ * 边角写法不保证与渲染结果一致。这里刻意不走 markdown-it 的渲染流程——它已经是帖子
+ * 详情页的渲染依赖，但本工具只需要纯文本；先渲染成 <p>/<strong> 再剥标签更慢，也容易
+ * 漏标签。步骤顺序有依赖：围栏先于行内代码，图片先于链接，自动链接先于通用 HTML 标签。
  */
 function plainText(markdown) {
   return String(markdown ?? '')
-    // 代码围栏：整段（含内容）替换为空格，避免代码里的符号干扰片段
-    .replace(/```[\s\S]*?```/g, ' ')
+    // 围栏代码块：闭合的整段丢弃；未闭合的从围栏行丢弃到文末（近似处理）
+    .replace(/^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?^ {0,3}\1\s*$/gm, ' ')
+    .replace(/^ {0,3}(?:`{3,}|~{3,})[^\n]*[\s\S]*/m, ' ')
     // 行内代码：只去掉标记，保留内容
     .replace(/`([^`]*)`/g, '$1')
-    // 图片：只留 alt 文本
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
-    // 链接：只留文字
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    // 水平分割线（---、***、___，允许中间有空格）
+    .replace(/(^|\s)([-*_])(?:\s*\2){2,}(?=\s|$)/g, ' ')
+    // 表格分隔行（如 | --- | :---: |），先于管道符替换
+    .replace(/^ {0,3}\|?(?:\s*:?-{3,}:?\s*\|)+(?:\s*:?-{3,}:?\s*)?$/gm, ' ')
+    // 图片先于链接：只留 alt 文本（URL 允许一层成对括号）
+    .replace(/!\[([^\]]*)\]\((?:[^()\s]|\([^()]*\))*\)/g, '$1')
+    // 链接：只留文字（URL 里的一层括号不会被截断，不留下多余的 ')'）
+    .replace(/\[([^\]]*)\]\((?:[^()\s]|\([^()]*\))*\)/g, '$1')
+    // 自动链接 <https://...>：保留 URL 文本，必须先于通用 HTML 标签剥离
+    .replace(/<((?:https?:\/\/|mailto:)[^>\s]+)>/gi, '$1')
+    // 原始 HTML 标签：替换为空格，保留标签之间的可见文字
+    .replace(/<\/?[a-zA-Z][^>]*>/g, ' ')
+    // 强调符号：先成对双标记，再成对单标记（粗体/斜体/删除线）
+    .replace(/~~(?=\S)([^~]+?)(?<=\S)~~/g, '$1')
+    .replace(/\*\*(?=\S)([^*]+?)(?<=\S)\*\*/g, '$1')
+    .replace(/__(?=\S)([^_]+?)(?<=\S)__/g, '$1')
+    .replace(/\*(?=\S)([^*\n]+?)(?<=\S)\*/g, '$1')
+    .replace(/_(?=\S)([^_\n]+?)(?<=\S)_/g, '$1')
     // 标题 / 引用 / 无序列表 / 有序列表前缀（逐行）
     .replace(/^\s{0,3}#{1,6}\s+/gm, '')
     .replace(/^\s{0,3}>\s?/gm, '')
     .replace(/^\s{0,3}(?:[-*+]|\d+\.)\s+/gm, '')
+    // 表格管道符
+    .replace(/\|/g, ' ')
     // 换行与连续空白折叠为单空格
     .replace(/\s+/g, ' ')
     .trim()
@@ -1030,15 +1206,42 @@ function plainText(markdown) {
 /**
  * 生成一行搜索片段：先清洗 Markdown，再按关键词定位窗口。
  * 有命中时以第一处命中为中心；无命中时取开头窗口（标题命中也能看到一点正文上下文）。
- * 截断处补省略号；命中窗口越界时自动收敛到文本边界。
+ * 截断处补省略号；窗口越界时自动收敛到文本边界，并吸附到 code point 边界，避免劈开
+ * emoji/生僻字。radius 非有限值（undefined/NaN/Infinity）时回退 DEFAULT_RADIUS，负数
+ * 按 0 处理；radius = 0 时无命中返回空串，有命中只保留关键词本身（两侧仍按是否截断补
+ * 省略号）。
  */
 export function buildSnippet(content, keyword, radius = DEFAULT_RADIUS) {
   const text = plainText(content)
   if (!text) return ''
-  const kw = String(keyword ?? '')
-  const pos = kw ? fold(text).indexOf(fold(kw)) : -1
-  const start = pos > radius ? pos - radius : 0
-  const end = pos === -1 ? Math.min(text.length, radius * 2) : Math.min(text.length, pos + kw.length + radius)
+
+  const limit = Number.isFinite(radius) ? Math.max(0, Math.floor(radius)) : DEFAULT_RADIUS
+  const needle = fold(keyword)
+  let pos = -1
+  let hitEnd = -1
+  if (needle) {
+    const { folded, map, endMap } = foldWithMap(text)
+    const index = folded.indexOf(needle)
+    if (index !== -1) {
+      pos = map[index]
+      hitEnd = endMap[index + needle.length - 1]
+    }
+  }
+
+  let start = 0
+  let end = 0
+  if (pos === -1) {
+    end = Math.min(text.length, limit * 2)
+  } else {
+    start = Math.max(0, pos - limit)
+    end = Math.min(text.length, hitEnd + limit)
+  }
+  // 命中窗口端点吸附到 code point 边界：start 落在低位代理上时回退到配对高位，
+  // end 前一个码元是高位代理（说明切开了代理对）时把低位代理一并纳入。
+  if (start > 0 && isLowSurrogate(text.charCodeAt(start))) start -= 1
+  if (end > 0 && end < text.length && isHighSurrogate(text.charCodeAt(end - 1))) end += 1
+
+  if (start === 0 && end === 0) return ''
   const head = start > 0 ? ELLIPSIS : ''
   const tail = end < text.length ? ELLIPSIS : ''
   return head + text.slice(start, end) + tail
@@ -1051,7 +1254,7 @@ Run:
 cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/utils/search.spec.js
 ```
 
-Expected: **PASS** —— `12 passed`。
+Expected: **PASS** —— `24 passed`。
 
 - [ ] **Step 2-3: 提交搜索文本工具**
 
@@ -1064,6 +1267,18 @@ git commit -m "feat: 新增搜索关键词高亮与片段工具"
 ```
 
 Expected: 提交成功；`git status` 干净。
+
+### Task 2 质量修复记录（实施偏差）
+
+质量评审后在同一分支追加一次修复提交（`fix: 修正搜索工具的大小写折叠与片段清洗边界`），只改动 `frontend/src/utils/search.js`、`frontend/src/utils/search.spec.js` 与本计划文档：
+
+1. **折叠索引对齐**：`String.prototype.toLowerCase()` 可能改变 UTF-16 长度（`'İ'.toLowerCase()` 得到 'i' + 组合点两个码元），原实现用折叠串下标切原文会错位、切出乱码。改为 `foldWithMap(source) -> { folded, map, endMap }`：逐码点折叠并记录每个折叠码元对应的原文起止下标，`indexOf` 命中后把区间映射回原文再切片；`buildSnippet` 的 `pos` 同样映射。
+2. **片段清洗补全**：`plainText` 增加强调符号（`**`/`__`/`~~` 与成对 `*`/`_`）、水平分割线、表格管道与分隔行、原始 HTML 标签、自动链接；围栏支持 4 个以上反引号，未闭合围栏丢弃到文末。顺序为围栏 → 行内代码 → 分割线/表格分隔行 → 图片 → 链接 → 自动链接 → HTML → 强调 → 行前缀 → 管道 → 空白折叠。**局限：这是面向「一行片段」的近似清洗，不是完整 Markdown 解析器**，嵌套、转义、setext 标题等边角写法不保证与渲染结果一致。
+3. **radius 校验与代理对安全**：非有限值（`undefined`/`NaN`/`Infinity`）回退 `DEFAULT_RADIUS = 40`，负数按 0；窗口端点吸附到 code point 边界，不劈开 emoji/生僻字。`radius = 0` 时无命中返回空串，有命中只保留关键词本身（两侧仍按是否截断补省略号）。
+4. **链接 URL 平衡括号**：链接/图片正则允许 URL 内一层成对括号，`[text](https://e.com/a_(b))` 不再留下多余的 `)`。
+5. **测试与注释**：相邻命中用 `'aaaa'` + `'aa'` 覆盖；补 CRLF、大小写、代理对、radius 边界用例；删除可证明等价的多余分支（无命中时 `from` 仍为 0，末尾分支会整段返回原文）；更正文中关于 markdown-it 的说明（它已是渲染依赖，本工具只是不需要渲染流程）。
+
+结果：`frontend/src/utils/search.spec.js` 共 **24 例**；前端全量 **26 文件 / 235 例** 通过。修复测试先在旧实现上失败（`İx` 被整段高亮、`buildSnippet('İİİİİx','x',2)` 只剩 `…`），改为映射下标后转绿。
 
 ---
 
@@ -2588,7 +2803,7 @@ Expected: 工作区干净；顶部 6 条提交依次为「回填」「文档」�
 | §4.4 控制器（`GET /search` 放 list 之后、detail 之前；两侧夹取） | Task 1 Step 1-7（含位置说明） |
 | §4.5 V3 迁移（逐字 SQL）+ H2 测试隔离（`spring.flyway.enabled=false`） | Task 1 Step 1-3（SQL 逐字）、Step 1-1（RepositoryTests properties）；Step 1-5 的集成测试同样带该属性；Task 5 Step 5-8 验证真实执行 |
 | §5.1 `postApi.search` | Task 3 Step 3-1/3-2 |
-| §5.2 `highlightSegments` / `buildSnippet`（indexOf、无正则、Markdown 轻量清洗、窗口 + 省略号） | Task 2 Step 2-1/2-2（12 例覆盖每一条规则） |
+| §5.2 `highlightSegments` / `buildSnippet`（indexOf、无正则、Markdown 轻量清洗、窗口 + 省略号） | Task 2 Step 2-1/2-2（24 例覆盖每一条规则） |
 | §5.3 `HeaderSearch.vue`（220px、maxlength、回车/图标、同页同词不重复、窄屏图标、watch URL、App.vue 标签之后、零 @media） | Task 3 Step 3-3/3-4/3-10；样式只写固定宽度，无媒体查询 |
 | §5.4 `SearchView.vue`（`/search?q=`、replace、内部 page、计数、PostListItem、三空态、requestSeq、usePostActions） | Task 3 Step 3-5/3-6（8 例逐一对应） |
 | §5.5 `PostListItem` 可选 `keyword`/`snippet`、`<mark class="hit">`、首页/标签页行为不变 | Task 3 Step 3-8/3-9；props 默认空串，首页与标签页不传 |
