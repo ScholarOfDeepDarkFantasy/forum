@@ -94,6 +94,14 @@ sudo -u pi podman logs --tail 100 forum-backend
 - 方式一（推荐，可追溯）：Jenkins `Build with Parameters`，`IMAGE_TAG=<上一个 BUILD_NUMBER>`，`DEPLOY=true`。流水线会重新构建同版本 jar/前端并用该 tag 部署（历史镜像仍保留时 build 很快）。
 - 方式二（只回滚容器）：`cd /pd/Program/forum/deploy && sudo -u pi sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=<旧tag>/' .env && sudo -u pi podman-compose -p forum up -d`。
 - 数据库无版本回滚概念（Flyway 只前进）；回滚代码前确认迁移兼容。
+- V3 迁移只创建扩展与索引，**回滚代码不需要回滚数据库**：旧版本后端不依赖它们，扩展保留无害。确实要清理索引时（例如重建索引期间临时释放磁盘）执行：
+
+```sql
+DROP INDEX IF EXISTS idx_posts_content_trgm;
+DROP INDEX IF EXISTS idx_posts_title_trgm;
+```
+
+（`pg_trgm` 扩展本身建议保留：删除后重建需要再扫一遍 `posts` 建索引。）
 
 ## 5. 冒烟检查（部署后）
 
@@ -118,6 +126,39 @@ curl -fsSI -H 'Host: raspi' "http://127.0.0.1/forum$AVATAR" | grep -Ei '^(HTTP/|
 ```
 
 > 必须带 `Host: raspi`：`app.conf` 是 `server_name raspi`，用 IP 访问会落到 `sites-enabled/default`。
+
+### 全文搜索（V3 pg_trgm）验证
+
+V3 在 `forum-backend` 启动时由 Flyway 自动执行（`forum` 角色有 `CREATE` 权限；PostgreSQL 15 的 pg_trgm 是 trusted 扩展，不需要超级用户）。部署后确认扩展、索引与接口：
+
+```bash
+# 1) 扩展已安装
+sudo -u pi podman exec postgresql psql -U postgres -d javaforum -c '\dx pg_trgm'
+# 期望：Name = pg_trgm，Version = 1.6
+
+# 2) 两个 GIN 部分索引存在
+sudo -u pi podman exec postgresql psql -U postgres -d javaforum -c '\d posts'
+# 期望：idx_posts_title_trgm、idx_posts_content_trgm，类型 gin，条件 (deleted = false)
+
+# 3) 搜索接口经 nginx 可用
+curl -fsS -H 'Host: raspi' 'http://127.0.0.1/forum/api/posts/search?keyword=Jenkins' | head -c 300
+# 期望：{"success":true,...,"data":{"content":[...],...}}（无匹配时 content 为 []，仍是 200）
+
+# 4) 空白关键词与缺参数都是 400（不是 500）
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' 'http://127.0.0.1/forum/api/posts/search?keyword=%20'
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' 'http://127.0.0.1/forum/api/posts/search'
+
+# 5) 搜索页 SPA 回退正常
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' 'http://127.0.0.1/forum/search?q=Jenkins'
+# 期望：200
+```
+
+数据量小时（十几篇帖子）`EXPLAIN` 显示顺序扫描属正常：规划器认为全表读比索引检索更便宜。
+
+```sql
+EXPLAIN SELECT id FROM posts WHERE deleted = false
+  AND LOWER(title) LIKE CONCAT('%', 'jenkins', '%');
+```
 
 ## 6. 排障
 
@@ -149,6 +190,8 @@ curl -fsSI -H 'Host: raspi' "http://127.0.0.1/forum$AVATAR" | grep -Ei '^(HTTP/|
 - **不要执行全局 `podman image prune`**：会把 mini-mall 等其它项目的镜像一起删掉；流水线只清理 `localhost/forum-backend` 的旧数字 tag。
 - **头像文件不在数据库备份范围**：`/pd/Program/forum/uploads/` 是独立目录，数据库备份/迁移不覆盖它。恢复时用 `sudo tar -C /pd/Program/forum -p -xf uploads.tar uploads` 保留属主，再跑一次 `deploy.sh` 修正权限。
 - **孤儿头像文件不会自动清理**：换头像、删号后旧文件只在「没有其他用户引用」时由后端删除；异常中断或历史数据可能留下无引用文件，目前没有清理任务，需要时按 `users.avatar_url` 人工对账。
+- **1–2 个字的关键词用不上全文搜索索引**：pg_trgm 的三元组索引在关键词短于 3 个字符时无法过滤，规划器会走 `posts` 顺序扫描。当前数据量（十几到几十篇）下无感；数据量增长后短词查询会变慢，属预期行为。
+- **中文按子串匹配，无分词与相关度排序**：搜索是「标题/正文包含关键词」，不区分词边界，也不做相关度打分；排序规则固定为「标题命中优先、同档按时间倒序」。
 
 ## 附录 A：Jenkins job `config.xml`
 

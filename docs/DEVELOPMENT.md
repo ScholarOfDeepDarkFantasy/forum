@@ -3,7 +3,7 @@
 > 本文件是项目的**单一事实来源（single source of truth）**：记录开发情况、当前进度、已知问题与后续计划。
 > **每次开发（新功能、修复、优化、重构）结束前都必须更新本文件**，约定见 §0。
 >
-> 最近更新：2026-10-20 ｜ 文档版本：v1.4
+> 最近更新：2026-10-21 ｜ 文档版本：v1.5
 
 ---
 
@@ -119,56 +119,57 @@ cd frontend && pnpm test --run
 | 第三轮 | Markdown 渲染 + 标签检索 | 7 | ✅ 已完成 | 2026-10-19 |
 | 部署工程化 | raspi：Jenkins + rootless podman + nginx 自动化部署（见 §4.7） | — | ✅ 已完成 | 2026-10-19 |
 | 第四轮 | 深色模式 + 头像上传 | 6 | ✅ 已完成 | 2026-10-20 |
+| 第五轮 | 全文搜索：搜索接口 + pg_trgm 索引 + 顶栏入口与搜索结果页 | 5 | ⏳ 待上线验收（Task 5） | — |
 
-**当前进度：MVP 100% ｜ 已完成 4 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 4 轮迭代，第五轮待上线验收。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
-## 3. 当前状态快照（2026-10-20）
+## 3. 当前状态快照（2026-10-21）
 
 ### 3.1 代码规模
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 73 | 3969 |
-| 后端测试（`src/test/java`） | 13 | 2711 |
-| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 33 | 3696 |
-| 前端测试（`*.spec.js`） | 25 | 3594 |
+| 后端主代码（`src/main/java`） | 73 | 4096 |
+| 后端测试（`src/test/java`） | 14 | 3151 |
+| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 36 | 4347 |
+| 前端测试（`*.spec.js`） | 28 | 4579 |
 
 后端分层（文件数）：`entity/` 12、`dto/` 17、`repository/` 9、`controller/` 9、`service/` 9、`security/` 5、`config/` 5、`util/` 4、`exception/` 2。
 
-前端目录（文件数）：`views/` 18（10 个页面 + 8 个 spec）、`components/` 9（5 个组件 + 4 个 spec）、`composables/` 6（3 个组合式函数 + 3 个 spec）、`styles/` 7（4 个 css + 3 个 spec）、`utils/` 8（4 个纯函数 + 4 个 spec）、`stores/` 3（2 个 store + 1 个 spec）、`api/` 2（1 个封装 + 1 个 spec）、`router/` 1、根目录 4（`App.vue`、`main.js`、`style.css`、`viteConfig.spec.js`）。
+前端目录（文件数）：`views/` 20（11 个页面 + 9 个 spec）、`components/` 11（6 个组件 + 5 个 spec）、`composables/` 6（3 个组合式函数 + 3 个 spec）、`styles/` 7（4 个 css + 3 个 spec）、`utils/` 10（5 个纯函数 + 5 个 spec）、`stores/` 3（2 个 store + 1 个 spec）、`api/` 2（1 个封装 + 1 个 spec）、`router/` 1、根目录 4（`App.vue`、`main.js`、`style.css`、`viteConfig.spec.js`）。
 
 ### 3.2 测试基线
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **90** 个用例 / 12 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
-| 前端 | **211** 个用例 / 25 个 spec | 全绿 |
+| 后端 | **105** 个用例 / 13 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 前端 | **274** 个用例 / 28 个 spec | 全绿 |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布（合计 90）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`TagFlowIntegrationTest` 8、`RepositoryTests` 7、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 4、`AvatarServiceTest` 4、`NotificationServiceTest` 4、`ForumApplicationTests` 2、`JwtTokenProviderTest` 2、`AuthFlowIntegrationTest` 1。
+后端测试类分布（合计 105）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`TagFlowIntegrationTest` 8、`RepositoryTests` 8、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 4、`AvatarServiceTest` 4、`NotificationServiceTest` 4、`ForumApplicationTests` 2、`JwtTokenProviderTest` 2、`AuthFlowIntegrationTest` 1。
 
-前端 spec 分布（合计 211）：`ProfileView` 18、`useTheme` 17、`markdown` 14、`usePostActions` 13、`index`（api）12、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`notifications` 9、`avatar` 9、`format` 9、`HomeView` 8、`breakpoint` 7、`notificationLink` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`PostListItem` 4、`NotificationsView` 4、`useResponsive` 3、`PostEditView` 3。
+前端 spec 分布（合计 274）：`search` 30、`SearchView` 19、`ProfileView` 18、`useTheme` 17、`markdown` 14、`usePostActions` 13、`index`（api）13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`notifications` 9、`avatar` 9、`format` 9、`HomeView` 8、`PostListItem` 8、`breakpoint` 7、`notificationLink` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`NotificationsView` 4、`useResponsive` 3、`PostEditView` 3。
 
 ### 3.3 数据库
 
 | 项 | 值 |
 | --- | --- |
 | 业务表 | 11 张：`users`、`roles`、`user_roles`、`boards`、`posts`、`comments`、`tags`、`post_tags`、`likes`、`favorites`、`notifications` |
-| 迁移脚本 | `V1__init_schema.sql`（建表 + 角色种子）、`V2__notification_comment_id.sql`（通知表加 `comment_id`） |
+| 迁移脚本 | `V1__init_schema.sql`（建表 + 角色种子）、`V2__notification_comment_id.sql`（通知表加 `comment_id`）、`V3__post_search_trgm_index.sql`（pg_trgm 扩展 + 标题/正文 GIN 部分索引） |
 | 审计字段 | 全部表含 `create_time`、`update_time`（由 `BaseEntity` + JPA Auditing 维护） |
 | 软删除 | `posts.deleted`、`comments.deleted` |
 | 默认管理员 | `admin` / `admin123456`（由 `DataInitializer` 幂等创建，角色 ADMIN+MODERATOR+USER） |
 
-### 3.4 接口清单（35 个端点）
+### 3.4 接口清单（36 个端点）
 
 | 控制器 | 端点 |
 | --- | --- |
 | `HealthController` | `GET /api/health` |
 | `AuthController` | `POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`PUT /api/auth/profile`、`GET /api/auth/users/{id}` |
 | `BoardController` | `GET /api/boards`、`GET /api/boards/{id}`、`POST /api/boards`、`PUT /api/boards/{id}`、`DELETE /api/boards/{id}` |
-| `PostController` | `GET /api/posts`、`GET /api/posts/{id}`、`GET /api/posts/mine`、`POST /api/posts`、`PUT /api/posts/{id}`、`DELETE /api/posts/{id}`、`GET /api/posts/favorites/mine`、`POST /api/posts/{id}/like`、`POST /api/posts/{id}/favorite`、`PUT /api/posts/{id}/pin`、`PUT /api/posts/{id}/exquisite` |
+| `PostController` | `GET /api/posts`、`GET /api/posts/search`、`GET /api/posts/{id}`、`GET /api/posts/mine`、`POST /api/posts`、`PUT /api/posts/{id}`、`DELETE /api/posts/{id}`、`GET /api/posts/favorites/mine`、`POST /api/posts/{id}/like`、`POST /api/posts/{id}/favorite`、`PUT /api/posts/{id}/pin`、`PUT /api/posts/{id}/exquisite` |
 | `TagController` | `GET /api/tags`、`GET /api/tags/posts` |
 | `CommentController` | `GET /api/posts/{postId}/comments`、`POST /api/posts/{postId}/comments`、`DELETE /api/posts/{postId}/comments/{id}` |
 | `NotificationController` | `GET /api/notifications`、`GET /api/notifications/unread-count`、`POST /api/notifications/read-all`、`POST /api/notifications/{id}/read` |
@@ -182,6 +183,14 @@ cd frontend && pnpm test --run
 | --- | --- | --- |
 | `GET /api/tags` | `keyword`（可选，标签名忽略大小写模糊匹配）、`page`（默认 0）、`size`（默认 30，钳制到 1~100） | `PageResponse<TagResponse>`；`TagResponse` 为 `id`/`name`/`postCount`，按 `postCount` 降序、同数按 `name` 升序，只统计未删除帖子 |
 | `GET /api/tags/posts` | `name`（必填，标签名，可含 `/`）、`page`（默认 0）、`size`（默认 10，钳制到 1~50） | `PageResponse<PostSummaryResponse>`；未知标签返回空页（200），缺 `name` 或 `page`/`size` 非数字返回 400 |
+
+全文搜索端点为公开 GET（`SecurityConfig` 的 `PUBLIC_GET` 已包含 `/api/posts/**`），响应统一包在 `Result<T>` 里：
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `GET /api/posts/search` | `keyword`（必填，去首尾空白后 1~50 个 code point）、`page`（默认 0，负数按 0）、`size`（默认 10，钳制到 1~50） | `PageResponse<PostSummaryResponse>`；标题命中优先、同档按 `createTime` 倒序（同时间再按 `id` 倒序），软删除不出现；错误统一 400：`缺少必需参数: keyword`、`搜索关键词不能为空`、`搜索关键词不能超过 50 个字符`、`参数格式不正确: page`（`size` 同理） |
+
+`PostSummaryResponse` 在搜索接口里额外带一个可空字段 `snippet`：正文命中处左右各 80 字符的纯文本窗口（**不清洗 Markdown、不含省略号**，由前端 `utils/search.js` 的 `buildSnippet` 完成清洗与省略号）；窗口端点吸附到 code point 边界，不会劈开 emoji/生僻字；标题命中且正文不含关键词时是空串，其它列表接口通过 `@JsonInclude(NON_NULL)` 省略该键（而非 `null`）。关键词里的 `%`、`_`、`!` 按字面量匹配（服务端统一转义后 SQL 用 `ESCAPE '!'`）。
 
 头像端点由 `UserController`（`@RequestMapping("/api/users")`）提供，只操作当前登录用户，`DELETE` 幂等：
 
@@ -204,6 +213,7 @@ cd frontend && pnpm test --run
 | `/notifications` | `NotificationsView` | 通知列表 + 单条已读 + 点击跳转 |
 | `/tags` | `TagsView` | 标签云（按帖子数降序）+ 关键词检索 + 分页 |
 | `/tags/:name` | `TagPostsView` | 某标签下的帖子列表（复用 `PostListItem` + 分页） |
+| `/search` | `SearchView` | 全文搜索结果页（`?q=`、结果计数、分页、标题/片段高亮、三种空态） |
 | `/admin` | `AdminView` | 板块 CRUD + 用户禁言封禁（桌面表格 / 窄屏卡片双渲染） |
 
 ---
@@ -427,6 +437,46 @@ cd frontend && pnpm test --run
 
 ---
 
+### 4.10 第五轮：全文搜索（2026-10-21）
+
+计划：`docs/superpowers/plans/2026-10-21-round5-fulltext-search.md`（5 个任务：后端接口 + V3 迁移 → 搜索文本工具 → 顶栏入口与搜索结果页 → 文档 → 全量验证与上线）
+
+目标：把首页已有的关键词 `LIKE` 过滤升级为独立的搜索结果页与公开搜索接口——标题命中优先、同档按发帖时间倒序，配合 pg_trgm GIN 索引支撑「包含」语义的子串检索；顶栏提供搜索入口，窄屏收成图标。
+
+新增/修改的文件：
+
+| 位置 | 文件 | 要点 |
+| --- | --- | --- |
+| 后端 | `repository/PostRepository.java` | `searchByKeyword`：`LOWER(title/content) LIKE CONCAT('%', :pattern, '%') ESCAPE '!'`，`CASE WHEN 标题命中 THEN 0 ELSE 1` + `createTime DESC, id DESC`，EntityGraph 只 join `board`/`author` |
+| 后端 | `service/PostService.java` | `search(rawKeyword, page, size)`：归一化 1~50 code point、`escapeLike`（`! % _` 转义）、clamp、**无 Sort** 的 `PageRequest`、两步分页 + `snippetOf` 截正文窗口 |
+| 后端 | `controller/PostController.java` | `GET /api/posts/search`，放在 `/{id}` 之前；controller 与 service 各夹取一次 `size` |
+| 后端 | `dto/post/PostSummaryResponse.java` | 新增可空 `snippet`：仅搜索接口填充，`@JsonInclude(NON_NULL)` 让其它列表的 JSON 省略该键 |
+| 后端 | `db/migration/V3__post_search_trgm_index.sql` | `CREATE EXTENSION IF NOT EXISTS pg_trgm` + 标题/正文两个 `USING gin (LOWER(...) gin_trgm_ops) WHERE deleted = false` |
+| 前端 | `utils/search.js` | `highlightSegments`（indexOf 循环、不构造正则）、`buildSnippet`（Markdown 轻量清洗 + 命中窗口 + 省略号） |
+| 前端 | `components/HeaderSearch.vue` | 桌面 220px 输入框、窄屏图标按钮，`useResponsive` + `v-if`，零新增 `@media` |
+| 前端 | `views/SearchView.vue` | `/search?q=`：结果计数、分页、三种空态、`requestSeq` 防竞态，点赞复用 `usePostActions` |
+| 前端 | `components/PostListItem.vue` | 可选 `keyword`/`snippet` props，文本层 `<mark class="hit">` 高亮（不引入 `v-html`） |
+| 前端 | `api/index.js`、`router/index.js`、`App.vue` | `postApi.search`、`/search` 懒加载路由、顶栏挂载（`.header-inner` 改 `flex-start` + `.nav-actions` 自动左推） |
+
+关键取舍：
+
+- **pg_trgm 而不是 tsvector**：中文没有空格分词，`to_tsvector('simple', ...)` 只能整段匹配；pg_trgm 的三元组索引对「包含」语义的子串检索有效，也不需要额外的分词插件。
+- **标题优先用 CASE，不做相关度评分**：`similarity()`/`ts_rank` 的排序用户无法预期；「标题命中的排前面、同档按时间」既好解释又稳定可测。
+- **两步分页**：`@EntityGraph` 带 `tags` 集合再分页会触发 `HHH90003004`（全表加载后内存分页），与首页/标签页保持同一套 `searchByKeyword` → `hydrate` → `mapSummaries`。
+- **`ESCAPE '!'`**：`%`/`_` 是 LIKE 通配符，不转义时搜「100%」会命中「1000」；service 统一转义，repository 只拼 `%pattern%`。
+- **片段由服务端截窗口、前端清洗**：列表 DTO 不带正文（避免搜索页响应随正文膨胀），服务端只给命中位置左右各 80 字符的窗口，并把窗口端点吸附到 code point 边界（避免劈开 emoji/生僻字）；Markdown 清洗、省略号与高亮统一在 `buildSnippet` 一处实现。
+- **H2 测试关闭 Flyway**：V3 的 `CREATE EXTENSION` 在 H2 上无法执行，测试库统一 `spring.flyway.enabled=false` + `ddl-auto=create-drop`。
+
+测试与验证：后端新增 `SearchFlowIntegrationTest` 14 例（契约 400、标题优先、时间倒序、分页与夹取、通配符转义、软删除、片段不劈开代理对、长度按 code point、大小写不敏感、既有响应无 `snippet` 键），`RepositoryTests` 新增 1 例覆盖 JPQL 的 CASE 排序与 `ESCAPE '!'`；前端新增 `search`/`HeaderSearch`/`SearchView` 三个 spec 并扩充 `PostListItem`/`api`。基线数字见 §3.2；上线验收由 Task 5 回填。
+
+已知限制：
+
+- 中文按子串匹配，没有分词与相关度排序；1–2 个字的关键词无法有效利用 trigram 索引，退化为顺序扫描（T14）。
+- `posts.content` 没有长度上限，超长正文的片段截取与传输仍有成本（T15）。
+- 跨列 OR（标题或正文）可能让查询规划器放弃 GIN 索引；数据量继续增长时可拆成两条查询再 `UNION`（未立项）。
+
+---
+
 ## 5. 待办与后续计划
 
 ### 5.1 技术债与风险（建议优先处理）
@@ -445,8 +495,11 @@ cd frontend && pnpm test --run
 | T10 | ~~前端未容器化~~ | 已关闭 | 需求明确前端不进容器：由主机 nginx 直接托管 dist（见 §4.7），不再作为技术债 |
 | T11 | **头像文件不在备份范围** | 中 | 头像落在宿主机 `/pd/Program/forum/uploads/`，数据库备份不含它；恢复时需单独 `tar` 该目录并保留属主，再跑 `deploy.sh` 修正权限（`podman unshare chmod a+rX`）。孤儿文件（换头像/删号后残留）目前无清理任务，见 §4.9 |
 | T12 | **主题选择不跨标签页同步** | 低 | 主题存 `localStorage` 的 `jf_theme`，但未监听 `storage` 事件；同源多标签下切换主题不会互相更新，刷新后一致。修法：在 `useTheme` 里监听 `window.addEventListener('storage', ...)` |
+| T13 | **首页关键词过滤不转义 LIKE 通配符** | 低 | 首页 `GET /api/posts?keyword=` 走 `searchIds` 的 `LOWER(...) LIKE LOWER(CONCAT('%', :keyword, '%'))`，未转义 `%`/`_`，搜「100%」会命中「1000」。本轮只给新搜索接口做了转义；修首页需同步改 JPQL 与前端提示，属独立小改动 |
+| T14 | **搜索无分词、无相关度排序** | 中 | 采用 pg_trgm 子串匹配：中文不分词，1–2 个字的关键词的 trigram 覆盖不足，规划器会放弃索引改走顺序扫描；排序只有「标题命中优先 + 时间倒序」，没有 `ts_rank`/`similarity` 之类相关度。数据量增长后的升级路径是 `tsvector`（需分词扩展）或两阶段检索 |
+| T15 | **`posts.content` 无长度上限** | 低 | 正文列是 `TEXT` 且无应用层长度校验；超长正文会放大 `snippet` 截取与索引维护成本，也让 `pg_trgm` 的 GIN 索引更大。可加与标题一致的长度提示或截断策略 |
 
-### 5.2 候选功能（第四轮已取头像上传与深色模式，其余未开始）
+### 5.2 候选功能（第五轮已取全文搜索，其余未开始）
 
 第二轮明确列为「不做」的功能，各自需要独立设计：
 
@@ -456,10 +509,10 @@ cd frontend && pnpm test --run
 | ~~标签检索页~~ ✅ 已完成 | 中 | 小 | 第三轮已交付：标签总览 + 按标签筛选帖子，两个公开 GET 接口（§4.8） |
 | ~~头像上传~~ ✅ 已完成 | 中 | 中 | 第四轮已交付：JPEG/PNG 校验 + EXIF 校正 + 256×256 裁剪、宿主机上传目录、全站头像展示与移除（§4.9） |
 | ~~深色模式~~ ✅ 已完成 | 低 | 小 | 第四轮已交付：双套设计令牌 + 跟随系统/手动切换 + 首屏防闪白（§4.9） |
+| ~~全文搜索~~ ✅ 已完成 | 中 | 中 | 第五轮已实现（代码与测试完成，待上线验收）：公开 `GET /api/posts/search` + pg_trgm GIN 部分索引、独立 `/search?q=` 结果页与顶栏入口（§4.10） |
 | WebSocket 实时通知 | 中 | 大 | 目前是 120 秒轮询兜底 |
-| 全文搜索 | 中 | 中 | PostgreSQL `tsvector` + GIN 索引，替换现有 `LIKE` |
 
-第三轮已取前两项（见 §4.8），第四轮已取头像上传与深色模式（见 §4.9）；其余候选（WebSocket 实时通知、全文搜索）留待后续轮次，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
+第三轮已取前两项（见 §4.8），第四轮已取头像上传与深色模式（见 §4.9），第五轮已取全文搜索（见 §4.10）；其余候选（WebSocket 实时通知等）留待后续轮次，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
 
 ---
 
@@ -496,6 +549,9 @@ cd frontend && pnpm test --run
 | 数据库 | **复用主机已有 `javaforum` 库** | 数据保留、迁移成本最低；Flyway checksum 与当前迁移一致、`DataInitializer` 幂等；代价是依赖已有 postgres 容器生命周期（已写入已知限制） |
 | CI 触发 | **SCM 轮询 H/5 + 手动**，不用 webhook | 主机没有公网入口，GitHub webhook 无法送达；轮询最长延迟约 5 分钟，可接受 |
 | 镜像构建策略 | jar 在 Jenkins 构建，Dockerfile 只组装运行时 | 主机没有 maven 镜像；`--format docker` 保留 HEALTHCHECK；小内存机不采用分层提取 |
+| 搜索实现 | **pg_trgm 子串匹配**，不用 `tsvector` | 中文没有空格分词，`to_tsvector('simple', ...)` 只能整段命中；pg_trgm 的三元组索引对「包含」语义有效，且 PostgreSQL 15 的 pg_trgm 是 trusted 扩展，`forum` 角色可直接 `CREATE EXTENSION` |
+| 搜索排序 | **标题命中优先 + `createTime` 倒序**，不做相关度评分 | 相关度分数用户无法预期；「标题命中的排前面」规则可解释、可测试，也避免引入 `similarity()` 的排序开销 |
+| 搜索片段 | **服务端截窗口、前端清洗与高亮** | 列表 DTO 保持轻量（不带正文）；Markdown 清洗、省略号与 `<mark>` 只在 `utils/search.js` 实现一次，避免 Java/JS 两套规则漂移 |
 
 ---
 
@@ -510,6 +566,18 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-10-21 | docs | 记录第五轮全文搜索功能（README、开发记录、部署手册） | 本次提交 |
+| 2026-10-21 | fix | 修正搜索框码点上限与同词回车短路 | `debe1d7` |
+| 2026-10-21 | fix | 修正搜索页状态清理与顶栏搜索交互细节 | `4f59db8` |
+| 2026-10-21 | feat | 第五轮搜索前端：`postApi.search`、顶栏 `HeaderSearch`、`/search` 结果页、命中词高亮与正文片段 | `aac049b` |
+| 2026-10-21 | fix | 修正搜索片段清洗的代码块与表格误伤 | `2e4027f` |
+| 2026-10-21 | fix | 修正搜索工具的大小写折叠与片段清洗边界 | `c39cc60` |
+| 2026-10-21 | feat | 第五轮搜索文本工具：`highlightSegments` 与 `buildSnippet` | `29e14ca` |
+| 2026-10-21 | fix | 加固全文搜索片段边界与排序稳定性 | `7658bca` |
+| 2026-10-21 | docs | 优化第五轮实现计划的自审细节 | `2a2c8ce` |
+| 2026-10-21 | feat | 第五轮全文搜索后端：`GET /api/posts/search`、标题优先排序、pg_trgm 索引与测试隔离 | `5fa2644` |
+| 2026-10-21 | docs | 新增第五轮全文搜索实现计划 | `070c3c4` |
+| 2026-10-21 | docs | 记录第五轮全文搜索设计 | `ad8ad9e` |
 | 2026-10-20 | docs | 第四轮上线验收记录（Build #6 成功、头像全链路实测）与变更日志回填 | 本次提交 |
 | 2026-10-20 | docs | 记录第四轮深色模式与头像上传功能（README、开发记录、部署手册） | `dc961a5` |
 | 2026-10-20 | chore | 部署支持头像上传目录：`UPLOAD_HOST_DIR` 卷、目录创建与属主/权限修正、nginx `/forum/uploads/` 直出 | `85940c3` |

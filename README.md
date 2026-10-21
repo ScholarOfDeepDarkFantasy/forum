@@ -21,6 +21,7 @@
 - **标签检索**：帖子可带多个标签，`/tags` 展示标签云（按帖子数降序，支持关键词检索与分页），点击标签进入 `/tags/:name` 查看该标签下的帖子
 - **深色模式**：默认跟随系统，也可手动选择浅色/深色（顶栏右侧、通知铃铛之前的主题菜单），选择存于 `localStorage` 的 `jf_theme`；`index.html` 的内联脚本在首屏挂上 `html.dark`，避免刷新时先白后黑；配色来自 `styles/tokens.css` 的双套 CSS 变量与 Element Plus 官方暗色变量
 - **头像上传**：资料页选择 JPEG/PNG（不超过 2MB），服务端只按文件魔数判定类型、按 EXIF 方向校正后居中裁剪为 256×256 JPEG，落盘到宿主机的 `/pd/Program/forum/uploads/avatars/` 并由 nginx 直出；支持移除，图片缺失或加载失败时回退为昵称首字母
+- **全文搜索**：顶栏搜索框或 `/search?q=` 独立结果页，标题与正文子串匹配、标题命中优先、命中词高亮；正文命中时显示片段。中文按子串匹配，无分词与相关度排序
 - 部署：前端由 nginx 托管、后端容器化运行，Jenkins 自动构建发布（见 `docs/deployment/README.md`）
 
 ## 环境要求
@@ -40,6 +41,7 @@ CREATE DATABASE javaforum WITH ENCODING 'UTF8';
 
 - `V1__init_schema.sql`：初始表结构与角色种子数据
 - `V2__notification_comment_id.sql`：通知表新增可空的 `comment_id` 列，用于把 REPLY 通知定位到具体评论
+- `V3__post_search_trgm_index.sql`：安装 `pg_trgm` 扩展，并为 `LOWER(title)`/`LOWER(content)` 建 GIN 三元组部分索引（`WHERE deleted = false`），支撑全文搜索的「包含」语义
 
 后端 `spring.jpa.hibernate.ddl-auto` 设为 `validate`：Hibernate 只校验实体与表结构是否一致，不建表也不改表，因此任何实体变更都必须配套一条迁移脚本。
 
@@ -226,7 +228,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 12 个测试类、90 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 13 个测试类、105 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 
@@ -236,7 +238,7 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 25 个 spec、211 个用例，覆盖：
+当前为 28 个 spec、274 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
@@ -251,6 +253,8 @@ pnpm build       # 生产构建
 - 编辑页 Markdown 预览（`src/views/PostEditView.spec.js`）：桌面左右分栏且输入正文时预览实时渲染、窄屏显示编辑/预览 tab 而不是分栏、编辑模式回填旧正文并渲染预览
 - 深色模式（`src/composables/useTheme.spec.js`、`src/components/ThemeToggle.spec.js`、`src/styles/tokens.spec.js`）：默认跟随系统并实时响应系统主题变化、手动选择写入 `localStorage`、存储值损坏时回退 `system`、`toggle` 按当前实际明暗取反、切到显式模式后解除 `matchMedia` 监听、`matchMedia` 缺失或 Storage 抛错不崩溃；`tokens.spec.js` 另守两套令牌集合一致、每个颜色令牌都有 `var()` 消费方、`main.js` 的 8 条样式导入顺序、首屏脚本先于模块脚本读取 `jf_theme`
 - 头像（`src/utils/avatar.spec.js`、`src/components/UserAvatar.spec.js`、`src/views/ProfileView.spec.js`）：站内 `/uploads/` 前缀拼 `BASE_URL`（含 `/forum/` 子路径）、外链与 data URL 原样透传、空值与仅前缀返回空串、加载失败回退昵称首字母并在 url 变化后重试、代理对昵称只取一个码点、上传成功刷新用户、非法类型与超过 2MB 时客户端拦截、移除头像
+- 搜索页与顶栏入口（`src/views/SearchView.spec.js`、`src/components/HeaderSearch.spec.js`、`src/components/PostListItem.spec.js`、`src/api/index.spec.js`）：读 `?q=` 拉取结果并展示计数、三种空态、分页与换词重置、过期响应丢弃、顶栏桌面输入框/窄屏图标两种形态、命中词 `<mark>` 高亮与正文片段、`postApi.search` 的请求路径
+- 搜索文本工具（`src/utils/search.spec.js`）：大小写不敏感分段高亮、正则元字符按字面匹配、Markdown 轻量清洗（代码围栏/行内代码/标题/引用/列表/链接/图片）、空白折叠、命中窗口与省略号
 
 ## 优化记录（第二轮）
 
@@ -276,6 +280,7 @@ pnpm build       # 生产构建
 
 - **历史纯文本帖子中的 Markdown 语法会被解释**：Markdown 渲染上线后，正文里恰好长得像 Markdown 的写法（`# 标题`、`*斜体*`、`[文字](链接)`、`| 表格 |` 等）会按语法渲染，而不是原样显示。本轮不按帖子版本区分渲染：单换行会转成 `<br>` 以尽量保留纯文本帖子的换行观感，需要原样展示的符号可用反斜杠转义或放进代码块。
 - **REPLY 通知的评论锚点只覆盖第一页评论**：帖子详情页每页加载 10 条根评论（后端按 `createTime` 升序只返回根评论，子回复随父评论平铺渲染）。若通知指向的根评论排在第 11 条之后，页面里不存在对应元素。此时不再静默失败：当该帖评论数大于 10 时会提示「目标评论可能在后面的评论分页里，可翻页查看」，需手动翻页定位。评论已删除也会命中同一条提示（该提示无法区分两种情况），这是本轮接受的误报。彻底修法是按 `commentId` 逐页回溯后再选中目标页——其代价（每次通知跳转最多多出若干次请求，且仍受页数上限约束）见 `docs/superpowers/specs/2026-10-16-experience-iteration-design.md` §5。
+- **全文搜索按子串匹配**：中文没有分词，「关键词 + 相关度排序」的能力有限；1–2 个字的关键词用不上 pg_trgm 索引，会退化为顺序扫描（数据量小时无感）。
 
 ## 目录结构
 
@@ -291,12 +296,12 @@ uploads/             # 本地开发的头像落盘目录（运行时生成、已
 
 frontend/src/
 ├── api/           # Axios 实例与接口封装
-├── components/    # 可复用组件（UserCard、BoardCard、PostListItem、UserAvatar、ThemeToggle）
+├── components/    # 可复用组件（UserCard、BoardCard、PostListItem、UserAvatar、ThemeToggle、HeaderSearch）
 ├── composables/   # 组合式函数（useResponsive、usePostActions、useTheme）
 ├── router/        # 路由表与登录/管理员守卫
 ├── stores/        # Pinia store（auth、notifications）
 ├── styles/        # tokens.css 双套设计令牌、common.css 跨视图共用类、markdown.css、highlight-dark.css
-├── utils/         # 纯函数（通知跳转映射、时间格式化、Markdown 渲染、头像地址解析）
+├── utils/         # 纯函数（通知跳转映射、时间格式化、Markdown 渲染、头像地址解析、搜索高亮与片段）
 └── views/         # 页面组件
 
 src/main/java/org/song/forum/

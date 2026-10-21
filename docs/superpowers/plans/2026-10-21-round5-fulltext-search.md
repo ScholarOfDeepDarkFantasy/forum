@@ -83,7 +83,7 @@
 - Modify: `src/main/java/org/song/forum/service/PostService.java:158,234-237`
 - Modify: `src/main/java/org/song/forum/controller/PostController.java:39`
 
-- [ ] **Step 1-1: 关闭 RepositoryTests 的 Flyway，并写失败的仓库搜索测试**
+- [x] **Step 1-1: 关闭 RepositoryTests 的 Flyway，并写失败的仓库搜索测试**
 
 Modify `src/test/java/org/song/forum/repository/RepositoryTests.java:22-30`，把 `@DataJpaTest` 的 properties 换成：
 
@@ -164,7 +164,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=RepositoryTests
 
 Expected: **FAIL** —— 编译失败：`cannot find symbol: method searchByKeyword(String,PageRequest)`（`PostRepository` 还没有该方法）。
 
-- [ ] **Step 1-2: 在 PostRepository 增加 searchByKeyword**
+- [x] **Step 1-2: 在 PostRepository 增加 searchByKeyword**
 
 Modify `src/main/java/org/song/forum/repository/PostRepository.java:33-35`（`searchIds` 方法之后、`findWithAssociations` 注释之前）插入：
 
@@ -196,7 +196,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=RepositoryTests
 
 Expected: **PASS** —— `Tests run: 8, Failures: 0, Errors: 0, Skipped: 0`。
 
-- [ ] **Step 1-3: 新增 V3 迁移（pg_trgm 扩展 + 两个 GIN 部分索引）**
+- [x] **Step 1-3: 新增 V3 迁移（pg_trgm 扩展 + 两个 GIN 部分索引）**
 
 Create `src/main/resources/db/migration/V3__post_search_trgm_index.sql`：
 
@@ -222,7 +222,7 @@ cd /e/JavaSpace/forum && ls src/main/resources/db/migration && grep -c 'CREATE I
 
 Expected: 迁移目录出现 `V1__init_schema.sql`、`V2__notification_comment_id.sql`、`V3__post_search_trgm_index.sql`；`grep -c` 输出 `2`。本步无 JUnit 用例可跑（H2 无法执行 `CREATE EXTENSION`，真实执行由 Task 5 的 raspi 冒烟验证）。
 
-- [ ] **Step 1-4: 给 PostSummaryResponse 增加可空 snippet 字段**
+- [x] **Step 1-4: 给 PostSummaryResponse 增加可空 snippet 字段**
 
 Modify `src/main/java/org/song/forum/dto/post/PostSummaryResponse.java:37`（`favorited` 字段之后、类结束 `}` 之前）追加：
 
@@ -249,7 +249,7 @@ cd /e/JavaSpace/forum && mvn -B test-compile
 
 Expected: **PASS** —— 编译通过（`PostDetailResponse.of` 显式逐字段复制，不受新字段影响）。先加字段再写集成测试：测试里要断言 `getSnippet()`，字段不存在时测试根本编译不过，红的原因就说不清了。
 
-- [ ] **Step 1-5: 写失败的搜索接口集成测试**
+- [x] **Step 1-5: 写失败的搜索接口集成测试**
 
 Create `src/test/java/org/song/forum/controller/SearchFlowIntegrationTest.java`：
 
@@ -647,7 +647,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=SearchFlowIntegrationTest
 
 Expected: **FAIL** —— `Tests run: 14`，用例普遍失败：第 1 例因 `GET /api/posts/search` 返回 404 而断言失败（端点尚未实现），第 2~4 例同样 404 而非 400，其余依赖搜索响应的用例一并失败。
 
-- [ ] **Step 1-6: 实现 PostService.search 与三个私有工具**
+- [x] **Step 1-6: 实现 PostService.search 与三个私有工具**
 
 Modify `src/main/java/org/song/forum/service/PostService.java:158`（`listByTag` 方法之后、`getDetail` 之前）插入：
 
@@ -753,7 +753,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=SearchFlowIntegrationTest
 
 Expected: **FAIL** —— 编译通过、`PostService.search` 就绪，但 `GET /api/posts/search` 仍是 404，第 1 例继续红。
 
-- [ ] **Step 1-7: 在 PostController 加 GET /search**
+- [x] **Step 1-7: 在 PostController 加 GET /search**
 
 Modify `src/main/java/org/song/forum/controller/PostController.java:39`（`list` 方法结束 `}` 之后、`detail` 注释之前）插入：
 
@@ -778,7 +778,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=SearchFlowIntegrationTest
 
 Expected: **PASS** —— `Tests run: 14, Failures: 0, Errors: 0, Skipped: 0`。
 
-- [ ] **Step 1-8: 后端全量回归**
+- [x] **Step 1-8: 后端全量回归**
 
 Run:
 
@@ -788,7 +788,7 @@ cd /e/JavaSpace/forum && mvn -B clean test
 
 Expected: **PASS** —— `BUILD SUCCESS`；`grep -h 'Tests run' target/surefire-reports/*.txt` 汇总为 **13 个测试类、105 个用例**，其中 1 个 POSIX 文件权限用例在 Windows 上 `Skipped`。
 
-- [ ] **Step 1-9: 提交后端搜索实现**
+- [x] **Step 1-9: 提交后端搜索实现**
 
 Run:
 
@@ -832,7 +832,7 @@ Task 1 提交后评审提出 5 条质量修复，已单独一个提交落地（`
 - Create: `frontend/src/utils/search.spec.js`
 - Create: `frontend/src/utils/search.js`
 
-- [ ] **Step 2-1: 写失败的工具 spec**
+- [x] **Step 2-1: 写失败的工具 spec**
 
 Create `frontend/src/utils/search.spec.js`：
 
@@ -1117,7 +1117,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/utils/search.spec.js
 
 Expected: **FAIL** —— `Failed to resolve import "./search"`（模块还不存在）。
 
-- [ ] **Step 2-2: 实现 utils/search.js**
+- [x] **Step 2-2: 实现 utils/search.js**
 
 Create `frontend/src/utils/search.js`：
 
@@ -1449,7 +1449,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/utils/search.spec.js
 
 Expected: **PASS** —— `30 passed`。
 
-- [ ] **Step 2-3: 提交搜索文本工具**
+- [x] **Step 2-3: 提交搜索文本工具**
 
 Run:
 
@@ -1502,7 +1502,7 @@ delta 复审确认上一轮三项问题已修复，但发现 `plainText` 的近�
 - Modify: `frontend/src/components/PostListItem.vue:6,8-11,15,36,38,99-102`
 - Modify: `frontend/src/App.vue:9,53,108-115,132-136`
 
-- [ ] **Step 3-1: 写失败的 postApi.search 请求路径用例**
+- [x] **Step 3-1: 写失败的 postApi.search 请求路径用例**
 
 Modify `frontend/src/api/index.spec.js:64`，把动态 import 改成同时取出 `postApi`：
 
@@ -1537,7 +1537,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/api/index.spec.js
 
 Expected: **FAIL** —— `postApi.search is not a function`（其余 12 例仍绿）。
 
-- [ ] **Step 3-2: 给 postApi 加 search**
+- [x] **Step 3-2: 给 postApi 加 search**
 
 Modify `frontend/src/api/index.js:105`（`list` 之后）：
 
@@ -1557,7 +1557,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/api/index.spec.js
 
 Expected: **PASS** —— `13 passed`。
 
-- [ ] **Step 3-3: 写失败的 HeaderSearch spec**
+- [x] **Step 3-3: 写失败的 HeaderSearch spec**
 
 Create `frontend/src/components/HeaderSearch.spec.js`：
 
@@ -1697,7 +1697,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/components/HeaderSear
 
 Expected: **FAIL** —— `Failed to resolve import "./HeaderSearch.vue"`。
 
-- [ ] **Step 3-4: 实现 HeaderSearch.vue**
+- [x] **Step 3-4: 实现 HeaderSearch.vue**
 
 Create `frontend/src/components/HeaderSearch.vue`：
 
@@ -1793,7 +1793,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/components/HeaderSear
 
 Expected: **PASS** —— `5 passed`。
 
-- [ ] **Step 3-5: 写失败的 SearchView spec**
+- [x] **Step 3-5: 写失败的 SearchView spec**
 
 Create `frontend/src/views/SearchView.spec.js`：
 
@@ -2033,7 +2033,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/views/SearchView.spec
 
 Expected: **FAIL** —— `Failed to resolve import "./SearchView.vue"`。
 
-- [ ] **Step 3-6: 实现 SearchView.vue**
+- [x] **Step 3-6: 实现 SearchView.vue**
 
 Create `frontend/src/views/SearchView.vue`：
 
@@ -2245,7 +2245,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/views/SearchView.spec
 
 Expected: **PASS** —— `8 passed`。
 
-- [ ] **Step 3-7: 注册 /search 路由**
+- [x] **Step 3-7: 注册 /search 路由**
 
 Modify `frontend/src/router/index.js:10`（`/tags/:name` 之后）插入：
 
@@ -2261,7 +2261,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/views/SearchView.spec
 
 Expected: **PASS** —— `13 passed`（路由表本身没有 spec，`viteConfig.spec.js` 只校验 base 与接口前缀）。
 
-- [ ] **Step 3-8: 给 PostListItem 写失败的高亮/片段用例**
+- [x] **Step 3-8: 给 PostListItem 写失败的高亮/片段用例**
 
 Modify `frontend/src/components/PostListItem.spec.js:80`（类末尾 `})` 之前）追加两个用例：
 
@@ -2299,7 +2299,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/components/PostListIt
 
 Expected: **FAIL** —— 两个新用例失败（`mark.hit` 不存在、`.post-snippet` 不存在），原有 4 例仍绿。
 
-- [ ] **Step 3-9: 给 PostListItem 加 keyword/snippet 与高亮渲染**
+- [x] **Step 3-9: 给 PostListItem 加 keyword/snippet 与高亮渲染**
 
 Modify `frontend/src/components/PostListItem.vue:8-11`，把 props 换成：
 
@@ -2388,7 +2388,7 @@ cd /e/JavaSpace/forum/frontend && pnpm exec vitest run src/components/PostListIt
 
 Expected: **PASS** —— `6 passed`。
 
-- [ ] **Step 3-10: 把 HeaderSearch 挂到顶栏并调整布局**
+- [x] **Step 3-10: 把 HeaderSearch 挂到顶栏并调整布局**
 
 Modify `frontend/src/App.vue:9`（`ThemeToggle` import 之后）新增：
 
@@ -2435,9 +2435,9 @@ Run:
 cd /e/JavaSpace/forum/frontend && pnpm test
 ```
 
-Expected: **PASS** —— **28 个 spec、273 个用例**（含 Task 3 质量修复新增的 16 例；`api` 12→13、`PostListItem` 4→8、`HeaderSearch` 5→9、`SearchView` 8→18）。`breakpoint` 仍断言 6 处 `@media`，未新增。
+Expected: **PASS** —— **28 个 spec、274 个用例**（含 Task 3 质量修复新增的 16 例；`api` 12→13、`PostListItem` 4→8、`HeaderSearch` 5→9、`SearchView` 8→19）。`breakpoint` 仍断言 6 处 `@media`，未新增。
 
-- [ ] **Step 3-11: 前端构建自检（可选但建议）**
+- [x] **Step 3-11: 前端构建自检（可选但建议）**
 
 Run:
 
@@ -2447,7 +2447,7 @@ cd /e/JavaSpace/forum/frontend && MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_P
 
 Expected: 构建成功；`dist/assets/` 里出现新的 `SearchView-*.js` chunk（懒加载路由生效）；仅有既有的 >500kB chunk 警告。
 
-- [ ] **Step 3-12: 提交前端入口与搜索页**
+- [x] **Step 3-12: 提交前端入口与搜索页**
 
 Run:
 
@@ -2473,9 +2473,9 @@ Expected: 提交成功；`git status` 干净；`git show --stat HEAD` 显示 10 
 4. **`@clear` 语义**：原 `@clear="submit"` 是 no-op（ElInput 先清空 model，submit 读到空白直接 return）。按「清空即回到空搜索页」的意图改为 `onClear()`：仅在 `route.name === 'search'` 时 `router.push({ name: 'search' })` 回空态，其他页面不动；Enter/图标仍走 `submit`。**偏差决策**：任务描述给的是 push 回空态，故保留 push（不 replace），并注册 HeaderSearch 的 clear 用例固化。
 5. **卫生**：更正 `HeaderSearch.vue` 中「space-between 之外」的过期注释（现为 `flex-start` + `.nav-actions` 的 `margin-left:auto`）；删除无样式的 `search-btn` class。
 6. **码点限长**：客户端按 `Array.from(q).length` 计 1–50 个 Unicode 码点，与服务端 `PostService` 的 `codePointCount(0, length) > 50` 对齐；HeaderSearch 与 SearchView 的提交路径统一，超限静默忽略（不新增提示组件，与计划「失败提示保持极简」一致）。复核补充：`maxlength="50"` 按 UTF-16 码元截断会让 26–50 个码点的 emoji 查询在输入阶段就被截断（真实用户只能输入 25 个 emoji），故两处 `maxlength` 放宽为 `100`，1–50 码点的真正上限仍由 `submit` 的码点校验兜底。
-7. **测试补齐**：SearchView 8→18、HeaderSearch 5→9、PostListItem 6→8，共新增 16 例（空 q 清错误态/作废在途、分页与重试保草稿、加载中不渲染计数、单页不分页、空白 q、同词不重复、码点限长（51 ASCII 拒绝 / 50 emoji 通过）、快速翻页过期响应、清空跳转与非搜索页不跳转、XSS 纯文本防护、关键词未命中不高亮、窄屏 aria-label）。先写测试：隐藏实现改动后 8 例失败（push 未调用、错误态残留、loading 残留、草稿被覆盖、计数在加载中渲染），恢复实现后转绿。复核后补强：同词用例显式断言 `replace` 未被调用——由此暴露出 SearchView 的 `submit()` 原本缺少「关键词未变则短路」判断（同词回车会再 `replace` 一次），已补上与 HeaderSearch 一致的 `route.query.q === q` 短路；并补 SearchView 自身清空按钮用例。
+7. **测试补齐**：SearchView 8→19、HeaderSearch 5→9、PostListItem 6→8，共新增 16 例（空 q 清错误态/作废在途、分页与重试保草稿、加载中不渲染计数、单页不分页、空白 q、同词不重复、码点限长（51 ASCII 拒绝 / 50 emoji 通过）、快速翻页过期响应、清空跳转与非搜索页不跳转、XSS 纯文本防护、关键词未命中不高亮、窄屏 aria-label）。先写测试：隐藏实现改动后 8 例失败（push 未调用、错误态残留、loading 残留、草稿被覆盖、计数在加载中渲染），恢复实现后转绿。复核后补强：同词用例显式断言 `replace` 未被调用——由此暴露出 SearchView 的 `submit()` 原本缺少「关键词未变则短路」判断（同词回车会再 `replace` 一次），已补上与 HeaderSearch 一致的 `route.query.q === q` 短路；并补 SearchView 自身清空按钮用例。
 
-结果：`cd frontend && pnpm test` → **28 个 spec / 274 个用例**全绿；`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 成功（仅既有 >500kB chunk 警告）；`breakpoint` 仍为 6 处 `@media (max-width: 768px)`，未新增依赖、未使用 `v-html`。计划上文 Step 3-1/3-3/3-5/3-8 的 spec 片段按上述行为同步，测试计数基线统一为 273。
+结果：`cd frontend && pnpm test` → **28 个 spec / 274 个用例**全绿；`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 成功（仅既有 >500kB chunk 警告）；`breakpoint` 仍为 6 处 `@media (max-width: 768px)`，未新增依赖、未使用 `v-html`。计划上文 Step 3-1/3-3/3-5/3-8 的 spec 片段按上述行为同步，测试计数基线统一为 274。
 
 ---
 
@@ -2492,7 +2492,7 @@ Expected: 提交成功；`git status` 干净；`git show --stat HEAD` 显示 10 
 > cd /e/JavaSpace/forum && git log --format='%h %s' -4
 > ```
 
-- [ ] **Step 4-1: README 功能清单与目录结构**
+- [x] **Step 4-1: README 功能清单与目录结构**
 
 Modify `README.md` 的「## 功能」列表，在「头像上传」条目之后插入：
 
@@ -2518,7 +2518,7 @@ cd /e/JavaSpace/forum && grep -n '全文搜索\|HeaderSearch\|搜索高亮' READ
 
 Expected: 3 行命中（功能条目、components 行、utils 行）。
 
-- [ ] **Step 4-2: README 测试基线与已知限制**
+- [x] **Step 4-2: README 测试基线与已知限制**
 
 Modify `README.md` 后端测试说明，把：
 
@@ -2541,7 +2541,7 @@ Modify 前端测试说明：
 改为：
 
 ```markdown
-当前为 28 个 spec、273 个用例，覆盖：
+当前为 28 个 spec、274 个用例，覆盖：
 ```
 
 并在前端覆盖清单末尾（「头像（…）」条目之后）追加两条：
@@ -2560,12 +2560,12 @@ Modify `README.md`「## 已知限制」列表末尾追加：
 Run:
 
 ```bash
-cd /e/JavaSpace/forum && grep -n '105 个用例\|273 个用例\|按子串匹配' README.md
+cd /e/JavaSpace/forum && grep -n '105 个用例\|274 个用例\|按子串匹配' README.md
 ```
 
 Expected: 3 行命中。
 
-- [ ] **Step 4-3: DEVELOPMENT 迭代轮次与状态快照**
+- [x] **Step 4-3: DEVELOPMENT 迭代轮次与状态快照**
 
 Modify `docs/DEVELOPMENT.md` §2.2 表格，在「第四轮」行之后追加：
 
@@ -2613,7 +2613,7 @@ cd /e/JavaSpace/forum && grep -n '第五轮\|已完成 5 轮迭代\|2026-10-21' 
 
 Expected: 至少命中「第五轮」行、「已完成 5 轮迭代」与快照标题。
 
-- [ ] **Step 4-4: DEVELOPMENT 测试基线与接口清单**
+- [x] **Step 4-4: DEVELOPMENT 测试基线与接口清单**
 
 Modify `docs/DEVELOPMENT.md` §3.2 表格两行：
 
@@ -2668,7 +2668,7 @@ cd /e/JavaSpace/forum && grep -n '36 个端点\|api/posts/search\|/search` | `Se
 
 Expected: 3 行命中。
 
-- [ ] **Step 4-5: DEVELOPMENT 新增 §4.10**
+- [x] **Step 4-5: DEVELOPMENT 新增 §4.10**
 
 在 `docs/DEVELOPMENT.md` §4.9 结束分隔线 `---` 之后、「## 5. 待办与后续计划」之前插入：
 
@@ -2720,7 +2720,7 @@ cd /e/JavaSpace/forum && grep -n '### 4.10 第五轮' docs/DEVELOPMENT.md
 
 Expected: 命中 1 行。
 
-- [ ] **Step 4-6: DEVELOPMENT 技术债、候选功能、决策与变更日志**
+- [x] **Step 4-6: DEVELOPMENT 技术债、候选功能、决策与变更日志**
 
 Modify §5.1 技术债表，在 T12 行之后追加：
 
@@ -2771,7 +2771,7 @@ cd /e/JavaSpace/forum && grep -n 'T13\|T14\|T15\|~~全文搜索~~' docs/DEVELOPM
 
 Expected: 4 行命中。
 
-- [ ] **Step 4-7: 部署手册（回滚、索引验证、已知限制）**
+- [x] **Step 4-7: 部署手册（回滚、索引验证、已知限制）**
 
 Modify `docs/deployment/README.md` §4 回滚，在「数据库无版本回滚概念…」之后追加：
 
@@ -2838,7 +2838,7 @@ cd /e/JavaSpace/forum && grep -n 'pg_trgm\|顺序扫描\|DROP INDEX' docs/deploy
 
 Expected: 至少 5 行命中。
 
-- [ ] **Step 4-8: 提交文档**
+- [x] **Step 4-8: 提交文档**
 
 Run:
 
@@ -2855,6 +2855,19 @@ git commit -m "docs: 记录第五轮全文搜索功能"
 ```
 
 Expected: 提交成功；`git status` 干净。
+
+### Task 4 实施偏差
+
+- 前端用例实测为 **274**（计划写 273）：`SearchView.spec.js` 经 Task 3 两轮修复后为 19 例（计划写 18），`PostListItem` 8 例、`api` 13 例；README 与 §3.2 均按实测写 274。
+- README 的迁移脚本清单补了 V3 一行（计划 Task 4 只要求功能/测试/限制三处，但该清单若停在 V1/V2 会与 §3.3 不一致）。
+- §4.10 的测试段把计划里的「见下方「上线验收」段落」改为「上线验收由 Task 5 回填」——本轮文档提交时尚未部署，没有该段落。
+- §5.2 把「全文搜索」行从候选表末尾移到已完成行之后（与第三/四轮已完成行的排法一致）。
+- §8 变更日志按真实提交补齐 12 行（计划模板只给 4 行、3 个哈希）：本轮除三个功能任务外还有 5 条修复提交与 3 条文档/计划提交，逐条登记才能维持「覆盖仓库全部提交」的约定。
+- 计划 §3.1 的分层文件数写 `dto/` 18，实测 17（本轮未新增 DTO 文件），按实测写 17。
+- Task 1–3 的步骤复选框在原计划中一直未勾选，本次一并补勾，保持计划状态与已完成工作一致。
+- 文档复核（docs reviewer）后修正：第五轮状态行暂记「⏳ 待上线验收（Task 5）」而非 Step 4-2 指示的「✅ 已完成」——本轮尚未 push/部署，提前标完成属于过度声明，Task 5 回填验收时再改为 ✅；进度行同步为「已完成 4 轮，第五轮待上线验收」，§5.2 全文搜索行改为「已实现（待上线验收）」。
+- 复核修正：README 功能条改为「命中词高亮；正文命中时显示片段」（标题命中没有片段，原措辞把片段写成了无条件行为）；部署手册的搜索接口期望响应改为 `{"success":true,...,"data":{"content":[...],...}}`（`Result<PageResponse>` 的嵌套结构）。
+- 复核修正：Task 3 质量修复记录里的 `SearchView` 「8→18」与「基线 273」统一为实测 19/274（Task 4 偏差第 1 条已按 274 记录）。
 
 ---
 
@@ -2887,7 +2900,7 @@ Run:
 cd /e/JavaSpace/forum/frontend && pnpm test
 ```
 
-Expected: **28 个 spec、273 个用例全绿**（含 `breakpoint` 的 6 处 `@media` 门禁）。
+Expected: **28 个 spec、274 个用例全绿**（含 `breakpoint` 的 6 处 `@media` 门禁）。
 
 - [ ] **Step 5-3: 生产构建（子路径 /forum/）**
 
@@ -2985,7 +2998,7 @@ Modify `docs/DEVELOPMENT.md` §4.10 的末尾（「已知限制」三条之后�
 - 推送后 Jenkins Build **#<N>** **SUCCESS**（镜像 `localhost/forum-backend:<N>`），`forum-backend` 重建后 `Up (healthy)`，仅监听 `127.0.0.1:8086`。
 - V3 由容器启动时的 Flyway 自动执行：`flyway_schema_history` 最新记录 `version=3 / success=t`；`\dx pg_trgm` 显示扩展已安装，`\d posts` 显示 `idx_posts_title_trgm`、`idx_posts_content_trgm` 两个 `gin` 部分索引（`WHERE deleted = false`）。`forum` 角色以非超级用户身份完成 `CREATE EXTENSION`（pg_trgm 为 trusted 扩展），未额外授权。
 - 冒烟：`/forum/api/health`、`/forum/api/posts/search?keyword=Jenkins`、`/forum/search?q=Jenkins` 均 200；空白关键词、缺参数、51 字符关键词均 400；`EXPLAIN` 在十几篇帖子的数据量下走顺序扫描，属预期（短词与低数据量用不上 trigram 索引）。
-- 全量测试：后端 13 个测试类 / 105 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 28 个 spec / 273 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
+- 全量测试：后端 13 个测试类 / 105 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 28 个 spec / 274 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
 ```
 
 Modify `docs/DEVELOPMENT.md` §8 变更日志，把上一轮文档提交行的「本次提交」替换成 `git log` 里该提交的真实短哈希，并在表格最上方新增一行：
