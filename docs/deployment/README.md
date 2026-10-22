@@ -17,7 +17,7 @@
 Jenkins :8080 → job `javaforum`（Jenkinsfile from SCM，master，轮询 H/5）
 ```
 
-要点：后端只绑 `127.0.0.1:8086`；数据库不新增容器；镜像/工作区/前端都在 `/pd`（根盘只剩 5G）。
+要点：后端只绑 `127.0.0.1:8086`；数据库不新增容器；镜像/工作区/前端都在 `/pd`（根盘只剩 5G）。SSE 端点 `/forum/api/notifications/stream` 由 snippet 单独配置（`proxy_buffering off` + `proxy_read_timeout 3600s`），漏配的表现与排障见第 6 节。
 
 ## 2. 一次性引导（换机器时照做；当前主机已完成）
 
@@ -160,6 +160,34 @@ EXPLAIN SELECT id FROM posts WHERE deleted = false
   AND LOWER(title) LIKE CONCAT('%', 'jenkins', '%');
 ```
 
+### 实时通知（SSE）验证
+
+通知走 `POST /api/notifications/stream-ticket` 换一次性 ticket，再用 `GET /api/notifications/stream?ticket=` 建 SSE 长连接；nginx 必须命中精确 location（`proxy_buffering off`、`proxy_read_timeout 3600s`、透传 `$is_args$args`），否则表现为「通知延迟十几秒」或「每分钟断一次」。
+
+```bash
+# 1) 未带 ticket：必须 401（`deploy.sh` 也会断言这一条；200 说明 nginx 把请求兜到了 SPA）
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' \
+  http://127.0.0.1/forum/api/notifications/stream
+
+# 2) 登录 → 取票 → 用 ticket 建流并观察心跳（15s 一条）
+TOKEN=$(curl -fsS -H 'Content-Type: application/json' \
+  -d "{\"username\":\"${SMOKE_USER:-admin}\",\"password\":\"${SMOKE_PASS:-admin123456}\"}" \
+  http://127.0.0.1:8086/api/auth/login | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+TICKET=$(curl -fsS -X POST -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:8086/api/notifications/stream-ticket | sed -n 's/.*"ticket":"\([^"]*\)".*/\1/p')
+echo "ticket=$TICKET"
+timeout 40 curl -sN -H 'Host: raspi' "http://127.0.0.1/forum/api/notifications/stream?ticket=$TICKET" | head -20
+# 期望：先收到 `: connected`，随后每 15s 一行 `event:heartbeat`
+
+# 3) 同一 ticket 只能消费一次：再请求必须 401
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' \
+  "http://127.0.0.1/forum/api/notifications/stream?ticket=$TICKET"   # 期望 401
+
+# 4) 另开一个账号 B 回复 A 的帖子，A 的流上应出现 event:notification（data 里 type=REPLY）
+```
+
+> `stream` 端点的鉴权在 ticket 内部完成，`SecurityConfig` 对它单独 `permitAll`；`POST /stream-ticket` 仍需 JWT。
+
 ## 6. 排障
 
 | 现象 | 排查 |
@@ -179,6 +207,10 @@ EXPLAIN SELECT id FROM posts WHERE deleted = false
 | 上传返回 `413` 或 `400 图片不能超过 2MB` | 413 来自 nginx：snippet 的 `/forum/api/` 已设 `client_max_body_size 3m`，若仍出现说明服务器上是旧版 snippet（重新发布或手工 `cp` 后 reload）；400 来自后端（超过 2MB 或 multipart 上限），响应体里带 `图片不能超过 2MB` |
 | 上传返回 `400 保存头像失败` | 容器内写 `/app/uploads` 失败：多为宿主目录属主/权限不对，重跑 `deploy.sh`（`podman unshare chown -R 1001:1001` + `chmod -R a+rX`），并确认 `uploads` 不是符号链接 |
 | 取头像 `403` | 文件对 nginx worker 不可读（历史 0600 或属主错）：重跑 `deploy.sh` 由 `chmod -R a+rX` 治愈；仍失败则 `ls -ln /pd/Program/forum/uploads/avatars` 检查权限 |
+| 通知要等十几秒甚至更久才到 | snippet 的 SSE 精确 location 未生效（`proxy_buffering off` 缺失会攒事件）：确认服务器上 snippet 是新版、`nginx -t` 后已 reload；`curl -N` 直连 8086 对比，直连实时、经 nginx 不实时即是此因 |
+| 通知在浏览器里每分钟断一次并频繁重连 | 通用 `/forum/api/` 的 `proxy_read_timeout`（60s）覆盖了 SSE：必须命中 `location = /forum/api/notifications/stream` 且 `proxy_read_timeout 3600s`；确认 `$is_args$args` 透传了 ticket |
+| `/forum/api/notifications/stream` 返回 200 HTML | 精确 location 缺失，请求被 `try_files` 兜到 `/forum/index.html`；`deploy.sh` 冒烟会因此失败 |
+| 取票 401「通知连接凭证无效或已过期」 | ticket 60 秒过期或已被消费（刷新页面会重新取票）；确认前端与后端版本配套、`app.sse.ticket-ttl-ms` 未被改小 |
 | Jenkins 起不来 | `sudo journalctl -u jenkins -n 100 --no-pager`；job config.xml 写坏时先移走 `/var/lib/jenkins/jobs/javaforum` 再重启 |
 
 ## 7. 已知限制
@@ -192,6 +224,8 @@ EXPLAIN SELECT id FROM posts WHERE deleted = false
 - **孤儿头像文件不会自动清理**：换头像、删号后旧文件只在「没有其他用户引用」时由后端删除；异常中断或历史数据可能留下无引用文件，目前没有清理任务，需要时按 `users.avatar_url` 人工对账。
 - **1–2 个字的关键词用不上全文搜索索引**：pg_trgm 的三元组索引在关键词短于 3 个字符时无法过滤，规划器会走 `posts` 顺序扫描。当前数据量（十几到几十篇）下无感；数据量增长后短词查询会变慢，属预期行为。
 - **中文按子串匹配，无分词与相关度排序**：搜索是「标题/正文包含关键词」，不区分词边界，也不做相关度打分；排序规则固定为「标题命中优先、同档按时间倒序」。
+- **实时通知是单实例的**：SSE 连接注册表在应用内存中，多实例部署时事件只从产生通知的实例推给连在它上面的客户端；升级/重启会让在线连接断开，客户端自动换票重连并校准未读数。单容器部署下无影响。
+- **SSE 依赖反向代理配置**：必须命中 `/forum/api/notifications/stream` 的精确 location（`proxy_buffering off`、`proxy_read_timeout 3600s`、`$is_args$args`）。漏配时通知会延迟或每分钟断连；`deploy.sh` 只断言「无 ticket 返回 401」，「是否真正实时」需按第 5 节手工验证。
 
 ## 附录 A：Jenkins job `config.xml`
 

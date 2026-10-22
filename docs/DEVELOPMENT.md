@@ -120,37 +120,38 @@ cd frontend && pnpm test --run
 | 部署工程化 | raspi：Jenkins + rootless podman + nginx 自动化部署（见 §4.7） | — | ✅ 已完成 | 2026-10-19 |
 | 第四轮 | 深色模式 + 头像上传 | 6 | ✅ 已完成 | 2026-10-20 |
 | 第五轮 | 全文搜索：搜索接口 + pg_trgm 索引 + 顶栏入口与搜索结果页 | 5 | ✅ 已完成 | 2026-10-21 |
+| 第六轮 | 实时通知：SSE 推送 + 一次性 ticket + 断线重连与 120s 兜底轮询 | 5 | ✅ 已完成 | 2026-10-22 |
 
-**当前进度：MVP 100% ｜ 已完成 5 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 6 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
-## 3. 当前状态快照（2026-10-21）
+## 3. 当前状态快照（2026-10-22）
 
 ### 3.1 代码规模
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 73 | 4096 |
-| 后端测试（`src/test/java`） | 14 | 3151 |
-| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 36 | 4347 |
-| 前端测试（`*.spec.js`） | 28 | 4579 |
+| 后端主代码（`src/main/java`） | 78 | 4616 |
+| 后端测试（`src/test/java`） | 17 | 4135 |
+| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4696 |
+| 前端测试（`*.spec.js`） | 30 | 5423 |
 
-后端分层（文件数）：`entity/` 12、`dto/` 17、`repository/` 9、`controller/` 9、`service/` 9、`security/` 5、`config/` 5、`util/` 4、`exception/` 2。
+后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 9、`service/` 11、`security/` 5、`config/` 6、`util/` 4、`exception/` 3。
 
-前端目录（文件数）：`views/` 20（11 个页面 + 9 个 spec）、`components/` 11（6 个组件 + 5 个 spec）、`composables/` 6（3 个组合式函数 + 3 个 spec）、`styles/` 7（4 个 css + 3 个 spec）、`utils/` 10（5 个纯函数 + 5 个 spec）、`stores/` 3（2 个 store + 1 个 spec）、`api/` 2（1 个封装 + 1 个 spec）、`router/` 1、根目录 4（`App.vue`、`main.js`、`style.css`、`viteConfig.spec.js`）。
+前端目录（文件数）：`views/` 20（11 个页面 + 9 个 spec）、`components/` 11（6 个组件 + 5 个 spec）、`composables/` 8（4 个组合式函数 + 4 个 spec）、`styles/` 7（4 个 css + 3 个 spec）、`utils/` 10（5 个纯函数 + 5 个 spec）、`stores/` 3（2 个 store + 1 个 spec）、`api/` 2（1 个封装 + 1 个 spec）、`router/` 1、根目录 5（`App.vue`、`main.js`、`style.css`、`viteConfig.spec.js`、`App.spec.js`）。
 
 ### 3.2 测试基线
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **105** 个用例 / 13 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
-| 前端 | **274** 个用例 / 28 个 spec | 全绿 |
+| 后端 | **133** 个用例 / 16 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 前端 | **309** 个用例 / 30 个 spec | 全绿 |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布（合计 105）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`TagFlowIntegrationTest` 8、`RepositoryTests` 8、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 4、`AvatarServiceTest` 4、`NotificationServiceTest` 4、`ForumApplicationTests` 2、`JwtTokenProviderTest` 2、`AuthFlowIntegrationTest` 1。
+后端测试类分布（合计 133）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`NotificationServiceTest` 10、`TagFlowIntegrationTest` 8、`RepositoryTests` 8、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`PostFlowIntegrationTest` 4、`AvatarServiceTest` 4、`ForumApplicationTests` 2、`JwtTokenProviderTest` 2、`AuthFlowIntegrationTest` 1。
 
-前端 spec 分布（合计 274）：`search` 30、`SearchView` 19、`ProfileView` 18、`useTheme` 17、`markdown` 14、`usePostActions` 13、`index`（api）13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`notifications` 9、`avatar` 9、`format` 9、`HomeView` 8、`PostListItem` 8、`breakpoint` 7、`notificationLink` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`NotificationsView` 4、`useResponsive` 3、`PostEditView` 3。
+前端 spec 分布（合计 309）：`search` 30、`useNotificationStream` 22、`SearchView` 19、`ProfileView` 18、`useTheme` 17、`notifications` 16、`markdown` 14、`index`（api）13、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`useResponsive` 3、`PostEditView` 3、`App` 2。
 
 ### 3.3 数据库
 
@@ -162,7 +163,7 @@ cd frontend && pnpm test --run
 | 软删除 | `posts.deleted`、`comments.deleted` |
 | 默认管理员 | `admin` / `admin123456`（由 `DataInitializer` 幂等创建，角色 ADMIN+MODERATOR+USER） |
 
-### 3.4 接口清单（36 个端点）
+### 3.4 接口清单（38 个端点）
 
 | 控制器 | 端点 |
 | --- | --- |
@@ -172,7 +173,7 @@ cd frontend && pnpm test --run
 | `PostController` | `GET /api/posts`、`GET /api/posts/search`、`GET /api/posts/{id}`、`GET /api/posts/mine`、`POST /api/posts`、`PUT /api/posts/{id}`、`DELETE /api/posts/{id}`、`GET /api/posts/favorites/mine`、`POST /api/posts/{id}/like`、`POST /api/posts/{id}/favorite`、`PUT /api/posts/{id}/pin`、`PUT /api/posts/{id}/exquisite` |
 | `TagController` | `GET /api/tags`、`GET /api/tags/posts` |
 | `CommentController` | `GET /api/posts/{postId}/comments`、`POST /api/posts/{postId}/comments`、`DELETE /api/posts/{postId}/comments/{id}` |
-| `NotificationController` | `GET /api/notifications`、`GET /api/notifications/unread-count`、`POST /api/notifications/read-all`、`POST /api/notifications/{id}/read` |
+| `NotificationController` | `GET /api/notifications`、`GET /api/notifications/unread-count`、`POST /api/notifications/read-all`、`POST /api/notifications/{id}/read`、`POST /api/notifications/stream-ticket`、`GET /api/notifications/stream` |
 | `AdminUserController` | `GET /api/admin/users`、`PUT /api/admin/users/{id}/status` |
 | `UserController` | `POST /api/users/me/avatar`、`DELETE /api/users/me/avatar` |
 | Actuator | `GET /actuator/health`（仅 ADMIN，仅暴露 health） |
@@ -200,6 +201,15 @@ cd frontend && pnpm test --run
 | `DELETE /api/users/me/avatar` | 无 | `Result<UserResponse>`（消息「头像已移除」）；本来没有头像也返回 200 |
 
 错误统一为 400：`仅支持 JPEG/PNG 图片`（魔数不符）、`无法解析图片`（解码失败、单边超 4096 或总像素超 2^24）、`图片不能超过 2MB`（multipart 超限或文件字节超限）、`请选择图片文件`（空文件）、`读取图片失败`（读流异常）、`保存头像失败`（落盘失败，消息可读但 HTTP 仍是 400）。服务端按 EXIF Orientation 校正方向后居中裁剪为 256×256 JPEG（quality 0.9）；文件名是服务端生成的 UUID（客户端文件名不参与路径拼接），权限 0644，先写临时文件再原子改名，事务提交后才删除旧文件（旧 URL 仍被其他用户引用时不删）。`GET /uploads/avatars/**` 是公开 GET（`SecurityConfig` 的 `PUBLIC_GET`）；本地开发由 `WebConfig` 把 `/uploads/**` 映射到 `app.upload-dir`，生产环境该前缀由 nginx 的 `location ^~ /forum/uploads/` 从宿主机目录直出，不经过 Spring。
+
+实时通知端点（`NotificationController`，`@RequestMapping("/api/notifications")`）采用「一次性票据 + SSE 长连接」：先用 JWT 换一张 60 秒有效、只能消费一次的 ticket，再用 ticket 建立连接；ticket 在 URL 查询串里，避免浏览器 `EventSource` 无法自定义请求头的限制（JWT 不落到 URL/日志）。
+
+| 端点 | 参数 | 返回 |
+| --- | --- | --- |
+| `POST /api/notifications/stream-ticket` | 无（需 `Authorization: Bearer`） | `Result<StreamTicketResponse>`：`ticket`（UUID）、`expiresIn`（秒，60） |
+| `GET /api/notifications/stream` | `ticket`（必填，查询串） | `text/event-stream`：`event:heartbeat`（每 15s 一条注释/心跳）、`event:notification`（`data` 为 `NotificationResponse` JSON）；ticket 缺失/过期/已用/伪造统一 **401**，错误体为 `Result` 的「通知连接凭证无效或已过期」 |
+
+服务端每用户最多保留 5 条连接（超出时 complete 最早一条），单条连接最长 30 分钟（`app.sse.timeout-ms`），到点由服务端 complete、前端换票重连；连接注册表在应用内存中（单实例部署，见 §6 已知限制）。通知只在**事务提交后**推送（`NotificationService.create` 内用 `TransactionSynchronization.afterCommit`，无事务时直接推），回滚不会误推；推送失败只记日志，不影响业务写入。`GET /api/notifications/stream` 由 `SecurityConfig` 单独 `permitAll`（鉴权由 ticket 完成），`POST /stream-ticket` 仍需 JWT。
 
 ### 3.5 前端页面
 
@@ -483,6 +493,55 @@ cd frontend && pnpm test --run
 - `EXPLAIN`：在现有 17 篇帖子的数据量下走 `Seq Scan`，属预期（数据量低、关键词短，用不上 trigram 索引）。
 - 全量测试：后端 13 个测试类 / 105 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 28 个 spec / 274 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
 
+### 4.11 第六轮：实时通知（SSE）（2026-10-22）
+
+计划：`docs/superpowers/plans/2026-10-22-round6-sse-notifications.md`（5 个任务：后端 SSE 基础设施 → 通知创建事务后推送 → 前端连接/退避/角标 → 通知页即时插入与横幅 → 部署、文档与上线）
+
+设计：`docs/superpowers/specs/2026-10-22-round6-sse-notifications-design.md`
+
+目标：把 120 秒轮询的通知体验改成「产生即推送」——顶栏角标即时 +1、右上角轻提示、通知页第 1 页即时插入新行；断线按 1s→30s 指数退避自动重连，重连后校准未读数；SSE 不可用时退回 120s 轮询兜底。
+
+新增/修改的文件：
+
+| 位置 | 文件 | 要点 |
+| --- | --- | --- |
+| 后端 | `service/NotificationStreamService.java` | 连接注册表 `ConcurrentHashMap<Long, Set<SseEmitter>>`：注册即发首帧注释、每 15s 心跳、单连接 30 分钟超时、每用户上限 5（超出 complete 最早一条）；`send` 走 2 线程有界队列，慢客户端不阻塞请求线程；锁内不改 I/O（先改注册表，锁外 complete） |
+| 后端 | `service/StreamTicketService.java` | UUID ticket + 60s TTL + 单次消费（consume 即删除）+ 定时清理过期票 |
+| 后端 | `config/SseConfig.java` | `@EnableScheduling` 驱动心跳与过期清理 |
+| 后端 | `exception/InvalidStreamTicketException.java`、`exception/GlobalExceptionHandler.java` | ticket 无效统一 401「通知连接凭证无效或已过期」 |
+| 后端 | `controller/NotificationController.java` | `POST /stream-ticket`（需 JWT）、`GET /stream?ticket=`（返回 `SseEmitter`） |
+| 后端 | `service/NotificationService.java` | `create` 内 `TransactionSynchronization.afterCommit` 推送（无同步时直接推），推送异常只记日志 |
+| 后端 | `service/CommentService.java`、`service/LikeService.java` | REPLY/LIKE/FAVORITE 三个触发点改调 `NotificationService.create`，事务边界知识集中在通知服务 |
+| 后端 | `application.yml`、`application-test.yml` | `app.sse.timeout-ms=1800000`、`heartbeat-ms=15000`、`ticket-ttl-ms=60000`、`max-connections-per-user=5` |
+| 前端 | `api/index.js` | `notificationApi.streamTicket()` |
+| 前端 | `composables/useNotificationStream.js` | 状态机 `connecting/open/retrying/disabled/closed`、1s→30s 指数退避、401 进入 disabled 且不再重连、坏 JSON 忽略、页面隐藏暂停、120s 兜底轮询（重连成功即停）、`stop` 清理定时器与连接 |
+| 前端 | `stores/notifications.js` | `handleIncoming`（去重、第 1 页插入、累计 `pendingNewCount`）、`loadList(0)` 与 `markAllRead` 清零 pending |
+| 前端 | `App.vue` | 登录后取票并 `start`；登出/账号切换 `stop` 并重置；SSE 不可用时保留 120s 轮询，替换原来的「轮询 + 双轨」逻辑 |
+| 前端 | `views/NotificationsView.vue` | `viewOpen` 置位与卸载复位、横幅（列表为空也显示）、点击 `load(0)` 回第 1 页并清零 |
+| 部署 | `deploy/nginx/forum.conf` | `location = /forum/api/notifications/stream` 精确匹配：`proxy_buffering off`、`proxy_cache off`、`proxy_read_timeout 3600s`、`proxy_set_header Connection ''`、`$is_args$args` |
+| 部署 | `deploy/deploy.sh` | 冒烟新增「无 ticket → 401」断言，防止 nginx 漏配时把请求兜到 SPA 返回 200 |
+| 文档 | `README.md`、`docs/DEVELOPMENT.md`、`docs/deployment/README.md` | 功能清单、SSE 配置项、开发/部署/排障记录 |
+
+关键取舍：
+
+- **SSE 而非 WebSocket**：本项目通知只需服务端单向推送；SSE 走普通 HTTP、nginx 原生支持、`EventSource` 自带重连语义，省掉 WS 握手与网关升级配置。代价是单向（通知没有客户端上行需求）。
+- **一次性 ticket 而非 URL 带 JWT**：`EventSource` 不能自定义请求头，把长期 JWT 放进查询串会进 access log；ticket 60 秒有效、消费即失效、只够换一条连接，泄露窗口极小。
+- **事务提交后推送**：在 `NotificationService.create` 内 `afterCommit`，业务回滚不会推「不存在的点赞/回复」；无事务同步时直接推，便于单测。
+- **推送异步化 + 每用户连接上限**：慢客户端不阻塞写接口；最多 5 条连接，超出挤掉最早一条，多标签页/反复重连都不会无限堆积。
+- **断线期间保留 120s 轮询兜底**：SSE 不可用时退回改造前的轮询行为，重连成功后自动停止，避免「SSE 一挂就完全收不到通知」。
+- **通知页即时插入只在第 1 页且页面可见时**：翻到第 2 页或页面隐藏时不改列表，只累计 `pendingNewCount` 显示「有 N 条新通知，点击刷新」，避免把用户正在读的分页顶乱。
+
+测试与验证：后端新增 `NotificationStreamServiceTest`（注册/上限/心跳/超时/重复注销/异步发送，12 例）、`StreamTicketServiceTest`（过期/重放/清理，6 例）、`SseFlowIntegrationTest`（ticket 契约、401、真实订阅，4 例）；`NotificationServiceTest` 扩到 10 例（afterCommit 推送、回滚不推、推送异常隔离）。前端新增 `useNotificationStream`（22 例）与 `App`（2 例），`notifications` 扩到 16 例、`NotificationsView` 扩到 8 例。基线数字见 §3.2。
+
+已知限制：见 §6「实时通知是单实例的」「SSE 需要反向代理配合」两条。
+
+上线验收（2026-10-22，执行后回填）：
+
+- 推送 `<docs 提交哈希>` 后 Jenkins Build **#<N>** **SUCCESS**（镜像 `localhost/forum-backend:<N>`），`forum-backend` 重建后 `Up (healthy)`，仅监听 `127.0.0.1:8086`。
+- nginx：snippet 含 SSE 精确 location（`proxy_buffering off`、`proxy_read_timeout 3600s`、`$is_args$args`），`nginx -t` 通过并 reload；`curl` 无 ticket → 401、同一 ticket 第二次 → 401。
+- 冒烟：`/forum/`、`/forum/api/health`、`/forum/api/notifications/unread-count` 均 200；已登录用户取票后 `curl -N` 收到 `event:heartbeat`，另一账号回复其帖子后收到 `event:notification`（`data` 含 `type=REPLY`）；`deploy.sh` 的 stream 401 断言通过。
+- 全量测试：后端 16 个测试类 / 133 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 30 个 spec / 309 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
+
 ---
 
 ## 5. 待办与后续计划
@@ -507,7 +566,7 @@ cd frontend && pnpm test --run
 | T14 | **搜索无分词、无相关度排序** | 中 | 采用 pg_trgm 子串匹配：中文不分词，1–2 个字的关键词的 trigram 覆盖不足，规划器会放弃索引改走顺序扫描；排序只有「标题命中优先 + 时间倒序」，没有 `ts_rank`/`similarity` 之类相关度。数据量增长后的升级路径是 `tsvector`（需分词扩展）或两阶段检索 |
 | T15 | **`posts.content` 无长度上限** | 低 | 正文列是 `TEXT` 且无应用层长度校验；超长正文会放大 `snippet` 截取与索引维护成本，也让 `pg_trgm` 的 GIN 索引更大。可加与标题一致的长度提示或截断策略 |
 
-### 5.2 候选功能（第五轮已取全文搜索，其余未开始）
+### 5.2 候选功能（第六轮已取实时通知，候选项已清空）
 
 第二轮明确列为「不做」的功能，各自需要独立设计：
 
@@ -518,9 +577,9 @@ cd frontend && pnpm test --run
 | ~~头像上传~~ ✅ 已完成 | 中 | 中 | 第四轮已交付：JPEG/PNG 校验 + EXIF 校正 + 256×256 裁剪、宿主机上传目录、全站头像展示与移除（§4.9） |
 | ~~深色模式~~ ✅ 已完成 | 低 | 小 | 第四轮已交付：双套设计令牌 + 跟随系统/手动切换 + 首屏防闪白（§4.9） |
 | ~~全文搜索~~ ✅ 已完成 | 中 | 中 | 第五轮已交付：公开 `GET /api/posts/search` + pg_trgm GIN 部分索引、独立 `/search?q=` 结果页与顶栏入口（§4.10） |
-| WebSocket 实时通知 | 中 | 大 | 目前是 120 秒轮询兜底 |
+| ~~WebSocket 实时通知~~ ✅ 已完成 | 中 | 大 | 第六轮已交付：以 SSE 实现（而非 WebSocket）一次性 ticket 鉴权 + 断线指数退避重连 + 120s 轮询兜底，见 §4.11 |
 
-第三轮已取前两项（见 §4.8），第四轮已取头像上传与深色模式（见 §4.9），第五轮已取全文搜索（见 §4.10）；其余候选（WebSocket 实时通知等）留待后续轮次，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
+第三轮已取前两项（见 §4.8），第四轮已取头像上传与深色模式（见 §4.9），第五轮已取全文搜索（见 §4.10），第六轮已取实时通知（见 §4.11）；第二轮列出的候选功能至此全部完成，后续新功能需重新评估价值与工作量，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
 
 ---
 
@@ -536,6 +595,9 @@ cd frontend && pnpm test --run
 | 构建产物有 chunk > 500kB 警告 | 首屏加载体积偏大 | Element Plus 全量引入所致，可按需引入或分包 |
 | Markdown 会解释历史纯文本帖子 | 正文里恰好像 Markdown 的写法（`# 标题`、`*斜体*`、`[文字](链接)`）被渲染成格式而非原样显示 | 单换行已转 `<br>` 以保留换行观感；需要原样展示可转义或用代码块；未做「按帖子版本区分渲染」 |
 | 无独立 404 标签页，标签聚合在应用层 | 未知标签与「标签下无帖子」共用空态；标签数量级大时聚合排序分页在应用层完成 | 已接受：标签数据量小；接口语义为「未知标签返回空页」（见 §4.8） |
+| 实时通知是单实例的 | SSE 连接注册表在应用内存中；多实例部署时事件只从产生通知的那个实例推给连在它上面的客户端 | 当前单容器部署不构成问题；发版/重启时在线连接断开，客户端自动换票重连并校准未读数 |
+| SSE 依赖反向代理正确配置 | 漏配 `proxy_buffering off` 表现为通知要等十几秒才到，漏配 `proxy_read_timeout` 表现为连接每分钟断一次 | snippet 内置精确 location + `deploy.sh` 冒烟断言 401；部署手册有「通知延迟」排障条目 |
+| SSE 断开期间的新通知不补推 | 断线期间发出的事件已丢失，重连只校准未读数，不重放列表 | 已接受：刷新或重新进入通知页即可看到；不做服务端离线队列（T16） |
 
 ---
 
@@ -560,6 +622,10 @@ cd frontend && pnpm test --run
 | 搜索实现 | **pg_trgm 子串匹配**，不用 `tsvector` | 中文没有空格分词，`to_tsvector('simple', ...)` 只能整段命中；pg_trgm 的三元组索引对「包含」语义有效，且 PostgreSQL 15 的 pg_trgm 是 trusted 扩展，`forum` 角色可直接 `CREATE EXTENSION` |
 | 搜索排序 | **标题命中优先 + `createTime` 倒序**，不做相关度评分 | 相关度分数用户无法预期；「标题命中的排前面」规则可解释、可测试，也避免引入 `similarity()` 的排序开销 |
 | 搜索片段 | **服务端截窗口、前端清洗与高亮** | 列表 DTO 保持轻量（不带正文）；Markdown 清洗、省略号与 `<mark>` 只在 `utils/search.js` 实现一次，避免 Java/JS 两套规则漂移 |
+| 实时通知传输 | **SSE**，不用 WebSocket | 只要服务端单向推送；SSE 走普通 HTTP、nginx 原生支持、`EventSource` 自带重连语义，省掉 WS 握手与网关升级配置 |
+| SSE 鉴权 | **一次性 ticket**（60s、单次消费）而不是查询串带 JWT | `EventSource` 不能自定义请求头；长期 JWT 放进 URL 会进 access log，ticket 泄露窗口小且消费后立即失效 |
+| 通知推送时机 | **事务提交后** `afterCommit` 推送 | 回滚不能推「不存在的点赞/回复」；无事务同步时直接推，便于单测 |
+| 实时通知降级 | **断线退回 120s 轮询**，重连成功即停 | 保留改造前的兜底行为，避免 SSE 不可用时完全收不到通知 |
 
 ---
 
@@ -574,6 +640,18 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-10-22 | docs | 记录第六轮实时通知（SSE）功能（README、开发记录、部署手册、计划验收步骤） | 本次提交 |
+| 2026-10-22 | fix | 修正通知横幅令牌与点击断言强度 | `b3a50a5` |
+| 2026-10-22 | feat | 第六轮通知页：SSE 事件即时插入第 1 页、新通知横幅、`viewOpen` 生命周期 | `a73fe41` |
+| 2026-10-22 | test | 锁定旧世代取票 401 不污染新会话 | `798a202` |
+| 2026-10-22 | fix | 修正 SSE 账号切换与取票竞态的生命周期处理 | `cda1b7b` |
+| 2026-10-22 | feat | 第六轮前端：SSE 连接、指数退避重连、120s 兜底轮询与实时角标 | `257cc57` |
+| 2026-10-22 | fix | 加固通知推送失败隔离与事务后推送测试 | `a83df85` |
+| 2026-10-22 | feat | 第六轮后端：通知创建事务提交后实时推送 | `9f37a48` |
+| 2026-10-22 | fix | 修正 SSE 连接注册表的锁内 I/O 与断连处理 | `5c2047f` |
+| 2026-10-22 | feat | 第六轮后端：SSE 通知基础设施（一次性 ticket 鉴权 + 连接注册表） | `104d288` |
+| 2026-10-22 | docs | 记录第六轮实时通知实现计划 | `6aa1d52` |
+| 2026-10-22 | docs | 记录第六轮实时通知（SSE）设计 | `a677986` |
 | 2026-10-21 | docs | 第五轮全文搜索上线验收（Build #8 成功、pg_trgm 索引与冒烟实测）与变更日志回填 | 本次提交 |
 | 2026-10-21 | docs | 记录第五轮全文搜索功能（README、开发记录、部署手册） | `67c13a6` |
 | 2026-10-21 | fix | 修正搜索框码点上限与同词回车短路 | `debe1d7` |

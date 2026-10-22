@@ -123,6 +123,14 @@ uploads_code="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Host: ra
 [ "$uploads_code" = "404" ] \
     || die "/forum/uploads/ 未直出（返回 $uploads_code，应为 404；检查 nginx snippet 是否已 reload 且 /pd/Program/forum/uploads 可读）"
 
+# SSE 订阅端点必须由后端回答 401（ticket 缺失），而不是落到 SPA 的 index.html（200）：
+# 若 nginx 精确匹配缺失，请求会被 try_files 兜到 /forum/index.html，这里会拿到 200；
+# 后端未更新或未起则可能是 404/502 —— 三者都说明「实时通知不可用」，部署应立刻失败
+stream_code="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Host: raspi' \
+    "http://127.0.0.1/forum/api/notifications/stream")"
+[ "$stream_code" = "401" ] \
+    || die "/forum/api/notifications/stream 未返回 401（返回 $stream_code，应为 401：缺 ticket 时后端必须拒绝；检查 nginx 精确匹配、后端版本与 reload）"
+
 log "清理旧镜像（保留最近 2 个数字 tag，绝不做全局 prune）"
 podman images --format '{{.Tag}}' localhost/forum-backend 2>/dev/null \
     | grep -E '^[0-9]+$' | sort -n | head -n -2 \

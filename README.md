@@ -16,7 +16,7 @@
 - 帖子：板块内发帖、编辑、删除（软删除），分页列表与关键词搜索，浏览量统计
 - 互动：点赞、收藏与「我的收藏」；评论支持楼中楼，删除后保留占位
 - 权限：管理员 / 版主 / 普通用户三级角色，支持置顶、加精、禁言、封禁
-- 通知：点赞、收藏、回复三类通知（另有 `SYSTEM` 预留类型），未读角标与单条已读，点击跳转到帖子或具体评论
+- 通知：点赞、收藏、回复三类通知（另有 `SYSTEM` 预留类型），未读角标与单条已读，点击跳转到帖子或具体评论；新通知经 SSE 实时到达（顶栏角标即时 +1、右上角轻提示），断线按 1s→30s 退避自动重连，重连后校准未读数
 - **Markdown 渲染**：帖子正文按 CommonMark + 表格/删除线（`markdown-it`）渲染（标题、列表、表格、代码块高亮、链接、图片），编辑页提供实时预览；渲染结果经 DOMPurify 白名单过滤、外链补 `target`/`rel`、图片懒加载后才插入 DOM，服务端仍只存纯文本
 - **标签检索**：帖子可带多个标签，`/tags` 展示标签云（按帖子数降序，支持关键词检索与分页），点击标签进入 `/tags/:name` 查看该标签下的帖子
 - **深色模式**：默认跟随系统，也可手动选择浅色/深色（顶栏右侧、通知铃铛之前的主题菜单），选择存于 `localStorage` 的 `jf_theme`；`index.html` 的内联脚本在首屏挂上 `html.dark`，避免刷新时先白后黑；配色来自 `styles/tokens.css` 的双套 CSS 变量与 Element Plus 官方暗色变量
@@ -114,6 +114,10 @@ java -jar target/forum-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 | `SERVER_PORT` | `8080` |
 | `JWT_EXPIRATION_MS` | `86400000`（24 小时） |
 | `LOG_FILE` | `logs/javaforum.log`（仅 `prod`） |
+| `SSE_TIMEOUT_MS` | `1800000`（单条 SSE 连接最长 30 分钟，到点客户端自动重连） |
+| `SSE_HEARTBEAT_MS` | `15000`（心跳事件间隔，用于穿透代理的空闲超时） |
+| `SSE_TICKET_TTL_MS` | `60000`（一次性连接凭证有效期） |
+| `SSE_MAX_CONNECTIONS_PER_USER` | `5`（每用户并发连接上限，超出时挤掉最早的一条） |
 
 ### 5. 验证启动
 
@@ -228,7 +232,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 13 个测试类、105 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 16 个测试类、133 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 
@@ -238,7 +242,7 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 28 个 spec、274 个用例，覆盖：
+当前为 30 个 spec、309 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
@@ -255,6 +259,8 @@ pnpm build       # 生产构建
 - 头像（`src/utils/avatar.spec.js`、`src/components/UserAvatar.spec.js`、`src/views/ProfileView.spec.js`）：站内 `/uploads/` 前缀拼 `BASE_URL`（含 `/forum/` 子路径）、外链与 data URL 原样透传、空值与仅前缀返回空串、加载失败回退昵称首字母并在 url 变化后重试、代理对昵称只取一个码点、上传成功刷新用户、非法类型与超过 2MB 时客户端拦截、移除头像
 - 搜索页与顶栏入口（`src/views/SearchView.spec.js`、`src/components/HeaderSearch.spec.js`、`src/components/PostListItem.spec.js`、`src/api/index.spec.js`）：读 `?q=` 拉取结果并展示计数、三种空态、分页与换词重置、过期响应丢弃、顶栏桌面输入框/窄屏图标两种形态、命中词 `<mark>` 高亮与正文片段、`postApi.search` 的请求路径
 - 搜索文本工具（`src/utils/search.spec.js`）：大小写不敏感分段高亮、正则元字符按字面匹配、Markdown 轻量清洗（代码围栏/行内代码/标题/引用/列表/链接/图片）、空白折叠、命中窗口与省略号
+- 实时通知连接（`src/composables/useNotificationStream.spec.js`）：取票后建立 SSE 连接、事件回调合并到 store、断线按 1s→30s 指数退避重连、重连成功回调、401 取票失败进入 `disabled` 且不再重连、坏 JSON 忽略不中断、页面隐藏时暂停与恢复、网络离线时 120s 轮询兜底且重连后停止、旧票晚到失败不破坏新会话、`stop` 清理定时器与连接
+- SSE 生命周期与开关（`src/App.spec.js`）：登录后取票并建立连接、未登录不取票、登出后 `stop` 且角标清零、SSE 关闭时退回 120s 轮询、账号切换时断开旧连接并以新 token 重新建立
 
 ## 优化记录（第二轮）
 
@@ -281,6 +287,8 @@ pnpm build       # 生产构建
 - **历史纯文本帖子中的 Markdown 语法会被解释**：Markdown 渲染上线后，正文里恰好长得像 Markdown 的写法（`# 标题`、`*斜体*`、`[文字](链接)`、`| 表格 |` 等）会按语法渲染，而不是原样显示。本轮不按帖子版本区分渲染：单换行会转成 `<br>` 以尽量保留纯文本帖子的换行观感，需要原样展示的符号可用反斜杠转义或放进代码块。
 - **REPLY 通知的评论锚点只覆盖第一页评论**：帖子详情页每页加载 10 条根评论（后端按 `createTime` 升序只返回根评论，子回复随父评论平铺渲染）。若通知指向的根评论排在第 11 条之后，页面里不存在对应元素。此时不再静默失败：当该帖评论数大于 10 时会提示「目标评论可能在后面的评论分页里，可翻页查看」，需手动翻页定位。评论已删除也会命中同一条提示（该提示无法区分两种情况），这是本轮接受的误报。彻底修法是按 `commentId` 逐页回溯后再选中目标页——其代价（每次通知跳转最多多出若干次请求，且仍受页数上限约束）见 `docs/superpowers/specs/2026-10-16-experience-iteration-design.md` §5。
 - **全文搜索按子串匹配**：中文没有分词，「关键词 + 相关度排序」的能力有限；1–2 个字的关键词用不上 pg_trgm 索引，会退化为顺序扫描（数据量小时无感）。
+- **实时通知是单实例的**：SSE 连接注册表在应用内存里，多实例部署时事件只从产生通知的那个实例推给连在它上面的客户端（JavaForum 目前单容器部署，不构成问题）；重启/发版会让在线连接断开，客户端自动换票重连，断线期间发出的事件不补推，只校准未读数，刷新或重新进入通知页即可看到。
+- **SSE 需要反向代理配合**：nginx 必须给 `location = /forum/api/notifications/stream` 单独关掉 `proxy_buffering`、把 `proxy_read_timeout` 放大到 3600s 并透传 `$is_args$args`；漏配时表现为「通知要等十几秒/一分钟才到」或「每分钟断一次」。`deploy/deploy.sh` 的冒烟会检查该端点返回 401，但「是否真的实时」仍需手工验证（部署手册有 curl 与双账号验收步骤）。
 
 ## 目录结构
 
