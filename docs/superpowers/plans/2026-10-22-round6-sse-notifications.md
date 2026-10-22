@@ -3303,3 +3303,10 @@ docs: 回填第六轮提交哈希与上线验收
    → 有 token 则 `start()`。另加连接世代 `epoch`：`start()/stop()` 推进世代，取票返回后世代不符的旧 ticket 直接丢弃，
    避免「ticket 在途 → stop → start → 旧 ticket 晚到」用上一会话 ticket 建连。`useNotificationStream(options)`
    新增可注入参数（原样转发给 `createNotificationStream`），仅用于测试注入 api/EventSource/timers。
+
+5. **增量审查后的测试补强（仅测试，无行为变更）**：增量审查提出「旧世代取票晚到失败（401）不得把新会话置为 disabled」
+   的 catch 分支 epoch 守卫无用例（删掉该守卫测试仍全绿）。已补 `旧世代 ticket 晚到失败（401）不把新会话置为 disabled`
+   用例（先红：删守卫即失败；后绿），锁定 `connect()` catch 中 `myEpoch !== epoch` 必须先于 401 判断。同时删除
+   `App.spec.js` 中由 mock 自行注册 `onUnmounted` 的卸载断言——该用例验证的是 mock 而不是真实 composable，
+   真实卸载契约已由 `useNotificationStream.spec.js`「组件卸载时断开连接」覆盖。store 的 `refreshUnread/loadList`
+   响应缺少会话世代校验（跨账号旧响应可能回写）记为后续债务，不在本任务处理。

@@ -8,18 +8,15 @@ const { streamMock, useNotificationStreamMock } = vi.hoisted(() => {
   return { streamMock: stream, useNotificationStreamMock: vi.fn() }
 })
 
-vi.mock('@/composables/useNotificationStream', async () => {
-  const { onUnmounted } = await import('vue')
-  return {
-    // App.vue 只调用一次并忽略返回值；真实 composable 在组件卸载时 stop，
-    // mock 也必须注册同样的清理，否则「卸载停止」这条契约永远测不到。
-    useNotificationStream: () => {
-      useNotificationStreamMock()
-      onUnmounted(() => streamMock.stop())
-      return streamMock
-    }
+vi.mock('@/composables/useNotificationStream', () => ({
+  // App.vue 只调用一次并忽略返回值。组件卸载时的真实断开由 composable 自身的
+  // onUnmounted 负责，其契约在 useNotificationStream.spec.js 中覆盖；这里不再
+  // 由 mock 自行注册清理，避免出现「测试自己验证自己」的假覆盖。
+  useNotificationStream: () => {
+    useNotificationStreamMock()
+    return streamMock
   }
-})
+}))
 
 // App.vue 的 setup 调用 useRouter()；不装真实路由插件时注入不到，mock 掉最省事。
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
@@ -72,12 +69,4 @@ describe('App.vue 实时通知接线', () => {
     expect(() => wrapper.unmount()).not.toThrow()
   })
 
-  it('组件卸载时调用 stop() 断开实时通知', () => {
-    const wrapper = mountApp()
-    expect(streamMock.stop).not.toHaveBeenCalled()
-
-    wrapper.unmount()
-
-    expect(streamMock.stop).toHaveBeenCalledTimes(1)
-  })
 })

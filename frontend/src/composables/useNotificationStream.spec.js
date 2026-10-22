@@ -363,6 +363,37 @@ describe('createNotificationStream', () => {
     expect(fresh.closed).toBe(false)
   })
 
+  it('旧世代 ticket 晚到失败（401）不把新会话置为 disabled，也不断开新连接', async () => {
+    let rejectOld
+    api.streamTicket.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectOld = reject
+        })
+    )
+
+    stream.start()
+    await flush()
+    expect(MockEventSource.instances).toHaveLength(0)
+
+    stream.stop()
+    api.streamTicket.mockResolvedValueOnce({ ticket: 'tk-new' })
+    stream.start()
+    await flush()
+    const fresh = MockEventSource.latest()
+    expect(fresh.url).toContain('ticket=tk-new')
+
+    // 旧世代的取票在最晚时刻以 401 失败：epoch 守卫必须先于 401 判断生效，
+    // 否则旧会话的失效会把刚建立的新会话永久置为 disabled。
+    rejectOld({ response: { status: 401 } })
+    await flush()
+
+    expect(stream.state.value).not.toBe('disabled')
+    expect(stream.state.value).toBe('connecting')
+    expect(fresh.closed).toBe(false)
+    expect(api.streamTicket).toHaveBeenCalledTimes(2)
+  })
+
   it('EventSource 构造失败时进入退避并启动兜底轮询，不会卡在 connecting', async () => {
     const constructed = []
     class ThrowingEventSource {
