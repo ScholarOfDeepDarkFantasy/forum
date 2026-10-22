@@ -146,9 +146,9 @@ onUnmounted(() => {
 .new-banner {
   margin: var(--jf-space-2) 0;
   padding: var(--jf-space-2) var(--jf-space-3);
-  border-radius: 4px;
+  border-radius: var(--jf-radius-sm);
   background: var(--jf-color-unread-bg);
-  color: var(--jf-color-text);
+  color: var(--jf-color-text-1);
   font-size: var(--jf-font-small);
   text-align: center;
   cursor: pointer;

@@ -136,14 +136,19 @@ describe('NotificationsView 新通知横幅', () => {
     expect(useNotificationStore().viewOpen).toBe(true)
   })
 
-  it('有 pending 时显示横幅，点击后回到第 1 页并清零', async () => {
+  it('有 pending 时显示横幅，点击后真的重拉第 1 页并清零', async () => {
     seed([unreadReply])
     const wrapper = mountView()
     await flush()
 
-    // 模拟「用户翻到第 2 页时来了新通知」：store 只累计 pending，不插入
     const store = useNotificationStore()
-    store.listPage = 1
+    // 先真的加载第 2 页。只手动改 listPage 的话，挂载时 load() 那次调用就能满足
+    // 「最后一次以 page:0 调用」的断言——把 @click 改成只清计数仍然全绿（空断言）。
+    await store.loadList(1)
+    expect(notificationApi.mine).toHaveBeenLastCalledWith({ page: 1, size: 10 })
+    expect(store.listPage).toBe(1)
+
+    // 模拟「用户停在第 2 页时来了新通知」：store 只累计 pending，不插入
     store.pendingNewCount = 2
     await nextTick()
 
@@ -151,12 +156,33 @@ describe('NotificationsView 新通知横幅', () => {
     expect(banner.exists()).toBe(true)
     expect(banner.text()).toContain('2 条新通知')
 
+    const callsBeforeClick = notificationApi.mine.mock.calls.length
+
     await banner.trigger('click')
     await flush()
 
+    // 点击必须真的重拉（调用次数 +1）并且落回第 1 页，而不只是把 pending 清零
+    expect(notificationApi.mine).toHaveBeenCalledTimes(callsBeforeClick + 1)
     expect(notificationApi.mine).toHaveBeenLastCalledWith({ page: 0, size: 10 })
+    expect(store.listPage).toBe(0)
     expect(store.pendingNewCount).toBe(0)
     expect(wrapper.find('.new-banner').exists()).toBe(false)
+  })
+
+  it('列表为空时横幅仍然显示', async () => {
+    // 横幅渲染在列表的 v-if/v-else 之外：首条通知到达时列表还是空的，若被
+    // el-empty 分支挡掉，用户就看不到任何变化。这条锁定既有行为，防止把横幅
+    // 挪回列表条件内造成回归。
+    seed([])
+    const wrapper = mountView()
+    await flush()
+    expect(wrapper.find('.empty').exists()).toBe(true)
+
+    useNotificationStore().pendingNewCount = 1
+    await nextTick()
+
+    expect(wrapper.find('.empty').exists()).toBe(true)
+    expect(wrapper.find('.new-banner').exists()).toBe(true)
   })
 
   it('卸载时把 viewOpen 复位，避免离开后继续往列表插入', async () => {

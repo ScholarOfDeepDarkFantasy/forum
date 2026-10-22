@@ -137,7 +137,7 @@ public void create(User recipient, User sender, Post post, Comment comment,
   2. `unreadCount += 1`；
   3. 若 `viewOpen && listLoaded && listPage === 0`：头部插入并截断到 `PAGE_SIZE`，`totalElements += 1`；
   4. 否则 `pendingNewCount += 1`。
-- `flushPending()`：`loadList(0)` 后清零 `pendingNewCount`；`loadList(0)` 本身成功时也清零。
+- 横幅点击不单独设 action：视图直接 `load(0)` → `loadList(0)`；`loadList(0)` 成功时清零 `pendingNewCount`（失败时保留 pending，用户仍能看到横幅，比清空更安全）。
 - 现有 `refreshUnread/loadList/markRead/markAllRead` 语义不变（`loadList` 仅新增 `listLoaded` 标记与第 0 页时的 `pendingNewCount` 清零）。
 
 ### 6.3 轻提示 `showNotificationToast(n)`
@@ -147,7 +147,7 @@ public void create(User recipient, User sender, Post post, Comment comment,
 
 ### 6.4 通知页 `NotificationsView.vue`
 
-- `pendingNewCount > 0`（说明不在第 1 页）时显示顶部提示条「有 N 条新通知，点击查看」，点击 `flushPending()` 回到第 1 页。
+- `pendingNewCount > 0`（说明不在第 1 页）时显示顶部提示条「有 N 条新通知，点击刷新」，点击 `load(0)`（即 `loadList(0)`）回到第 1 页。
 - 第 1 页时新通知由 store 直接插入头部。
 - 分页、全部已读、单条已读语义不变。
 
@@ -223,7 +223,7 @@ location = /forum/api/notifications/stream {
 ### 9.2 前端（vitest）
 
 1. `useNotificationStream.spec`（stub `EventSource`、fake timers）：连接前先取 ticket；open 后停轮询且刷新未读数；error 后退避并用**新** ticket 重连；断线期间每 120s 轮询；登出/卸载关闭且不再重连；401（ticket 失效）走重连。
-2. `stores/notifications.spec`：`handleIncoming` 去重、角标 +1、第 1 页头部插入/截断/total、非第 1 页 pending 计数、`flushPending`。
+2. `stores/notifications.spec`：`handleIncoming` 去重、角标 +1、第 1 页头部插入/截断/total、非第 1 页 pending 计数、第 0 页 `loadList` 清零 pending。
 3. `NotificationsView.spec`：提示条出现/点击刷新。
 4. `breakpoint.spec`：`@media` 仍为 6 处。
 

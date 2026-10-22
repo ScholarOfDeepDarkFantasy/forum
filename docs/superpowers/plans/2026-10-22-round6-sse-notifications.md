@@ -2597,9 +2597,9 @@ onUnmounted(() => {
 .new-banner {
   margin: var(--jf-space-2) 0;
   padding: var(--jf-space-2) var(--jf-space-3);
-  border-radius: 4px;
+  border-radius: var(--jf-radius-sm);
   background: var(--jf-color-unread-bg);
-  color: var(--jf-color-text);
+  color: var(--jf-color-text-1);
   font-size: var(--jf-font-small);
   text-align: center;
   cursor: pointer;
@@ -3317,3 +3317,18 @@ docs: 回填第六轮提交哈希与上线验收
    该用例先红（挂载未置位）后绿，才真正锁定「挂载置位 + 卸载复位」契约。另：计划 Step 4-3 预测的定向 22（7+15）、
    全量 295（292+3）已过期——实际 `frontend/src/stores/notifications.spec.js` 为 16 条（Task 3 期间新增），
    故定向为 23（7+16）、全量为 308（305+3），均全绿；Task 4 的 Step 标题下无复选框，未做勾选。
+
+7. **Task 4 质量审查修复（I-1/M-1/M-2/M-3/M-4）**：
+   - **I-1**：`frontend/src/views/NotificationsView.spec.js` 的横幅点击用例原先把 `store.listPage` 直接置 1，从未真实请求第 2 页，
+     `toHaveBeenLastCalledWith({ page: 0, size: 10 })` 被挂载时 `load()` 的调用满足——把 `@click="load(0)"` 改成只清计数仍全绿（空断言）。
+     修复为先 `await store.loadList(1)`（断言 mock 以 `{ page: 1, size: 10 }` 调用且 `listPage === 1`），记录点击前调用次数，
+     点击后断言调用次数 +1、最后一次入参 `{ page: 0, size: 10 }`、`listPage === 0`、`pendingNewCount === 0`、横幅消失。
+     变异自证：把点击改为 `notifications.pendingNewCount = 0` 后该用例失败（期望 3 次调用、实际 2 次），恢复后全绿。
+   - **M-1**：`NotificationsView.vue` 中 `.new-banner` 的 `color: var(--jf-color-text)` 改为 `var(--jf-color-text-1)`
+     （`--jf-color-text` 全仓未定义，暗色模式下会落到继承色）。
+   - **M-2**：同处 `border-radius: 4px` 改为 `var(--jf-radius-sm)`。
+   - **M-3**：新增「列表为空时横幅仍然显示」用例（`seed([])` + `pendingNewCount = 1` 时 `.empty` 与 `.new-banner` 同时存在），
+     锁定横幅渲染在列表 `v-if` 之外的既有行为，防回归。
+   - **M-4**：删除 store 中已无 src 调用方的死 action `flushPending()`（视图用 `load(0)`；失败时保留 pending 更安全），
+     并同步设计文档 §6.2/§6.4：`flushPending()` 改为 `load(0)`（`loadList(0)`）、文案「点击查看」改为「点击刷新」。
+   - 结果：定向视图 8 条 + store 16 条 = 24 全绿；全量 30 files / 309 tests；`VITE_BASE_PATH=/forum/ pnpm build` 通过；`breakpoint.spec` 仍 6 处、7 条全绿。

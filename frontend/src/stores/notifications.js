@@ -91,11 +91,6 @@ export const useNotificationStore = defineStore('notifications', {
       }
     },
 
-    /** 通知页横幅点击：回到第 1 页重新拉取（顺带清 pending） */
-    async flushPending() {
-      await this.loadList(0)
-    },
-
     async markAllRead() {
       await notificationApi.markAllRead()
       this.unreadCount = 0
