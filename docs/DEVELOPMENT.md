@@ -535,11 +535,11 @@ cd frontend && pnpm test --run
 
 已知限制：见 §6「实时通知是单实例的」「SSE 需要反向代理配合」两条。
 
-上线验收（2026-10-22，执行后回填）：
+上线验收（2026-10-22）：
 
-- 推送 `<docs 提交哈希>` 后 Jenkins Build **#<N>** **SUCCESS**（镜像 `localhost/forum-backend:<N>`），`forum-backend` 重建后 `Up (healthy)`，仅监听 `127.0.0.1:8086`。
-- nginx：snippet 含 SSE 精确 location（`proxy_buffering off`、`proxy_read_timeout 3600s`、`$is_args$args`），`nginx -t` 通过并 reload；`curl` 无 ticket → 401、同一 ticket 第二次 → 401。
-- 冒烟：`/forum/`、`/forum/api/health`、`/forum/api/notifications/unread-count` 均 200；已登录用户取票后 `curl -N` 收到 `event:heartbeat`，另一账号回复其帖子后收到 `event:notification`（`data` 含 `type=REPLY`）；`deploy.sh` 的 stream 401 断言通过。
+- 推送 `9ead0d0` 后 Jenkins Build **#10** **SUCCESS**（镜像 `localhost/forum-backend:10`），`forum-backend` 重建后 `Up (healthy)`，仅监听 `127.0.0.1:8086`。
+- nginx：snippet 含 SSE 精确 location（`proxy_buffering off`、`proxy_read_timeout 3600s`、`$is_args$args`），`nginx -t` 通过并 reload；`curl` 无 ticket → **401**、同一 ticket 第二次 → **401**。
+- 冒烟：`/forum/`、`/forum/api/health`、`/forum/api/notifications/unread-count` 均 200；已登录用户取票后 `curl -N` 收到 `text/event-stream` 与 `:connected`/`:heartbeat`，另一账号楼中楼回复其评论后收到 `event:notification`（`data` 含 `type=REPLY`，未读数 0 → 1）；`deploy.sh` 的 stream 401 断言随构建通过。
 - 全量测试：后端 16 个测试类 / 133 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 30 个 spec / 309 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
 
 ---
@@ -640,7 +640,8 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-22 | docs | 记录第六轮实时通知（SSE）功能（README、开发记录、部署手册、计划验收步骤） | 本次提交 |
+| 2026-10-22 | docs | 第六轮实时通知上线验收（Build #10、SSE 全链路实测）与变更日志回填 | 本次提交 |
+| 2026-10-22 | docs | 记录第六轮实时通知（SSE）功能（README、开发记录、部署手册、计划验收步骤） | `9ead0d0` |
 | 2026-10-22 | fix | 修正通知横幅令牌与点击断言强度 | `b3a50a5` |
 | 2026-10-22 | feat | 第六轮通知页：SSE 事件即时插入第 1 页、新通知横幅、`viewOpen` 生命周期 | `a73fe41` |
 | 2026-10-22 | test | 锁定旧世代取票 401 不污染新会话 | `798a202` |
