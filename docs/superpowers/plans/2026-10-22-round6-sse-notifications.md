@@ -3279,3 +3279,19 @@ docs: 回填第六轮提交哈希与上线验收
 ```
 
 提交顺序与上表一致；第 5 条包含 `deploy/nginx/forum.conf`、`deploy/deploy.sh`、三份文档与本计划；第 6 条只改 `docs/DEVELOPMENT.md`（把 §8 的「本次提交」行补成最终哈希，并写入 Build 号与验收结论）。
+
+## 附录 B：实施偏差记录（第六轮）
+
+1. **`NotificationService.create` 的返回值**：spec（`docs/superpowers/specs/2026-10-22-round6-sse-notifications-design.md:89`）写的是
+   `public void create(User recipient, User sender, Post post, Comment comment, NotificationType type, String content)`，
+   实现改为返回 `Notification`（本计划 Step 2-2 的代码块即 `public Notification create(...)`）。
+   原因：调用方与单测可以直接断言已持久化实体的字段/默认未读，不必为了拿 id 再查一次库；对现有调用点无影响（返回值可忽略）。
+
+2. **「提交后才推送」的验证边界**：`SseFlowIntegrationTest.stage4` 只验证「收到 SSE 帧时，通知已经可以通过 REST 查到（未读数 ≥1）」，
+   无法单独证明「先提交、后推送」的严格时序——HTTP/SSE 层观察不到服务端事务边界。真正的时序保证由
+   `NotificationServiceTest` 的 `afterCommit` 单测承担：有事务同步时提交前不推送、回滚不推送、无事务时立即推送。
+   第六轮质量修复又在 stage4 中加了 reader 流负向断言（只推给收件人，而非广播），并校验点赞响应 200/`success=true`。
+
+3. **推送失败隔离**：`create` 的 `afterCommit` 与无事务分支统一走 `pushSafely(...)`，用 `try/catch (RuntimeException)` 记 `WARN`
+   后继续返回通知。原因：通知此时已入库，推送失败若冒泡会变成业务请求 500（afterCommit 中还会抛回提交线程）。
+   `NotificationServiceTest` 有专门用例断言推送抛异常时 `create` 不抛、仍返回通知，且 WARN 带异常上下文。

@@ -1,6 +1,7 @@
 package org.song.forum.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import java.util.NoSuchElementException;
  * 通知服务：我的通知列表、未读数、全部已读
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class NotificationService {
 
@@ -37,7 +39,8 @@ public class NotificationService {
      * 如果事务随后回滚，更会推出一条数据库里根本不存在的通知。
      *
      * <p>没有事务同步时（单元测试、或将来某个非事务调用方）直接推送：
-     * 通知只能「迟到」，不能「丢失」。
+     * 通知只能「迟到」，不能「丢失」。因此实时推送失败只记 WARN，不让已经入库的通知
+     * 因为一次 SSE 写失败而抛回调用方（afterCommit 里抛出还会冒泡回提交线程）。
      *
      * @return 已持久化的通知实体，供调用方记日志或测试断言
      */
@@ -56,15 +59,18 @@ public class NotificationService {
         NotificationResponse payload = toResponse(notification);
         Long recipientId = recipient.getId();
 
+        // 判「同步已初始化」而不是 isActualTransactionActive：@Transactional 调用方通常也有实际事务，
+        // 但单测只 initSynchronization 时 isActualTransactionActive 为 false，会退化成立即推送，
+        // 就验证不了 afterCommit 时机。
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    notificationStreamService.push(recipientId, payload);
+                    pushSafely(recipientId, payload);
                 }
             });
         } else {
-            notificationStreamService.push(recipientId, payload);
+            pushSafely(recipientId, payload);
         }
         return notification;
     }
@@ -114,6 +120,20 @@ public class NotificationService {
     }
 
     // ---------- 内部方法 ----------
+
+    /**
+     * 实时推送的失败隔离：通知已入库（afterCommit 时事务也已提交），
+     * 再让 RuntimeException 冒泡只会把一次 SSE 写失败变成业务请求 500。
+     * 保留 recipientId/notificationId 与原始异常，便于排查「库里有、页面没弹」。
+     */
+    private void pushSafely(Long recipientId, NotificationResponse payload) {
+        try {
+            notificationStreamService.push(recipientId, payload);
+        } catch (RuntimeException e) {
+            log.warn("通知已入库但实时推送失败: recipientId={}, notificationId={}",
+                    recipientId, payload.getId(), e);
+        }
+    }
 
     private NotificationResponse toResponse(Notification n) {
         return NotificationResponse.builder()
