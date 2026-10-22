@@ -134,7 +134,10 @@ export const notificationApi = {
   mine: (params) => api.get('/notifications', { params }),
   unreadCount: () => api.get('/notifications/unread-count'),
   markAllRead: () => api.post('/notifications/read-all'),
-  markRead: (id) => api.post(`/notifications/${id}/read`)
+  markRead: (id) => api.post(`/notifications/${id}/read`),
+  // SSE 连接不能带 Authorization 头（EventSource 不支持自定义头）：
+  // 先换一张 60s 有效的一次性 ticket，再拼进 EventSource 的 URL。
+  streamTicket: () => api.post('/notifications/stream-ticket')
 }
 
 // ========== 管理 ==========

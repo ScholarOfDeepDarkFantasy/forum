@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { Bell, User, SwitchButton, Connection, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
+import { useNotificationStream } from '@/composables/useNotificationStream'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import HeaderSearch from '@/components/HeaderSearch.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
@@ -12,6 +13,9 @@ import UserAvatar from '@/components/UserAvatar.vue'
 const router = useRouter()
 const auth = useAuthStore()
 const notifications = useNotificationStore()
+
+// 实时通知：登录后自动连 SSE，登出/卸载自动断开；断线退避与兜底轮询都在 composable 内
+useNotificationStream()
 
 function handleUserCommand(command) {
   if (command === 'profile') {
@@ -21,24 +25,18 @@ function handleUserCommand(command) {
   } else if (command === 'logout') {
     auth.logout()
     notifications.unreadCount = 0
+    notifications.pendingNewCount = 0
     ElMessage.success('已退出登录')
     router.push('/')
   }
 }
 
 onMounted(() => {
-  // 未登录时不注册定时器：refreshUnread 会打到后端换回 401，拦截器随即弹「请先登录」并整页跳转 /login，
-  // 游客停在首页也会被莫名踢走。兜底轮询只对已登录会话有意义；
-  // 本分支只覆盖「带着 token 刷新/直接进入页面」的会话，登录页在登录成功后另行触发一次。
+  // 带 token 刷新/直接进入页面时先拉一次未读数；登录成功后的刷新由登录页负责。
+  // 他人产生的新通知现在走 SSE 实时事件，不再需要 120s 全局轮询——
+  // 连接断开期间由 composable 临时恢复 120s 轮询，重连成功后停止。
   if (!auth.isLoggedIn) return
   notifications.refreshUnread()
-  // 角标刷新的全部时机：登录后（此处）、进入通知页（NotificationsView onMounted）、
-  // 「全部已读」后（store.markAllRead 归零）、以及下面这条 120 秒兜底轮询——
-  // 用于反映**他人**操作产生的通知。
-  // 点赞/收藏/评论成功后刻意不刷新：后端对自发行为不写通知（LikeService 与
-  // CommentService 均跳过 recipient 为操作者本人的通知），当前用户自己的任何
-  // 操作都不可能改变自己的未读数，补一次请求只会白跑。
-  setInterval(() => notifications.refreshUnread(), 120_000)
 })
 </script>
 

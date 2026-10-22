@@ -130,6 +130,101 @@ describe('notifications store', () => {
     expect(store.unreadCount).toBe(1)
   })
 
+  /** 构造一页列表，避免每个用例重复写 content/total 结构 */
+  function pageOf(items = [], totalElements = items.length) {
+    return { content: items, totalElements, totalPages: 1 }
+  }
+
+  function notification(id, isRead = false) {
+    return { id, type: 'LIKE', content: `通知 ${id}`, isRead, createTime: '2026-10-22T10:00:00' }
+  }
+
+  it('handleIncoming：通知页未打开时只累计未读与 pending，不动列表', async () => {
+    notificationApi.mine.mockResolvedValue(pageOf([notification(1)]))
+    const store = useNotificationStore()
+    await store.loadList(0)
+
+    store.viewOpen = false
+    store.handleIncoming(notification(2))
+
+    expect(store.unreadCount).toBe(1)
+    expect(store.pendingNewCount).toBe(1)
+    expect(store.list.content.map((n) => n.id)).toEqual([1])
+  })
+
+  it('handleIncoming：通知页打开且第 1 页时头部插入并清空 pending', async () => {
+    const store = useNotificationStore()
+    store.list = pageOf([notification(1)])
+    store.listLoaded = true
+    store.viewOpen = true
+    store.listPage = 0
+
+    store.handleIncoming(notification(2))
+
+    expect(store.list.content.map((n) => n.id)).toEqual([2, 1])
+    expect(store.list.totalElements).toBe(2)
+    expect(store.pendingNewCount).toBe(0)
+    expect(store.unreadCount).toBe(1)
+  })
+
+  it('handleIncoming：列表已满 10 条时插入并挤掉最后一条，长度不变', () => {
+    const store = useNotificationStore()
+    const items = Array.from({ length: 10 }, (_, i) => notification(i + 1))
+    store.list = pageOf(items, 30)
+    store.listLoaded = true
+    store.viewOpen = true
+    store.listPage = 0
+
+    store.handleIncoming(notification(99))
+
+    expect(store.list.content).toHaveLength(10)
+    expect(store.list.content[0].id).toBe(99)
+    // 原来第 10 条被挤出去，第 9 条成为新的末尾
+    expect(store.list.content[9].id).toBe(9)
+    expect(store.list.totalElements).toBe(31)
+  })
+
+  it('handleIncoming：翻到第 2 页时不插入，只累计 pending（不能打乱当前分页）', () => {
+    const store = useNotificationStore()
+    store.list = pageOf([notification(11)], 20)
+    store.listLoaded = true
+    store.viewOpen = true
+    store.listPage = 1
+
+    store.handleIncoming(notification(2))
+
+    expect(store.list.content.map((n) => n.id)).toEqual([11])
+    expect(store.pendingNewCount).toBe(1)
+  })
+
+  it('handleIncoming：同一个 id 重复送达时去重，未读与 pending 都不变', () => {
+    const store = useNotificationStore()
+    store.list = pageOf([notification(5)])
+    store.listLoaded = true
+    store.viewOpen = true
+    store.listPage = 0
+
+    store.handleIncoming(notification(5))
+    store.handleIncoming(notification(5))
+
+    expect(store.list.content).toHaveLength(1)
+    expect(store.unreadCount).toBe(0)
+    expect(store.pendingNewCount).toBe(0)
+  })
+
+  it('loadList(0) 与 markAllRead 都会清空 pending', async () => {
+    notificationApi.mine.mockResolvedValue(pageOf([notification(1)]))
+    const store = useNotificationStore()
+    store.pendingNewCount = 3
+
+    await store.loadList(0)
+    expect(store.pendingNewCount).toBe(0)
+
+    store.pendingNewCount = 2
+    await store.markAllRead()
+    expect(store.pendingNewCount).toBe(0)
+  })
+
   it('markRead 的未读数不会减成负数', async () => {
     // 未读数可能落后于列表（角标靠轮询刷新），极端情况下本地计数已是 0。
     notificationApi.markRead.mockResolvedValue(null)

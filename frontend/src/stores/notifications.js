@@ -16,7 +16,13 @@ export const useNotificationStore = defineStore('notifications', {
   state: () => ({
     unreadCount: 0,
     list: emptyPage(),
-    listPage: 0
+    listPage: 0,
+    /** 有新通知但当前列表不适合插入时累计的条数；通知页据此显示「有 N 条新通知」 */
+    pendingNewCount: 0,
+    /** 通知页是否打开：只有打开且停在第 1 页才即时插入，否则会打乱分页 */
+    viewOpen: false,
+    /** 列表是否已成功加载过：首次加载前插入会被随后的响应覆盖 */
+    listLoaded: false
   }),
 
   actions: {
@@ -36,11 +42,49 @@ export const useNotificationStore = defineStore('notifications', {
     async loadList(page = 0) {
       this.list = await notificationApi.mine({ page, size: PAGE_SIZE })
       this.listPage = page
+      this.listLoaded = true
+      // 第 1 页就是服务端的最新状态，横幅随之归零
+      if (page === 0) {
+        this.pendingNewCount = 0
+      }
+    },
+
+    /**
+     * 合并一条 SSE 推送进来的通知。
+     *
+     * <p>按 id 去重：重连补发、开两个标签页都会让同一条通知到达多次。
+     *
+     * <p>只有「通知页打开 + 已加载过 + 停在第 1 页」才插到头部并挤掉最后一条：
+     * 翻页时插入会让用户正在看的第 2 页混进新数据，未打开页面时插入则会在
+     * 下次进入时被首次加载覆盖。其余情况只累计 pending，由横幅提示刷新。</p>
+     */
+    handleIncoming(notification) {
+      if (!notification || notification.id == null) return
+      if (this.list.content.some((item) => item.id === notification.id)) return
+
+      // 服务端已经把通知写进库，未读数直接 +1；重连后 onopen 还会以接口结果校准
+      this.unreadCount += 1
+
+      if (this.viewOpen && this.listLoaded && this.listPage === 0) {
+        this.list.content.unshift(notification)
+        if (this.list.content.length > PAGE_SIZE) {
+          this.list.content.pop()
+        }
+        this.list.totalElements = (this.list.totalElements ?? 0) + 1
+      } else {
+        this.pendingNewCount += 1
+      }
+    },
+
+    /** 通知页横幅点击：回到第 1 页重新拉取（顺带清 pending） */
+    async flushPending() {
+      await this.loadList(0)
     },
 
     async markAllRead() {
       await notificationApi.markAllRead()
       this.unreadCount = 0
+      this.pendingNewCount = 0
       await this.loadList(this.listPage)
     },
 
@@ -57,7 +101,7 @@ export const useNotificationStore = defineStore('notifications', {
       if (item && item.isRead) return
       await notificationApi.markRead(id)
       if (item) item.isRead = true
-      // 角标靠轮询刷新，可能落后于列表；钳在 0 避免出现 -1
+      // 角标由实时事件累加，这里只保证不会因为「已读一条」减成 -1
       this.unreadCount = Math.max(0, this.unreadCount - 1)
     }
   }
