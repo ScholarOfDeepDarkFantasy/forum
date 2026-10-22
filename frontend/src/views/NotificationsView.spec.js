@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick } from 'vue'
+import { useNotificationStore } from '@/stores/notifications'
 
 // 同其它视图测试：useRoute/useRouter 是 <script setup> 的注入式依赖，
 // mocks 选项替换不了，mock 模块本身最省事。
@@ -122,5 +124,50 @@ describe('NotificationsView 点击通知', () => {
 
     expect(notificationApi.markRead).not.toHaveBeenCalled()
     expect(push).not.toHaveBeenCalled()
+  })
+})
+
+describe('NotificationsView 新通知横幅', () => {
+  it('打开页面时把 viewOpen 置为 true', async () => {
+    seed([])
+    mountView()
+    await flush()
+
+    expect(useNotificationStore().viewOpen).toBe(true)
+  })
+
+  it('有 pending 时显示横幅，点击后回到第 1 页并清零', async () => {
+    seed([unreadReply])
+    const wrapper = mountView()
+    await flush()
+
+    // 模拟「用户翻到第 2 页时来了新通知」：store 只累计 pending，不插入
+    const store = useNotificationStore()
+    store.listPage = 1
+    store.pendingNewCount = 2
+    await nextTick()
+
+    const banner = wrapper.find('.new-banner')
+    expect(banner.exists()).toBe(true)
+    expect(banner.text()).toContain('2 条新通知')
+
+    await banner.trigger('click')
+    await flush()
+
+    expect(notificationApi.mine).toHaveBeenLastCalledWith({ page: 0, size: 10 })
+    expect(store.pendingNewCount).toBe(0)
+    expect(wrapper.find('.new-banner').exists()).toBe(false)
+  })
+
+  it('卸载时把 viewOpen 复位，避免离开后继续往列表插入', async () => {
+    seed([])
+    const wrapper = mountView()
+    await flush()
+    // 先确认挂载期间确实置位，否则「卸载后为 false」在初始值就是 false 时是空断言
+    expect(useNotificationStore().viewOpen).toBe(true)
+
+    wrapper.unmount()
+
+    expect(useNotificationStore().viewOpen).toBe(false)
   })
 })

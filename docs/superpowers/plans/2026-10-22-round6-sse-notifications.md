@@ -3310,3 +3310,10 @@ docs: 回填第六轮提交哈希与上线验收
    `App.spec.js` 中由 mock 自行注册 `onUnmounted` 的卸载断言——该用例验证的是 mock 而不是真实 composable，
    真实卸载契约已由 `useNotificationStream.spec.js`「组件卸载时断开连接」覆盖。store 的 `refreshUnread/loadList`
    响应缺少会话世代校验（跨账号旧响应可能回写）记为后续债务，不在本任务处理。
+
+6. **Task 4 的卸载用例补前置断言、测试数量已过期**：计划 Step 4-1 的第三个用例（卸载复位 `viewOpen`）在实现前就是绿的——
+   `viewOpen` 初始为 `false`，`onUnmounted` 尚未实现时「卸载后为 false」恒成立，属于空断言，无法证明「卸载复位」。
+   实际在挂载并 `flush()` 后补一条前置断言 `expect(useNotificationStore().viewOpen).toBe(true)`（仍属同一用例），
+   该用例先红（挂载未置位）后绿，才真正锁定「挂载置位 + 卸载复位」契约。另：计划 Step 4-3 预测的定向 22（7+15）、
+   全量 295（292+3）已过期——实际 `frontend/src/stores/notifications.spec.js` 为 16 条（Task 3 期间新增），
+   故定向为 23（7+16）、全量为 308（305+3），均全绿；Task 4 的 Step 标题下无复选框，未做勾选。

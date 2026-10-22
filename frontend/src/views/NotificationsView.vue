@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { PAGE_SIZE, useNotificationStore } from '@/stores/notifications'
@@ -68,11 +68,18 @@ function targetOf(n) {
 }
 
 onMounted(() => {
+  // 通知页打开期间，SSE 新事件由 store.handleIncoming 决定「插入」还是「累计横幅」；
+  // 离开时必须复位，否则停在第 1 页的旧快照会让后续事件继续插进已经不在屏幕上的列表。
+  notifications.viewOpen = true
   load()
   // App.vue 只在应用挂载时刷一次角标，之后靠 SSE 实时事件累加（连接断开期间才由
   // composable 临时恢复 120s 轮询兜底）；用户停留在通知页时其它标签页/设备可能已把
   // 通知读掉，进入本页时重新对账一次，避免角标与列表不一致。
   notifications.refreshUnread()
+})
+
+onUnmounted(() => {
+  notifications.viewOpen = false
 })
 </script>
 
@@ -84,6 +91,14 @@ onMounted(() => {
         <el-button size="small" :loading="marking" @click="markAll">全部已读</el-button>
       </div>
     </template>
+
+    <div
+      v-if="notifications.pendingNewCount"
+      class="new-banner"
+      @click="load(0)"
+    >
+      有 {{ notifications.pendingNewCount }} 条新通知，点击刷新
+    </div>
 
     <template v-if="notifications.list.content.length">
       <div
@@ -124,6 +139,23 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+/* 新通知横幅：只在「通知页打开但不是第 1 页/列表未加载完」或「页面未打开」时出现，
+   点击回到第 1 页，由 load(0) → store.loadList(0) 顺带把 pendingNewCount 清零。
+   放在列表 v-if 之外：列表为空时也要提示，否则首条通知到达时用户看不到任何变化。 */
+.new-banner {
+  margin: var(--jf-space-2) 0;
+  padding: var(--jf-space-2) var(--jf-space-3);
+  border-radius: 4px;
+  background: var(--jf-color-unread-bg);
+  color: var(--jf-color-text);
+  font-size: var(--jf-font-small);
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+.new-banner:hover {
+  background: var(--jf-color-bg-hover);
 }
 .notif {
   display: flex;
