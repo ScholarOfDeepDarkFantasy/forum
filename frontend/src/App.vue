@@ -24,8 +24,8 @@ function handleUserCommand(command) {
     router.push('/admin')
   } else if (command === 'logout') {
     auth.logout()
-    notifications.unreadCount = 0
-    notifications.pendingNewCount = 0
+    // 角标/列表/分页等会话状态由 useNotificationStream 的 token watch 统一清空，
+    // 这里不再各自清一半，避免登出/换号两条路径的重置逻辑漂移。
     ElMessage.success('已退出登录')
     router.push('/')
   }

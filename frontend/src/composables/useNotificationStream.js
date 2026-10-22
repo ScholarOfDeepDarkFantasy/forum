@@ -58,6 +58,12 @@ export function createNotificationStream({
   let started = false
   let stopped = true
   let pendingReconnect = false
+  /**
+   * 连接世代。每次 start()/stop() 开启新一代，取票返回后与世代比对：
+   * 换号或手动停止时在途的旧 ticket 即使晚到也直接丢弃，不能拿上一会话的
+   * ticket 建连（否则旧用户的通知会继续进新用户的 store）。
+   */
+  let epoch = 0
 
   function closeSource() {
     if (!source) return
@@ -97,7 +103,17 @@ export function createNotificationStream({
   function open(ticket) {
     closeSource()
     const url = `${import.meta.env.BASE_URL}api/notifications/stream?ticket=${encodeURIComponent(ticket)}`
-    const es = new EventSourceImpl(url)
+    let es
+    try {
+      es = new EventSourceImpl(url)
+    } catch {
+      // 构造失败（浏览器禁用 EventSource、URL 非法等）不能让 async connect 变成
+      // 未处理的 rejection，也不能把状态卡在 connecting：按断线处理，退避重试 + 兜底轮询。
+      // 页面不可见时不启动轮询（省电），回前台由 visibilitychange 立即重连。
+      scheduleRetry()
+      if (!documentRef?.hidden) startFallbackPolling()
+      return
+    }
     source = es
     es.addEventListener?.('notification', onNotification)
 
@@ -116,7 +132,8 @@ export function createNotificationStream({
       // 必须自己换新 ticket 重来。
       closeSource()
       scheduleRetry()
-      startFallbackPolling()
+      // 页面隐藏时省电，不跑兜底轮询；回前台重连成功后由 onopen 校准
+      if (!documentRef?.hidden) startFallbackPolling()
     }
   }
 
@@ -137,6 +154,8 @@ export function createNotificationStream({
     if (!started || stopped || state.value === 'disabled') return
     retryTimer = null
     state.value = 'connecting'
+    // 记住发起取票时的世代：await 期间 stop()/start() 会推进世代，旧 ticket 必须作废
+    const myEpoch = epoch
 
     let ticket
     try {
@@ -144,6 +163,8 @@ export function createNotificationStream({
       ticket = data?.ticket
       if (!ticket) throw new Error('empty ticket')
     } catch (error) {
+      // 世代已变：这是上一会话的失败，既不能触发重连，也不能因旧 401 把新会话置为 disabled
+      if (myEpoch !== epoch || !started || stopped) return
       if (error?.response?.status === 401) {
         // ticket 端点都 401 了，说明会话已失效；再重连只会每 30s 刷一次 401
         state.value = 'disabled'
@@ -154,8 +175,14 @@ export function createNotificationStream({
       return
     }
 
-    // 取票是异步的：期间用户可能已登出或组件已卸载
-    if (!started || stopped) return
+    // 取票是异步的：期间用户可能已登出、换号或组件已卸载
+    if (myEpoch !== epoch || !started || stopped) return
+    if (documentRef?.hidden) {
+      // 页面不可见时不建连（省电，也不浪费一次性 ticket）；回前台由 visibilitychange 立即重连
+      pendingReconnect = true
+      state.value = 'retrying'
+      return
+    }
     open(ticket)
   }
 
@@ -169,6 +196,9 @@ export function createNotificationStream({
 
   function start() {
     if (started) return
+    // 只在真正开启新会话时推进世代：幂等 start 若也推进，会把当前在途 ticket 作废
+    // 却没有新的 connect 接手，流会永久停在 connecting。
+    epoch += 1
     started = true
     stopped = false
     pendingReconnect = false
@@ -179,6 +209,8 @@ export function createNotificationStream({
   }
 
   function stop() {
+    // 推进世代使在途取票失效：旧 ticket 晚到时不能再建连
+    epoch += 1
     started = false
     stopped = true
     pendingReconnect = false
@@ -197,19 +229,28 @@ export function createNotificationStream({
 }
 
 /**
- * 组件侧入口：登录后建立 SSE，登出/组件卸载时断开。
+ * 组件侧入口：登录后建立 SSE，登出/换号/组件卸载时断开。
  * 只在 App.vue 调用一次（整个应用一条连接）。
+ *
+ * <p>监听 token 而不是 isLoggedIn：A→B 直接登录时登录态是 true→true，
+ * 只 watch 布尔会继续用 A 的连接把 A 的通知推进 B 的 store；A 的流若已
+ * 401 disabled，B 登录后也永远不会重新 start。</p>
+ *
+ * <p>options 原样转发给 createNotificationStream，测试可注入 api/EventSource/timers。</p>
  */
-export function useNotificationStream() {
+export function useNotificationStream(options = {}) {
   const store = useNotificationStore()
   const auth = useAuthStore()
-  const stream = createNotificationStream({ store })
+  const stream = createNotificationStream({ ...options, store })
 
   watch(
-    () => auth.isLoggedIn,
-    (loggedIn) => {
-      if (loggedIn) stream.start()
-      else stream.stop()
+    () => auth.token,
+    (token) => {
+      // 先停旧连接并清空上一会话的通知状态，再按新 token 连接；
+      // 登出（token 为空）只清理，不重连。
+      stream.stop()
+      store.resetSession()
+      if (token) stream.start()
     },
     { immediate: true }
   )

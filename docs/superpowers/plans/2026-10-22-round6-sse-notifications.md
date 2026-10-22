@@ -3295,3 +3295,11 @@ docs: 回填第六轮提交哈希与上线验收
 3. **推送失败隔离**：`create` 的 `afterCommit` 与无事务分支统一走 `pushSafely(...)`，用 `try/catch (RuntimeException)` 记 `WARN`
    后继续返回通知。原因：通知此时已入库，推送失败若冒泡会变成业务请求 500（afterCommit 中还会抛回提交线程）。
    `NotificationServiceTest` 有专门用例断言推送抛异常时 `create` 不抛、仍返回通知，且 WARN 带异常上下文。
+
+4. **`useNotificationStream` 改为 watch token（非仅布尔登录态）**：本计划 Step 3-1 与 spec §6.1 均写「watch auth token/用户」，
+   但首版实现只 `watch(() => auth.isLoggedIn)`；A→B 直接登录（登录页无守卫、可重复登录）是 `true→true` 不触发，
+   旧连接会把 A 的通知推进 B 的 store，A 的流若已 401 `disabled` 则 B 登录后永不 `start`。第六轮质量修复改为
+   watch `auth.token`：变化时 `stop()` → `store.resetSession()`（清 `unreadCount/pendingNewCount/list/listPage/listLoaded/viewOpen`）
+   → 有 token 则 `start()`。另加连接世代 `epoch`：`start()/stop()` 推进世代，取票返回后世代不符的旧 ticket 直接丢弃，
+   避免「ticket 在途 → stop → start → 旧 ticket 晚到」用上一会话 ticket 建连。`useNotificationStream(options)`
+   新增可注入参数（原样转发给 `createNotificationStream`），仅用于测试注入 api/EventSource/timers。

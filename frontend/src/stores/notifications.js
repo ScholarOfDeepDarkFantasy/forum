@@ -26,6 +26,21 @@ export const useNotificationStore = defineStore('notifications', {
   }),
 
   actions: {
+    /**
+     * 清空会话级状态（角标/列表/分页/横幅）。
+     *
+     * <p>登出或切换账号时必须调用：A 的未读数、列表与分页位置都不能带进 B 的会话，
+     * 否则新账号会短暂看到上一个账号的通知内容。</p>
+     */
+    resetSession() {
+      this.unreadCount = 0
+      this.pendingNewCount = 0
+      this.list = emptyPage()
+      this.listPage = 0
+      this.listLoaded = false
+      this.viewOpen = false
+    },
+
     async refreshUnread() {
       try {
         const data = await notificationApi.unreadCount()

@@ -241,4 +241,23 @@ describe('notifications store', () => {
 
     expect(store.unreadCount).toBe(0)
   })
+
+  it('resetSession 清空上一会话的角标、列表与分页状态', () => {
+    const store = useNotificationStore()
+    store.unreadCount = 7
+    store.pendingNewCount = 3
+    store.list = pageOf([notification(1)], 1)
+    store.listPage = 2
+    store.listLoaded = true
+    store.viewOpen = true
+
+    store.resetSession()
+
+    expect(store.unreadCount).toBe(0)
+    expect(store.pendingNewCount).toBe(0)
+    expect(store.list).toEqual({ content: [], totalElements: 0, totalPages: 0 })
+    expect(store.listPage).toBe(0)
+    expect(store.listLoaded).toBe(false)
+    expect(store.viewOpen).toBe(false)
+  })
 })

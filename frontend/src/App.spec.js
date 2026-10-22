@@ -5,12 +5,21 @@ import { createPinia, setActivePinia } from 'pinia'
 // vi.mock 的工厂会被提升到 import 之前，跨行引用必须用 vi.hoisted
 const { streamMock, useNotificationStreamMock } = vi.hoisted(() => {
   const stream = { start: vi.fn(), stop: vi.fn(), state: { value: 'closed' } }
-  return { streamMock: stream, useNotificationStreamMock: vi.fn(() => stream) }
+  return { streamMock: stream, useNotificationStreamMock: vi.fn() }
 })
 
-vi.mock('@/composables/useNotificationStream', () => ({
-  useNotificationStream: useNotificationStreamMock
-}))
+vi.mock('@/composables/useNotificationStream', async () => {
+  const { onUnmounted } = await import('vue')
+  return {
+    // App.vue 只调用一次并忽略返回值；真实 composable 在组件卸载时 stop，
+    // mock 也必须注册同样的清理，否则「卸载停止」这条契约永远测不到。
+    useNotificationStream: () => {
+      useNotificationStreamMock()
+      onUnmounted(() => streamMock.stop())
+      return streamMock
+    }
+  }
+})
 
 // App.vue 的 setup 调用 useRouter()；不装真实路由插件时注入不到，mock 掉最省事。
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
@@ -49,7 +58,7 @@ describe('App.vue 实时通知接线', () => {
   beforeEach(() => {
     localStorage.clear()
     setActivePinia(createPinia())
-    useNotificationStreamMock.mockClear()
+    vi.clearAllMocks()
   })
 
   it('挂载时启用实时通知 composable', () => {
@@ -61,5 +70,14 @@ describe('App.vue 实时通知接线', () => {
     const wrapper = mountApp()
     expect(wrapper.find('.bell-badge').exists()).toBe(false)
     expect(() => wrapper.unmount()).not.toThrow()
+  })
+
+  it('组件卸载时调用 stop() 断开实时通知', () => {
+    const wrapper = mountApp()
+    expect(streamMock.stop).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+
+    expect(streamMock.stop).toHaveBeenCalledTimes(1)
   })
 })
