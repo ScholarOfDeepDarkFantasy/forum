@@ -213,6 +213,9 @@ class SseFlowIntegrationTest {
                 .contains("text/event-stream");
         assertThat(opened.headers().firstValue("X-Accel-Buffering").orElse(""))
                 .isEqualTo("no");
+        // 流是持久连接，不能落进任何 HTTP 缓存
+        assertThat(opened.headers().firstValue("Cache-Control").orElse(""))
+                .contains("no-cache");
         opened.body().close();
 
         assertThat(streamReject(ticket).statusCode()).isEqualTo(401);

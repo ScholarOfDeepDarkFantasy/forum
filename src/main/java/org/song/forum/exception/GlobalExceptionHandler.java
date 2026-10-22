@@ -136,6 +136,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.fail(e.getMessage()));
     }
 
+    /**
+     * 异步流（SSE）在连接断开后的写失败 → 安静收尾，不转 500。
+     * <p>浏览器关页/切网时容器会抛 IOException（含 AsyncRequestNotUsableException），
+     * 这是正常断连而不是服务端故障：只记 debug，返回 null 不再写 body——
+     * 响应已作为异步流提交，再写 500 JSON 只会二次失败、并让日志被 ERROR 刷屏。</p>
+     */
+    @ExceptionHandler(java.io.IOException.class)
+    public ResponseEntity<Result<Void>> handleIo(java.io.IOException e) {
+        log.debug("IO 异常（连接已断开，按正常断连处理）: {}", e.toString());
+        return null;
+    }
+
     /** 兜底 → 500 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<Void>> handleOther(Exception e) {

@@ -7,7 +7,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.song.forum.dto.notification.NotificationResponse;
 import org.song.forum.dto.notification.StreamTicketResponse;
@@ -22,7 +21,8 @@ import org.song.forum.util.Result;
 import java.util.Map;
 
 /**
- * 通知接口：我的通知列表、未读数、全部已读（均需登录）
+ * 通知接口：我的通知列表、未读数、全部已读（均需登录）；
+ * 例外是 {@code /stream}，它由一次性 ticket 鉴权（见 {@link #stream}）。
  */
 @RestController
 @RequestMapping("/api/notifications")
@@ -64,7 +64,7 @@ public class NotificationController {
 
     /**
      * 下发一次性 SSE 订阅票据（需登录）。
-     * <p>前端拿到 ticket 后拼到 EventSource 的 query 上；ticket 60 秒有效、
+     * <p>前端拿到 ticket 后拼到 EventSource 的 query 上；ticket 默认 60 秒有效（可配置）、
      * 用一次即焚，因此不需要也不应该再校验 JWT。</p>
      */
     @PostMapping("/stream-ticket")
