@@ -20,3 +20,11 @@ spring:
 
 jwt:
   secret: test-only-secret-key-must-be-at-least-32-bytes-long-0123456789
+
+app:
+  sse:
+    # 单测/集成测试不需要真实长连接：4 秒内一定收到事件或超时，测试不会挂住
+    timeout-ms: 4000
+    heartbeat-ms: 200
+    max-connections-per-user: 5
+    ticket-ttl-ms: 3000

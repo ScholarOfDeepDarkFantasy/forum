@@ -125,6 +125,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.fail("资源不存在"));
     }
 
+    /**
+     * SSE 订阅 ticket 无效 → 401。
+     * <p>不能落到 Exception 兜底：那会返回 500，nginx 冒烟与前端都无法区分
+     * 「没有权限」和「服务端坏了」。ticket 一次性，过期/重放都必须拒绝。</p>
+     */
+    @ExceptionHandler(InvalidStreamTicketException.class)
+    public ResponseEntity<Result<Void>> handleInvalidStreamTicket(InvalidStreamTicketException e) {
+        log.warn("SSE 订阅凭证校验失败: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.fail(e.getMessage()));
+    }
+
     /** 兜底 → 500 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<Void>> handleOther(Exception e) {

@@ -63,6 +63,9 @@ public class SecurityConfig {
                         // 必须最先声明：否则下面 GET 全放行会把 /actuator 一并放开
                         .requestMatchers(ADMIN_ONLY).hasRole("ADMIN")
                         .requestMatchers(PUBLIC_GET).permitAll()
+                        // SSE 订阅：EventSource 不能带 Authorization 头，鉴权由一次性 ticket 承担。
+                        // 必须显式写出并说明原因：收紧「GET 全放行」时不能靠记忆判断它是否被误伤。
+                        .requestMatchers(HttpMethod.GET, "/api/notifications/stream").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         // 必须先于下面的 GET 放行规则声明，否则匿名请求会直达 Controller 抛 500
                         .requestMatchers("/api/auth/me", "/api/auth/profile").authenticated()
