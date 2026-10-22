@@ -5,8 +5,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.song.forum.dto.notification.NotificationResponse;
+import org.song.forum.entity.Comment;
 import org.song.forum.entity.Notification;
+import org.song.forum.entity.NotificationType;
+import org.song.forum.entity.Post;
+import org.song.forum.entity.User;
 import org.song.forum.repository.NotificationRepository;
 import org.song.forum.util.PageResponse;
 
@@ -20,6 +26,48 @@ import java.util.NoSuchElementException;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationStreamService notificationStreamService;
+
+    // ---------- 供其它服务调用的创建入口 ----------
+
+    /**
+     * 创建一条通知，并在事务提交后实时推送给接收者。
+     *
+     * <p>为什么必须等提交：提交前推送，接收者点开时可能还查不到这条通知；
+     * 如果事务随后回滚，更会推出一条数据库里根本不存在的通知。
+     *
+     * <p>没有事务同步时（单元测试、或将来某个非事务调用方）直接推送：
+     * 通知只能「迟到」，不能「丢失」。
+     *
+     * @return 已持久化的通知实体，供调用方记日志或测试断言
+     */
+    public Notification create(User recipient, User sender, Post post, Comment comment,
+                               NotificationType type, String content) {
+        Notification notification = notificationRepository.save(Notification.builder()
+                .recipient(recipient)
+                .sender(sender)
+                .post(post)
+                .comment(comment)
+                .type(type)
+                .content(content)
+                .build());
+
+        // 先在事务内把响应算好：懒加载字段在这里都还能读到
+        NotificationResponse payload = toResponse(notification);
+        Long recipientId = recipient.getId();
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    notificationStreamService.push(recipientId, payload);
+                }
+            });
+        } else {
+            notificationStreamService.push(recipientId, payload);
+        }
+        return notification;
+    }
 
     /** 我的通知（时间倒序） */
     @Transactional(readOnly = true)

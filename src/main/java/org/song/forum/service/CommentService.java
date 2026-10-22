@@ -11,14 +11,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.song.forum.dto.comment.CommentRequest;
 import org.song.forum.dto.comment.CommentResponse;
 import org.song.forum.entity.Comment;
-import org.song.forum.entity.Notification;
 import org.song.forum.entity.NotificationType;
 import org.song.forum.entity.Post;
 import org.song.forum.entity.User;
 import org.song.forum.entity.UserStatus;
 import org.song.forum.exception.BusinessException;
 import org.song.forum.repository.CommentRepository;
-import org.song.forum.repository.NotificationRepository;
 import org.song.forum.repository.PostRepository;
 import org.song.forum.repository.UserRepository;
 import org.song.forum.util.PageResponse;
@@ -37,7 +35,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
 
     /** 发表评论（parentId 非空时为楼中楼回复） */
     @Transactional
@@ -93,15 +91,10 @@ public class CommentService {
         postRepository.incrementCommentCount(postId);
 
         // 回复他人评论 → REPLY 通知（自己回复自己不通知）
+        // 走 NotificationService.create：实体会在事务提交后推 SSE，避免推出去的 commentId 查不到
         if (parent != null && !parent.getAuthor().getId().equals(authorId)) {
-            notificationRepository.save(Notification.builder()
-                    .recipient(parent.getAuthor())
-                    .sender(author)
-                    .post(post)
-                    .comment(parent)
-                    .type(NotificationType.REPLY)
-                    .content(author.getUsername() + " 回复了你的评论")
-                    .build());
+            notificationService.create(parent.getAuthor(), author, post, parent,
+                    NotificationType.REPLY, author.getUsername() + " 回复了你的评论");
         }
         log.info("用户 {} 评论帖子 {}: {}", author.getUsername(), postId, comment.getId());
         return toResponse(comment);

@@ -20,6 +20,7 @@ import org.song.forum.dto.auth.RegisterRequest;
 import org.song.forum.dto.board.BoardRequest;
 import org.song.forum.dto.board.BoardResponse;
 import org.song.forum.dto.notification.StreamTicketResponse;
+import org.song.forum.dto.post.LikeToggleResponse;
 import org.song.forum.dto.post.PostDetailResponse;
 import org.song.forum.dto.post.PostRequest;
 import org.song.forum.util.Result;
@@ -30,6 +31,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -219,6 +221,63 @@ class SseFlowIntegrationTest {
         opened.body().close();
 
         assertThat(streamReject(ticket).statusCode()).isEqualTo(401);
+    }
+
+    private long unreadCount(String token) {
+        // 接口返回 Result<Map<String, Long>>（{"count": n}），不是裸 Long
+        Map<String, Long> data = rest.exchange(url("/api/notifications/unread-count"), HttpMethod.GET,
+                new HttpEntity<>(bearer(token)),
+                new ParameterizedTypeReference<Result<Map<String, Long>>>() {}).getBody().getData();
+        return data.get("count");
+    }
+
+    @Test
+    @Order(4)
+    void stage4_likePushesRealSseEventOnlyToRecipient() throws Exception {
+        // 楼主 = author，点赞者 = reader。另开一帖，避免依赖 stage1 帖子的归属
+        String adminToken = loginAdmin();
+        BoardRequest board = new BoardRequest();
+        board.setName("SSE 推送板块");
+        board.setSortOrder(2);
+        Long boardId = rest.exchange(url("/api/boards"), HttpMethod.POST,
+                new HttpEntity<>(board, bearer(adminToken)),
+                new ParameterizedTypeReference<Result<BoardResponse>>() {}).getBody().getData().getId();
+
+        PostRequest post = new PostRequest();
+        post.setBoardId(boardId);
+        post.setTitle("SSE 实时推送测试帖");
+        post.setContent("点赞后楼主应立刻收到通知");
+        Long postId = rest.exchange(url("/api/posts"), HttpMethod.POST,
+                new HttpEntity<>(post, bearer(authorToken)),
+                new ParameterizedTypeReference<Result<PostDetailResponse>>() {})
+                .getBody().getData().getId();
+
+        // 建立楼主的真实 SSE 连接
+        StreamTicketResponse ticket = issueTicket(authorToken);
+        HttpResponse<Stream<String>> stream = openStream(ticket.ticket());
+        assertThat(stream.statusCode()).isEqualTo(200);
+
+        // readNotificationData 会阻塞读流（心跳保证有行可读），所以点赞放到另一个线程触发
+        Thread liker = new Thread(() -> rest.exchange(url("/api/posts/" + postId + "/like"),
+                HttpMethod.POST, new HttpEntity<>(bearer(readerToken)),
+                new ParameterizedTypeReference<Result<LikeToggleResponse>>() {}));
+        liker.start();
+        String data;
+        try {
+            data = readNotificationData(stream.body(), Duration.ofSeconds(10));
+        } finally {
+            stream.body().close();
+        }
+        liker.join(Duration.ofSeconds(10).toMillis());
+
+        assertThat(data).as("应在 10s 内收到 LIKE 通知事件").isNotNull();
+        assertThat(data).contains("\"type\":\"LIKE\"");
+        assertThat(data).contains("sse_reader");
+        assertThat(data).contains("\"postId\":" + postId);
+
+        // 只通知楼主：操作者自己的未读数为 0，楼主为 1
+        assertThat(unreadCount(readerToken)).isZero();
+        assertThat(unreadCount(authorToken)).isEqualTo(1L);
     }
 
 }

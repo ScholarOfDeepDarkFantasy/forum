@@ -11,14 +11,12 @@ import org.song.forum.dto.post.LikeToggleResponse;
 import org.song.forum.dto.post.PostSummaryResponse;
 import org.song.forum.entity.Favorite;
 import org.song.forum.entity.Like;
-import org.song.forum.entity.Notification;
 import org.song.forum.entity.NotificationType;
 import org.song.forum.entity.Post;
 import org.song.forum.entity.User;
 import org.song.forum.exception.BusinessException;
 import org.song.forum.repository.FavoriteRepository;
 import org.song.forum.repository.LikeRepository;
-import org.song.forum.repository.NotificationRepository;
 import org.song.forum.repository.PostRepository;
 import org.song.forum.repository.UserRepository;
 import org.song.forum.util.PageResponse;
@@ -42,7 +40,7 @@ public class LikeService {
     private final FavoriteRepository favoriteRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
 
     /** 切换点赞：未赞→赞(+1+通知)，已赞→取消(-1) */
     @Transactional
@@ -61,13 +59,9 @@ public class LikeService {
                     likeRepository.save(Like.builder().user(actor).post(post).build());
                     postRepository.incrementLikeCount(postId);
                     if (!post.getAuthor().getId().equals(userId)) {
-                        notificationRepository.save(Notification.builder()
-                                .recipient(post.getAuthor())
-                                .sender(actor)
-                                .post(post)
-                                .type(NotificationType.LIKE)
-                                .content(actor.getUsername() + " 赞了你的帖子「" + post.getTitle() + "」")
-                                .build());
+                        notificationService.create(post.getAuthor(), actor, post, null,
+                                NotificationType.LIKE,
+                                actor.getUsername() + " 赞了你的帖子「" + post.getTitle() + "」");
                     }
                     return new LikeToggleResponse(true, post.getLikeCount() + 1);
                 });
@@ -90,13 +84,9 @@ public class LikeService {
                     favoriteRepository.save(Favorite.builder().user(actor).post(post).build());
                     postRepository.incrementFavoriteCount(postId);
                     if (!post.getAuthor().getId().equals(userId)) {
-                        notificationRepository.save(Notification.builder()
-                                .recipient(post.getAuthor())
-                                .sender(actor)
-                                .post(post)
-                                .type(NotificationType.FAVORITE)
-                                .content(actor.getUsername() + " 收藏了你的帖子「" + post.getTitle() + "」")
-                                .build());
+                        notificationService.create(post.getAuthor(), actor, post, null,
+                                NotificationType.FAVORITE,
+                                actor.getUsername() + " 收藏了你的帖子「" + post.getTitle() + "」");
                     }
                     return new LikeToggleResponse(true, post.getFavoriteCount() + 1);
                 });
