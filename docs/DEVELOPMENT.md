@@ -36,7 +36,7 @@ cd frontend && pnpm test --run
 - 记录为 `本次提交`，提交后用一条单独的 `docs:` 提交回填真实哈希（本项目采用此方式）；
 - 或先提交代码，再单独提交一条回填记录。
 
-因此**变更日志行数会比 `git rev-list --count HEAD` 少 1~2 条**，属正常现象，不是漏记。
+因此最新一条记录的「提交」列可能是「本次提交」，由紧随其后的 `docs:` 回填提交改为真实哈希；这只会造成 1~2 条的时序性差异。另有**历史缺口**：本表并非自首个提交起逐条记录，早期提交从未补录（用上方命令对账，差值远大于 1~2），属既有欠账，不回填历史；但本轮起新增提交必须逐条记录，回填时一并核对上一条。
 
 ---
 
@@ -569,7 +569,7 @@ cd frontend && pnpm test --run
 | 后端 | `security/LoginRateLimiter.java`、`config/ClockConfig.java` | `ConcurrentHashMap<String, Window>`（`Deque<Long> failures` + `lockedUntil`），`Clock` 注入；`@Scheduled` 定期清理过期窗口 |
 | 后端 | `exception/TooManyLoginAttemptsException.java`、`exception/GlobalExceptionHandler.java` | 锁定抛异常 → 429 + `Retry-After` + `Result.fail("登录失败次数过多，请 X 分钟后再试")` |
 | 后端 | `controller/AuthController.java` | `login` 先 `check(ip)` 再验密；`BadCredentialsException` 才 `recordFailure`，成功 `recordSuccess`（账号不存在也算凭据失败） |
-| 后端 | `application.yml` | `app.security.login.{max-failures,window-ms,lock-ms,cleanup-interval-ms}`，全部可用 `LOGIN_*` 覆盖（生产 compose 未透传，需同时改 `docker-compose.yml`，见下方第 7 条） |
+| 后端 | `application.yml` | `app.security.login.{max-failures,window-ms,lock-ms,cleanup-interval-ms}`，全部可用 `LOGIN_*` 覆盖（已由 `docker-compose.yml` 的 `environment` 透传，生产只改 `.env` 重启容器即生效，见下方第 7 条） |
 | 前端 | `api/index.js`、`stores/auth.js` | `authApi.logout()`；`logout()` 改异步、尽力而为地调后端，`finally` 里统一清态 |
 | 前端 | `stores/auth.spec.js` | 新增 3 例：成功清态、后端失败仍清态、未登录不抛错 |
 | 文档 | `README.md`、`docs/DEVELOPMENT.md`、`docs/deployment/README.md` | 功能、迁移、配置项、测试基线、接口清单、上线记录 |
@@ -595,11 +595,13 @@ cd frontend && pnpm test --run
 2. 封禁的双保险（过滤器内 `status != BANNED` 判断 + `AdminUserService` 递增 token_version）没有互相独立的测试用例锁定，任一失效现有 6 个集成用例仍会通过。
 3. 重复登出不幂等：token 已失效时 `POST /api/auth/logout` 返回 401，前端在「已退出登录」成功提示之后还会收到「请先登录」并整页跳转 `/login`（静默请求配置留待后续统一处理）。
 4. `ClientIpResolver` 的信任范围已从「仅环回」放宽到「环回 + RFC1918 私网」（修复容器端口映射下 `remoteAddr` 为网关导致的全站共桶）；残留：`X-Forwarded-For` 兜底仍取**第一个**合法字面量（攻击者可用伪造首段更换计数桶）、IPv4-mapped loopback（`::ffff:127.0.0.1`）未被识别、无代理头且来源非环回时仍回落到共享桶。
-5. `LoginRateLimiter`：`cleanupExpired()` 迭代时按 key 删除存在竞态，极端情况下可能少计一次失败；4 个阈值配置无合法性校验（如 lock-ms<=0 会静默关闭锁定）。
+5. `LoginRateLimiter`：`cleanupExpired()` 迭代时按 key 删除存在竞态，极端情况下可能少计一次失败；4 个阈值配置无合法性校验（如 lock-ms<=0 会静默关闭锁定）；锁定瞬间已通过 `check` 的在途请求仍可能把 `lockedUntil` 顺延（有界，最多一个 `lock-ms`）。
 6. 每个 429 都会打一条不含客户端 IP 的 WARN 日志，锁定期间可被低成本流量刷日志。
 7. `docker-compose.yml` 已透传 `LOGIN_*`（默认值与 `application.yml` 一致），只改 `.env` 重启容器即可生效（修复前需同时改 compose）。
 8. SSE 长连接不会因 token 失效立即断开（最长 30 分钟超时兜底）；前端登出时本地清态等待后端响应（最长全局 15s 超时），该窗口内界面仍显示已登录。
 9. 测试加固项未做：token_version 非零值持久化、`validate()` 成功路径、登出「先调后端后清本地」不变量均无独立断言。
+10. 成功登录会清空该 IP 的**全部**失败记录（`LoginRateLimiter.recordSuccess` 直接 `remove(ip)`），而 `POST /api/auth/register` 是公开接口：攻击者可「4 次错密码 + 1 次自己账号成功登录」循环，使失败窗口永远归零、锁定永不触发（这是 spec 的既定语义，不是实现偏差）。后续可考虑按 `(IP, username)` 计数，或只在该窗口的失败都指向同一账号时清零。
+11. 前端登出在后端失败时静默：断网 / 5xx / 15s 超时时 `authApi.logout()` 的异常被 `catch {}` 吞掉，本地态已清且界面提示「已退出登录」，但服务端 `token_version` 未 +1，被窃 token 在剩余有效期内仍可用（默认 24h）；用户看不到任何失败提示。后续应在失败时提示「服务端会话未能失效，建议修改密码」或自动重试一次。
 
 上线验收（2026-10-23）：
 
@@ -714,7 +716,8 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-24 | docs | 回填第七轮登录限流修复验证（Build #15 与 B.5 重跑） | 本次提交 |
+| 2026-10-24 | docs | 第七轮终审记录（已知取舍补第 10/11 条、计划实施偏差、文档订正） | 本次提交 |
+| 2026-10-24 | docs | 回填第七轮登录限流修复验证（Build #15 与 B.5 重跑） | `4afc9d7` |
 | 2026-10-24 | fix | 修复容器部署下登录限流未按真实客户端 IP 隔离（信任私网代理源 + compose 透传 LOGIN_*） | `419be00` |
 | 2026-10-23 | docs | 第七轮安全加固上线验收（JWT 主动失效与登录限流、Build #13）与变更日志回填 | `68d4e10` |
 | 2026-10-23 | docs | 记录第七轮安全加固（README、开发记录、部署手册、测试基线） | `14ceda7` |

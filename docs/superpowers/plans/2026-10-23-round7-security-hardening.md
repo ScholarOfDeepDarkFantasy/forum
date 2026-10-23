@@ -56,6 +56,9 @@ docs: 回填第七轮提交哈希与上线验收
 3. **旧 token（没有 `ver`）**：spec §5 明确「无 `ver` 按 0 处理，上线不强制全员重登」。因此**版本 0 的用户**用第七轮之前的 token 仍可访问；一旦该用户登出或被封禁（版本变 1），旧 token 立即 401。Task 2 的集成测试第 6 例同时锁定这两半。
 4. **限流只统计凭据失败**：用户名不存在、密码错误都算失败（两者在 `AuthService.login` 里都是 `BadCredentialsException`）；参数校验失败（400）、账号被封禁（400 `BusinessException`）不计入，避免把「已封禁账号反复登录」变成对同一 IP 的额外惩罚。
 5. **`X-Real-IP` 的信任模型**：只有请求来自环回地址（`127.0.0.0/8`、`::1`）时才读代理头。生产环境 nginx 的 `/forum/api/` 与 SSE location 都用 `proxy_set_header X-Real-IP $remote_addr;` **覆盖**写入，客户端伪造的同名头不生效；`X-Forwarded-For` 只在没有合法 `X-Real-IP` 时兜底，取第一个合法字面量。全程只做正则形状校验，不调用 `InetAddress#getByName`（避免 DNS 解析阻塞与 SSRF 面）。
+
+> **2026-10-24 实施偏差（上线后修订）**：本条的「仅环回」信任模型在部署冒烟后放宽为「环回 + RFC1918 私网」——rootless podman 的端口映射使后端 `remoteAddr` 为容器网关 `10.89.3.15`，仅信环回会导致全站共用一个计数桶。修复见提交 `419be00` 与 `docs/DEVELOPMENT.md` §4.12「修复记录」；本节及后文相关表述（Task 3、Task 6、附录 B.5）以文末 **§12 实施偏差** 为准。
+
 6. **投影返回类型**：`UserTokenState.getTokenVersion()` 用 primitive `long`（列 `NOT NULL DEFAULT 0`），与 spec §6.2 的 `Long` 语义等价，同时避免投影代理的拆箱歧义；比较时与 `JwtTokenProvider.tokenVersion(claims)` 同为 `long`。
 
 ---
@@ -2833,3 +2836,20 @@ sudo -u pi podman images --format "{{.Repository}}:{{.Tag}}" | grep forum-backen
 预期：`forum-backend Up ... (healthy)`；镜像 tag 与本次 Build 编号一致（如 `localhost/forum-backend:11`）。
 
 冒烟结论记录到 `docs/DEVELOPMENT.md` §4.12「上线验收」，并确认 §8 的 6 行哈希与 Build 编号一致，然后才执行 Step 6-6 的第二次推送。
+
+---
+
+## 12. 实施偏差（2026-10-24，上线后补充）
+
+本计划正文保留立项时的原始规格（作为评审依据），实际实施与验证结果以本节为准，差异均已在上线后修复并复验通过：
+
+| 项 | 计划（正文） | 实际 | 原因与处置 |
+| --- | --- | --- | --- |
+| `X-Real-IP` 信任模型 | 仅环回地址（§0(5)、Task 3 ClientIpResolver、Task 6/附录 B.5 均按此验收） | 环回 + RFC1918 私网（`isTrustedProxy` / `isPrivateIpv4`） | 部署冒烟 B.5 发现 rootless podman 的 `127.0.0.1:8086:8080` 端口映射使后端 `remoteAddr` 为容器网关 `10.89.3.15`，仅信环回会导致全站共用一个计数桶（任何来源 5 次错密码锁死全站登录）。提交 `419be00` 修复，重跑 B.5 全部通过 |
+| `LOGIN_*` 环境变量 | `application.yml` 支持环境变量覆盖 | 同时在 `docker-compose.yml` 的 `environment` 透传 4 个变量 | 生产只改 `.env` 重启容器即生效；随 `419be00` 上线，Build #15 起容器内可查到 4 个变量 |
+| 后端测试数 | 20 个测试类 / 161 个用例（§8 基准表） | 20 个测试类 / **163** 个用例（1 skipped） | `ClientIpResolverTest` 6→8 例（新增「私网网关采信 `X-Real-IP`」「私网无代理头回落 `remoteAddr`」）；§8 表格未回改，以本节与 `docs/DEVELOPMENT.md` §3.2 为准 |
+| 提交数 | 附录 A 的 7 条（Task 1–6 + 回填 + 勾选） | 7 条 + `419be00`（修复）+ `4afc9d7`（修复验证回填）+ 终审记录提交 | 修复与回填为计划外的上线后动作，均已推送 |
+| 部署验证 | 计划只要求 Build #12 一次验收 | Build **#12/#13/#14**（初次上线）与 **#15/#16**（修复与回填） | 均 `Finished: SUCCESS`；镜像 tag 与构建号一致、容器 `Up (healthy)` |
+| 已知取舍补充 | §10 未列 | `docs/DEVELOPMENT.md` §4.12 新增第 10 条（成功登录清空整 IP 窗口，可被公开注册接口绕过）与第 11 条（前端登出后端失败静默，服务端 token 仍有效） | 来自上线后整体终审的 Important 项，接受并延后处理 |
+
+仍与正文一致、未变更的约定：版本校验放在过滤器、旧 token 缺 `ver` 按 0、只统计 `BadCredentialsException`、限流计数在 Controller 层、`UserTokenState.getTokenVersion()` 用 `long`、`@Scheduled` 拆 `cleanupScheduled()`/`cleanupExpired()`。

@@ -106,7 +106,7 @@ java -jar target/forum-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 
 ### 4. 显式配置项
 
-除 `DB_PASSWORD`、`JWT_SECRET` 两个必填项外，其余都有默认值，可按需覆盖（生产环境需同时改 `docker-compose.yml` 透传，见部署手册）：
+除 `DB_PASSWORD`、`JWT_SECRET` 两个必填项外，其余都有默认值，可按需覆盖（生产环境由 `docker-compose.yml` 的 `environment` 透传，改 `.env` 后重启容器即生效；第七轮的 4 个 `LOGIN_*` 已列入透传，见部署手册）：
 
 | 变量 | 默认值 |
 |---|---|
