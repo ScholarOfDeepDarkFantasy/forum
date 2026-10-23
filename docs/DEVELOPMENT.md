@@ -607,10 +607,10 @@ cd frontend && pnpm test --run
 - Flyway 自动执行 V4：`flyway_schema_history` 最新记录 `4|add user token version|t`；`information_schema.columns` 显示 `token_version` 为 `bigint / is_nullable=NO / column_default=0`；`SELECT count(*) FROM users WHERE token_version IS NULL` 返回 **0**。
 - 冒烟：`GET /api/health` 直连 8086 返回 `{"success":true,"data":{"status":"UP"}}`，经 nginx（`Host: raspi`，`/forum/api/health`）返回 200；管理员 `POST /api/auth/logout` 返回 200，旧 token 再访问 `/api/auth/me` 返回 401，重新登录 200；新注册用户被封禁（`PUT /api/admin/users/11/status`）返回 200，其原 token 立即 401。
 - 限流：`X-Real-IP: 203.0.113.9` 连续 5 次错密码，第 6 次返回 **429** 且响应头 `Retry-After: 89x~900`（锁定后立即执行为 900，稍等几秒为 899/89x，属正常；本次实测 900）。
-- 环境偏差（如实记录）：在本机 `127.0.0.1:8086` 直连时，podman 端口映射（`127.0.0.1:${HOST_PORT:-8086}:8080`）让后端看到的 `remoteAddr` 是容器网关地址 `10.89.3.15` 而非环回，`ClientIpResolver` 因此忽略代理头，**所有客户端共用一个计数桶**：换 IP（198.51.100.7/8/9）仍是 429，经 nginx 登录同样 429。改用容器内环回直连复核后逻辑本身正确——`X-Real-IP: 203.0.113.11` 连续 5 次失败后该 IP 被锁（日志 `IP 203.0.113.11 登录失败 5 次，锁定 900000 ms`），换 `X-Real-IP: 203.0.113.12` 用正确密码返回 200。生产链路要让按 IP 限流真正生效，需让 nginx→后端连接保留环回源地址（或把信任条件放宽到容器私网段），已记入上方「已知取舍」第 4 条。
+- 环境偏差（如实记录）：在本机 `127.0.0.1:8086` 直连时，podman 端口映射（`127.0.0.1:${HOST_PORT:-8086}:8080`）让后端看到的 `remoteAddr` 是容器网关地址 `10.89.3.15` 而非环回，`ClientIpResolver` 因此忽略代理头，**所有客户端共用一个计数桶**：换 IP（198.51.100.7/8/9）仍是 429，经 nginx 登录同样 429。改用容器内环回直连复核后逻辑本身正确——`X-Real-IP: 203.0.113.11` 连续 5 次失败后该 IP 被锁（日志 `IP 203.0.113.11 登录失败 5 次，锁定 900000 ms`），换 `X-Real-IP: 203.0.113.12` 用正确密码返回 200。生产链路要让按 IP 限流真正生效，需让 nginx→后端连接保留环回源地址（或把信任条件放宽到容器私网段），已记入上方「已知取舍」第 4 条。（该全站共桶现象已在 Build #15 修复，见下方修复记录。）
 - 全量测试：后端 20 个测试类 / 161 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 31 个 spec / 314 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
 
-修复记录（2026-10-24）：B.5 冒烟发现容器部署下限流失效——本机直连 `127.0.0.1:8086` 时换 `X-Real-IP`（198.51.100.7/8/9）仍是 429，改经 nginx 登录同样 429，日志为 `IP 10.89.3.15 登录失败 5 次`。根因：podman 端口映射使后端看到的 `remoteAddr` 是容器网关 `10.89.3.15`（私网），旧 `ClientIpResolver` 只在环回源时才读代理头，于是所有客户端落进同一个计数桶。修复：信任范围从「仅环回」放宽到「环回 + RFC1918 私网」（新增 `isTrustedProxy` / `isPrivateIpv4`），并让 `docker-compose.yml` 透传 4 个 `LOGIN_*` 阈值。测试：`ClientIpResolverTest` 6→8 例（新增私网网关采信 `X-Real-IP`、无私网代理头回落 `remoteAddr`），后端全量 163 例。部署验证见 Build **#15**（发布后回填）。
+修复记录（2026-10-24）：B.5 冒烟发现容器部署下限流失效——本机直连 `127.0.0.1:8086` 时换 `X-Real-IP`（198.51.100.7/8/9）仍是 429，改经 nginx 登录同样 429，日志为 `IP 10.89.3.15 登录失败 5 次`。根因：podman 端口映射使后端看到的 `remoteAddr` 是容器网关 `10.89.3.15`（私网），旧 `ClientIpResolver` 只在环回源时才读代理头，于是所有客户端落进同一个计数桶。修复：信任范围从「仅环回」放宽到「环回 + RFC1918 私网」（新增 `isTrustedProxy` / `isPrivateIpv4`），并让 `docker-compose.yml` 透传 4 个 `LOGIN_*` 阈值。测试：`ClientIpResolverTest` 6→8 例（新增私网网关采信 `X-Real-IP`、无私网代理头回落 `remoteAddr`），后端全量 163 例。部署验证：推送 `419be00` 后 Jenkins Build **#15** SUCCESS（镜像 `localhost/forum-backend:15`，容器 `Up (healthy)`）；重跑冒烟 B.5：`X-Real-IP: 203.0.113.9` 连续 5 次错密码均 401、第 6 次 **429** 且 `Retry-After: 892`；换 `X-Real-IP: 198.51.100.7` 用正确密码 **200**；经 nginx 正确密码 **200**；容器内 `LOGIN_*` 4 个变量均已注入（`LOGIN_MAX_FAILURES=5`、`LOGIN_WINDOW_MS=900000`、`LOGIN_LOCK_MS=900000`、`LOGIN_CLEANUP_INTERVAL_MS=60000`）。
 
 ---
 
@@ -714,8 +714,9 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-24 | fix | 修复容器部署下登录限流未按真实客户端 IP 隔离（信任私网代理源 + compose 透传 LOGIN_*） | 本次提交 |
-| 2026-10-23 | docs | 第七轮安全加固上线验收（JWT 主动失效与登录限流、Build #13）与变更日志回填 | 本次提交 |
+| 2026-10-24 | docs | 回填第七轮登录限流修复验证（Build #15 与 B.5 重跑） | 本次提交 |
+| 2026-10-24 | fix | 修复容器部署下登录限流未按真实客户端 IP 隔离（信任私网代理源 + compose 透传 LOGIN_*） | `419be00` |
+| 2026-10-23 | docs | 第七轮安全加固上线验收（JWT 主动失效与登录限流、Build #13）与变更日志回填 | `68d4e10` |
 | 2026-10-23 | docs | 记录第七轮安全加固（README、开发记录、部署手册、测试基线） | `14ceda7` |
 | 2026-10-23 | feat | 第七轮前端：登出调用后端失效接口，失败也清本地态 | `ff99b73` |
 | 2026-10-23 | feat | 第七轮后端：登录失败按 IP 限流并返回 429 | `3cc36af` |
