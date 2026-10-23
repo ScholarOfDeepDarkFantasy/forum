@@ -121,23 +121,24 @@ cd frontend && pnpm test --run
 | 第四轮 | 深色模式 + 头像上传 | 6 | ✅ 已完成 | 2026-10-20 |
 | 第五轮 | 全文搜索：搜索接口 + pg_trgm 索引 + 顶栏入口与搜索结果页 | 5 | ✅ 已完成 | 2026-10-21 |
 | 第六轮 | 实时通知：SSE 推送 + 一次性 ticket + 断线重连与 120s 兜底轮询 | 5 | ✅ 已完成 | 2026-10-22 |
+| 第七轮 | 安全加固：JWT 主动失效（`token_version`）+ 登录失败按 IP 限流（429 + `Retry-After`） | 6 | ✅ 已完成 | 2026-10-23 |
 
-**当前进度：MVP 100% ｜ 已完成 6 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 7 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
-## 3. 当前状态快照（2026-10-22）
+## 3. 当前状态快照（2026-10-23）
 
 ### 3.1 代码规模
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 78 | 4616 |
-| 后端测试（`src/test/java`） | 17 | 4135 |
-| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4696 |
-| 前端测试（`*.spec.js`） | 30 | 5423 |
+| 后端主代码（`src/main/java`） | 82 | 4988 |
+| 后端测试（`src/test/java`） | 21 | 4743 |
+| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4712 |
+| 前端测试（`*.spec.js`） | 31 | 5505 |
 
-后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 9、`service/` 11、`security/` 5、`config/` 6、`util/` 4、`exception/` 3。
+后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 9、`service/` 11、`security/` 7（+`ClientIpResolver`、`LoginRateLimiter`，`exception/` 另加 `TooManyLoginAttemptsException`）、`config/` 7（+`ClockConfig`）、`util/` 4、`exception/` 4。
 
 前端目录（文件数）：`views/` 20（11 个页面 + 9 个 spec）、`components/` 11（6 个组件 + 5 个 spec）、`composables/` 8（4 个组合式函数 + 4 个 spec）、`styles/` 7（4 个 css + 3 个 spec）、`utils/` 10（5 个纯函数 + 5 个 spec）、`stores/` 3（2 个 store + 1 个 spec）、`api/` 2（1 个封装 + 1 个 spec）、`router/` 1、根目录 5（`App.vue`、`main.js`、`style.css`、`viteConfig.spec.js`、`App.spec.js`）。
 
@@ -145,30 +146,30 @@ cd frontend && pnpm test --run
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **133** 个用例 / 16 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
-| 前端 | **309** 个用例 / 30 个 spec | 全绿 |
+| 后端 | **161** 个用例 / 20 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 前端 | **314** 个用例 / 31 个 spec | 全绿 |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布（合计 133）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`NotificationServiceTest` 10、`TagFlowIntegrationTest` 8、`RepositoryTests` 8、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`PostFlowIntegrationTest` 4、`AvatarServiceTest` 4、`ForumApplicationTests` 2、`JwtTokenProviderTest` 2、`AuthFlowIntegrationTest` 1。
+后端测试类分布（合计 161）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`NotificationServiceTest` 10、`LoginRateLimiterTest` 9、`RepositoryTests` 9、`TagFlowIntegrationTest` 8、`ClientIpResolverTest` 6、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`AuthInvalidationIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`PostFlowIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
 
-前端 spec 分布（合计 309）：`search` 30、`useNotificationStream` 22、`SearchView` 19、`ProfileView` 18、`useTheme` 17、`notifications` 16、`markdown` 14、`index`（api）13、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`useResponsive` 3、`PostEditView` 3、`App` 2。
+前端 spec 分布（合计 314）：`search` 30、`useNotificationStream` 22、`SearchView` 19、`ProfileView` 18、`useTheme` 17、`notifications` 16、`index`（api）15、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 3、`useResponsive` 3、`PostEditView` 3、`App` 2。
 
 ### 3.3 数据库
 
 | 项 | 值 |
 | --- | --- |
 | 业务表 | 11 张：`users`、`roles`、`user_roles`、`boards`、`posts`、`comments`、`tags`、`post_tags`、`likes`、`favorites`、`notifications` |
-| 迁移脚本 | `V1__init_schema.sql`（建表 + 角色种子）、`V2__notification_comment_id.sql`（通知表加 `comment_id`）、`V3__post_search_trgm_index.sql`（pg_trgm 扩展 + 标题/正文 GIN 部分索引） |
+| 迁移脚本 | `V1__init_schema.sql`（建表 + 角色种子）、`V2__notification_comment_id.sql`（通知表加 `comment_id`）、`V3__post_search_trgm_index.sql`（pg_trgm 扩展 + 标题/正文 GIN 部分索引）、`V4__add_user_token_version.sql`（用户表加 `token_version`，默认 0） |
 | 审计字段 | 全部表含 `create_time`、`update_time`（由 `BaseEntity` + JPA Auditing 维护） |
 | 软删除 | `posts.deleted`、`comments.deleted` |
 | 默认管理员 | `admin` / `admin123456`（由 `DataInitializer` 幂等创建，角色 ADMIN+MODERATOR+USER） |
 
-### 3.4 接口清单（38 个端点）
+### 3.4 接口清单（39 个端点）
 
 | 控制器 | 端点 |
 | --- | --- |
 | `HealthController` | `GET /api/health` |
-| `AuthController` | `POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`PUT /api/auth/profile`、`GET /api/auth/users/{id}` |
+| `AuthController` | `POST /api/auth/register`、`POST /api/auth/login`、`POST /api/auth/logout`、`GET /api/auth/me`、`PUT /api/auth/profile`、`GET /api/auth/users/{id}` |
 | `BoardController` | `GET /api/boards`、`GET /api/boards/{id}`、`POST /api/boards`、`PUT /api/boards/{id}`、`DELETE /api/boards/{id}` |
 | `PostController` | `GET /api/posts`、`GET /api/posts/search`、`GET /api/posts/{id}`、`GET /api/posts/mine`、`POST /api/posts`、`PUT /api/posts/{id}`、`DELETE /api/posts/{id}`、`GET /api/posts/favorites/mine`、`POST /api/posts/{id}/like`、`POST /api/posts/{id}/favorite`、`PUT /api/posts/{id}/pin`、`PUT /api/posts/{id}/exquisite` |
 | `TagController` | `GET /api/tags`、`GET /api/tags/posts` |
@@ -177,6 +178,8 @@ cd frontend && pnpm test --run
 | `AdminUserController` | `GET /api/admin/users`、`PUT /api/admin/users/{id}/status` |
 | `UserController` | `POST /api/users/me/avatar`、`DELETE /api/users/me/avatar` |
 | Actuator | `GET /actuator/health`（仅 ADMIN，仅暴露 health） |
+
+`POST /api/auth/logout` 需要登录，成功返回 200 与消息「已退出登录」，并让该用户此前签发的所有 JWT 立即失效（`users.token_version` +1）；`POST /api/auth/login` 在密码连续错误达到阈值后返回 **429**，响应头带 `Retry-After: <秒>`，响应体为 `Result.fail(...)`。
 
 两个标签端点均为公开 GET（`SecurityConfig` 的 `PUBLIC_GET` 含 `/api/tags/**`），响应统一包在 `Result<T>` 里：
 
@@ -542,6 +545,69 @@ cd frontend && pnpm test --run
 - 冒烟：`/forum/`、`/forum/api/health`、`/forum/api/notifications/unread-count` 均 200；已登录用户取票后 `curl -N` 收到 `text/event-stream` 与 `:connected`/`:heartbeat`，另一账号楼中楼回复其评论后收到 `event:notification`（`data` 含 `type=REPLY`，未读数 0 → 1）；`deploy.sh` 的 stream 401 断言随构建通过。
 - 全量测试：后端 16 个测试类 / 133 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 30 个 spec / 309 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
 
+### 4.12 第七轮：安全加固（JWT 主动失效与登录限流）（2026-10-23）
+
+计划：`docs/superpowers/plans/2026-10-23-round7-security-hardening.md`（6 个任务：数据模型与签发版本 → 请求态校验、登出与封禁 → 登录失败限流 → 前端登出 → 文档 → 全量验证与上线）
+
+设计：`docs/superpowers/specs/2026-10-23-round7-jwt-invalidation-rate-limit-design.md`
+
+目标：解决 §5.1 的 T4、T5 两条技术债——封禁与登出必须让**已签发**的 JWT 立即失效，登录接口必须按客户端 IP 抗暴力破解；公开 GET 的语义与缓存行为保持不变。
+
+新增/修改的文件：
+
+| 位置 | 文件 | 要点 |
+| --- | --- | --- |
+| 后端 | `db/migration/V4__add_user_token_version.sql` | `users` 加 `token_version BIGINT NOT NULL DEFAULT 0`，历史用户与旧 token 都从 0 开始 |
+| 后端 | `entity/User.java` | `@Column(name = "token_version", nullable = false) @Builder.Default private long tokenVersion = 0L` |
+| 后端 | `security/JwtTokenProvider.java` | `createToken(..., long tokenVersion)` 写 `ver` 声明；`static long tokenVersion(Claims)` 用 `Number` 读（jjwt 对小数返回 `Integer`），缺声明按 0 |
+| 后端 | `repository/UserRepository.java` | 只读投影 `UserTokenState { getId / getStatus / getTokenVersion }` + `findTokenStateById`，不加载 roles 集合 |
+| 后端 | `security/JwtAuthenticationFilter.java` | 解析签名后回查一次库：用户不存在 / `BANNED` / `ver` 与库中版本不符 → 不建立认证态 |
+| 后端 | `service/AuthService.java`、`controller/AuthController.java` | `logout(userId)` 在事务内 `tokenVersion + 1`（脏检查即可，不 save）；`POST /api/auth/logout` 需要登录 |
+| 后端 | `service/AdminUserService.java` | `case BANNED` 分支在 `save` 前同样 `tokenVersion + 1`；`MUTED`/`ACTIVE` 不动版本 |
+| 后端 | `config/SecurityConfig.java` | `/api/auth/logout` 与 `/api/auth/me`、`/api/auth/profile` 并列 `authenticated()` |
+| 后端 | `security/ClientIpResolver.java` | 非环回地址直接信任；环回（nginx 反代）时取 `X-Real-IP`，非法再退 `X-Forwarded-For` 首个合法字面量；全程正则校验，不做 DNS |
+| 后端 | `security/LoginRateLimiter.java`、`config/ClockConfig.java` | `ConcurrentHashMap<String, Window>`（`Deque<Long> failures` + `lockedUntil`），`Clock` 注入；`@Scheduled` 定期清理过期窗口 |
+| 后端 | `exception/TooManyLoginAttemptsException.java`、`exception/GlobalExceptionHandler.java` | 锁定抛异常 → 429 + `Retry-After` + `Result.fail("登录失败次数过多，请 X 分钟后再试")` |
+| 后端 | `controller/AuthController.java` | `login` 先 `check(ip)` 再验密；`BadCredentialsException` 才 `recordFailure`，成功 `recordSuccess`（账号不存在也算凭据失败） |
+| 后端 | `application.yml` | `app.security.login.{max-failures,window-ms,lock-ms,cleanup-interval-ms}`，全部可用 `LOGIN_*` 覆盖 |
+| 前端 | `api/index.js`、`stores/auth.js` | `authApi.logout()`；`logout()` 改异步、尽力而为地调后端，`finally` 里统一清态 |
+| 前端 | `stores/auth.spec.js` | 新增 3 例：成功清态、后端失败仍清态、未登录不抛错 |
+| 文档 | `README.md`、`docs/DEVELOPMENT.md`、`docs/deployment/README.md` | 功能、迁移、配置项、测试基线、接口清单、上线记录 |
+
+关键取舍：
+
+- **`token_version` 而非黑名单**：单实例部署、不引入 Redis；用户表的一行版本号既能让登出/封禁立即生效，又天然支持「一次性让某用户全部设备下线」。代价是每个带 token 的请求多一次主键查询（只取 3 列），以及角色变更仍不即时（本轮不处理）。
+- **版本校验放在过滤器而不是业务 Service**：认证态只在请求入口建立一次，后续 `@PreAuthorize` 与 `SecurityUtils.currentUserId()` 都读同一份认证态，不会出现「一半请求看到新状态、一半看到旧状态」。
+- **旧 token 缺 `ver` 按 0**：上线时不必强制所有人重新登录；只要用户没登出/被封禁，版本仍是 0，旧 token 继续可用。
+- **计数放在 Controller 而不是认证过滤器**：只有 `BadCredentialsException`（用户名不存在或密码错）才计入失败，其它 401（token 过期、格式错）不污染登录失败窗口；锁定判断发生在验密之前，锁定期间不消耗 CPU 做 BCrypt。
+- **信任 `X-Real-IP` 的前提是 nginx 覆盖写**：`deploy/nginx/forum.conf` 两个 `location` 都写了 `proxy_set_header X-Real-IP $remote_addr;`，客户端自带的同名头会被覆盖；因此只在 `remoteAddr` 是环回地址时才读它，直连 8086 无法伪造成任意 IP。
+- **限流用内存窗口而不是 Bucket4j**：与「不新增依赖」的既有约定一致，5 次/15 分钟的粗粒度窗口不需要令牌桶的精度；窗口淘汰靠时间戳裁剪 + 定时清理，`MutableClock` 让单测无需 sleep。
+
+测试与验证：后端新增 `AuthInvalidationIntegrationTest`（真实登出/封禁/版本不符/旧 token/禁言仍可用，6 例）、`ClientIpResolverTest`（6 例）、`LoginRateLimiterTest`（9 例）、`LoginRateLimitIntegrationTest`（429 与 `Retry-After`、锁定内正确密码仍 429、其它 IP 不受影响、成功登录清零，4 例）；`JwtTokenProviderTest` 加 `ver` 断言、`RepositoryTests` 加默认值断言。前端 `auth.spec.js` 3 例、`index.spec.js` 加 2 例（登出请求路径、429 不清登录态）。基线数字见 §3.2。
+
+已知限制：见 §6「登录限流是单实例的」与 §5.2 的候选「限流改共享存储」。
+
+#### 已知取舍（代码审查记录）
+
+本轮 Task 1–4 的两阶段审查（规格符合性 + 代码质量）接受并延后以下问题，均不阻塞本轮上线，后续迭代择机处理：
+
+1. `JwtAuthenticationFilter` 的会话校验只捕获 `NumberFormatException`；数据库异常（`DataAccessException`）会导致 500 且响应体不是统一 `Result` 结构。
+2. 封禁的双保险（过滤器内 `status != BANNED` 判断 + `AdminUserService` 递增 token_version）没有互相独立的测试用例锁定，任一失效现有 6 个集成用例仍会通过。
+3. 重复登出不幂等：token 已失效时 `POST /api/auth/logout` 返回 401，前端在「已退出登录」成功提示之后还会收到「请先登录」并整页跳转 `/login`（静默请求配置留待后续统一处理）。
+4. `ClientIpResolver`：X-Real-IP 缺失时 X-Forwarded-For 兜底取**第一个**合法字面量，攻击者可用伪造首段更换计数桶；IPv4-mapped loopback（`::ffff:127.0.0.1`）未被识别；无代理头且来源非环回时回落到共享桶（NAT 下可能整栋楼共用一个桶）。
+5. `LoginRateLimiter`：`cleanupExpired()` 迭代时按 key 删除存在竞态，极端情况下可能少计一次失败；4 个阈值配置无合法性校验（如 lock-ms<=0 会静默关闭锁定）。
+6. 每个 429 都会打一条不含客户端 IP 的 WARN 日志，锁定期间可被低成本流量刷日志。
+7. `docker-compose.yml` 未透传 `LOGIN_*` 环境变量，生产要调阈值必须同时改 compose（只改 `.env` 无效）——需要作为上线备注。
+8. SSE 长连接不会因 token 失效立即断开（最长 30 分钟超时兜底）；前端登出时本地清态等待后端响应（最长全局 15s 超时），该窗口内界面仍显示已登录。
+9. 测试加固项未做：token_version 非零值持久化、`validate()` 成功路径、登出「先调后端后清本地」不变量均无独立断言。
+
+上线验收（2026-10-23）：
+
+- 推送 `<hash>` 后 Jenkins Build **#<N>** **SUCCESS**，`forum-backend` 重建后 `Up (healthy)`。
+- Flyway 自动执行 V4：`flyway_schema_history` 最新记录 `version=4 / description=add user token version / success=t`；`\d users` 显示 `token_version bigint not null default 0`。
+- 冒烟：管理员 `POST /api/auth/logout` 返回 200，旧 token 再访问 `/api/auth/me` 返回 401；新建用户被管理员封禁后其 token 立即 401；`X-Real-IP: 203.0.113.9` 连续 5 次错密码后第 6 次返回 **429** 且响应头 `Retry-After: 900`，锁定期间用正确密码仍 429。
+- 全量测试：后端 20 个测试类 / 161 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 31 个 spec / 314 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
+
 ---
 
 ## 5. 待办与后续计划
@@ -553,8 +619,8 @@ cd frontend && pnpm test --run
 | T1 | **数据库密码仍在 git 历史中** | 高 | 自 `6eecbdc` 起 `application.yml` 含明文密码。2026-10-19 部署引导时已把 raspi 上 `forum` 角色密码重置为随机值（历史里那份仅对旧环境有效），但明文字符串仍在历史中。彻底处理需 `git filter-repo` 改写历史，属不可逆操作，需明确授权后执行 |
 | T2 | **无 PR 级 CI** | 低 | 主分支的构建/部署已由 raspi Jenkins 承担（2026-10-19，见 §4.7）。主机没有公网入口，无法做 GitHub PR 触发，PR 级校验仍需 GitHub Actions（后端 JDK 17 + H2；前端 pnpm test + build） |
 | T3 | **无前端 E2E 测试** | 中 | 真实浏览器验证目前靠一次性 Playwright 脚本（在 `C:\Temp\jf-pw`，未入库）。建议把关键路径（登录→发帖→评论→通知跳转）固化为仓库内 E2E |
-| T4 | **JWT 无法主动失效** | 中 | 无 refresh token、无黑名单。封禁用户后其已签发的 token 在 24 小时内仍可用（权限校验不查库）。修法：过滤器里查用户状态，或引入短期 token + refresh |
-| T5 | **登录接口无速率限制** | 中 | 可被暴力破解。建议加基于 IP 的限流（如 Bucket4j）或失败次数锁定 |
+| T4 | ~~**JWT 无法主动失效**~~ | 已关闭 | 2026-10-23 第七轮：`users.token_version` + 过滤器回查，登出与封禁各 +1，旧 token 立即 401（见 §4.12）。角色变更仍不即时，属遗留的小口子 |
+| T5 | ~~**登录接口无速率限制**~~ | 已关闭 | 2026-10-23 第七轮：按客户端 IP 的失败窗口 + 锁定，429 带 `Retry-After`（见 §4.12）。计数在单实例内存里，多实例需换共享存储（见 §5.2） |
 | T6 | **REPLY 通知锚点只覆盖第一页评论** | 低 | 详见 §6 |
 | T7 | **数据库连接串硬编码 `raspi`** | 低 | `application.yml` 默认值仍是 `localhost`（面向本地开发）；实际部署形态已写入 `.env.example` 与 `docs/deployment/README.md`（容器内 `host.containers.internal:5432`）。代码内默认值没有改成 `raspi`，避免本地开发被污染 |
 | T8 | **残留的冒烟测试数据** | 低 | 真实库中存在 `smoke_user`、`t4_op`、`t4_ap`、板块「冒烟测试板块」等手工测试数据，交付演示前应清理 |
@@ -566,7 +632,7 @@ cd frontend && pnpm test --run
 | T14 | **搜索无分词、无相关度排序** | 中 | 采用 pg_trgm 子串匹配：中文不分词，1–2 个字的关键词的 trigram 覆盖不足，规划器会放弃索引改走顺序扫描；排序只有「标题命中优先 + 时间倒序」，没有 `ts_rank`/`similarity` 之类相关度。数据量增长后的升级路径是 `tsvector`（需分词扩展）或两阶段检索 |
 | T15 | **`posts.content` 无长度上限** | 低 | 正文列是 `TEXT` 且无应用层长度校验；超长正文会放大 `snippet` 截取与索引维护成本，也让 `pg_trgm` 的 GIN 索引更大。可加与标题一致的长度提示或截断策略 |
 
-### 5.2 候选功能（第六轮已取实时通知，候选项已清空）
+### 5.2 候选功能（第七轮新增「限流共享存储」一项）
 
 第二轮明确列为「不做」的功能，各自需要独立设计：
 
@@ -578,8 +644,9 @@ cd frontend && pnpm test --run
 | ~~深色模式~~ ✅ 已完成 | 低 | 小 | 第四轮已交付：双套设计令牌 + 跟随系统/手动切换 + 首屏防闪白（§4.9） |
 | ~~全文搜索~~ ✅ 已完成 | 中 | 中 | 第五轮已交付：公开 `GET /api/posts/search` + pg_trgm GIN 部分索引、独立 `/search?q=` 结果页与顶栏入口（§4.10） |
 | ~~WebSocket 实时通知~~ ✅ 已完成 | 中 | 大 | 第六轮已交付：以 SSE 实现（而非 WebSocket）一次性 ticket 鉴权 + 断线指数退避重连 + 120s 轮询兜底，见 §4.11 |
+| 限流改共享存储（多实例） | 中 | 中 | 当前 `LoginRateLimiter` 的失败计数在单实例内存，多实例部署时各算各的、重启清零（§4.12、§6）。改法：把 `Window` 换成 Redis 的 `INCR`+`EXPIRE` 或 Bucket4j 的分布式后端，接口保持不变 |
 
-第三轮已取前两项（见 §4.8），第四轮已取头像上传与深色模式（见 §4.9），第五轮已取全文搜索（见 §4.10），第六轮已取实时通知（见 §4.11）；第二轮列出的候选功能至此全部完成，后续新功能需重新评估价值与工作量，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进，避免一次铺开。
+第三轮已取前两项（见 §4.8），第四轮已取头像上传与深色模式（见 §4.9），第五轮已取全文搜索（见 §4.10），第六轮已取实时通知（见 §4.11），第七轮不再新增业务功能、只做安全加固（见 §4.12）；「限流改共享存储」是加固后新暴露的运维型候选，等到真的多实例部署时再取。后续新功能需重新评估价值与工作量，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进。
 
 ---
 
@@ -626,6 +693,8 @@ cd frontend && pnpm test --run
 | SSE 鉴权 | **一次性 ticket**（60s、单次消费）而不是查询串带 JWT | `EventSource` 不能自定义请求头；长期 JWT 放进 URL 会进 access log，ticket 泄露窗口小且消费后立即失效 |
 | 通知推送时机 | **事务提交后** `afterCommit` 推送 | 回滚不能推「不存在的点赞/回复」；无事务同步时直接推，便于单测 |
 | 实时通知降级 | **断线退回 120s 轮询**，重连成功即停 | 保留改造前的兜底行为，避免 SSE 不可用时完全收不到通知 |
+| Token 主动失效 | **用户级 `token_version` 版本号**，不用 Redis 黑名单 | 单实例部署、不新增中间件；登出/封禁各 +1，过滤器每请求比一次即失效，还能一次性踢掉某用户全部设备；代价是每请求多一次只取 3 列的主键查询 |
+| 登录限流位置 | **Controller 层计数 + 内存滑动窗口**，不放认证过滤器 | 只统计真正的凭据错误（`BadCredentialsException`），token 过期/格式错的 401 不占用失败额度；锁定判断在 BCrypt 之前，被锁时不做无谓的哈希计算 |
 
 ---
 
@@ -640,6 +709,12 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-10-23 | docs | 第七轮安全加固上线验收（JWT 主动失效与登录限流、Build #<N>）与变更日志回填 | 本次提交 |
+| 2026-10-23 | docs | 记录第七轮安全加固（README、开发记录、部署手册、测试基线） | `<hash5>` |
+| 2026-10-23 | feat | 第七轮前端：登出调用后端失效接口，失败也清本地态 | `<hash4>` |
+| 2026-10-23 | feat | 第七轮后端：登录失败按 IP 限流并返回 429 | `<hash3>` |
+| 2026-10-23 | feat | 第七轮后端：封禁与登出即时失效旧 token | `<hash2>` |
+| 2026-10-23 | feat | 第七轮后端：用户 token 增加版本号并写入 JWT | `<hash1>` |
 | 2026-10-22 | docs | 第六轮实时通知上线验收（Build #10、SSE 全链路实测）与变更日志回填 | 本次提交 |
 | 2026-10-22 | docs | 记录第六轮实时通知（SSE）功能（README、开发记录、部署手册、计划验收步骤） | `9ead0d0` |
 | 2026-10-22 | fix | 修正通知横幅令牌与点击断言强度 | `b3a50a5` |

@@ -399,7 +399,7 @@ git commit -m "feat: 为用户 token 增加版本号并写入 JWT"
 - Modify: `src/main/java/org/song/forum/service/AdminUserService.java`
 - Create: `src/test/java/org/song/forum/controller/AuthInvalidationIntegrationTest.java`
 
-- [ ] **Step 2-1：先写失败测试（RED）**
+- [x] **Step 2-1：先写失败测试（RED）**
 
 新建 `src/test/java/org/song/forum/controller/AuthInvalidationIntegrationTest.java`。这个类专门验证「token 签发之后，服务端状态一变，旧 token 立刻不可用」。
 
@@ -618,7 +618,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=AuthInvalidationIntegrationTest
 
 预期（RED）：`Tests run: 6, Failures: 4, Errors: 0, Skipped: 0`，`BUILD FAILURE`。4 个失败分别是：登出返回 500（未映射路径被兜底异常处理器吞掉，接口还不存在）、封禁后旧 token 仍 200、直接改库后旧 token 仍 200、旧 token 用例的登出步骤 500。`validTokenStillWorks` 与 `mutedUserTokenStillWorks` 应当已经通过——它们证明改动前的行为是「只要签名对就一直有效」。
 
-- [ ] **Step 2-2：仓储增加只读投影查询**
+- [x] **Step 2-2：仓储增加只读投影查询**
 
 把 `src/main/java/org/song/forum/repository/UserRepository.java` 替换为：
 
@@ -664,7 +664,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 }
 ```
 
-- [ ] **Step 2-3：过滤器回查用户状态与版本**
+- [x] **Step 2-3：过滤器回查用户状态与版本**
 
 把 `src/main/java/org/song/forum/security/JwtAuthenticationFilter.java` 替换为：
 
@@ -754,7 +754,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 }
 ```
 
-- [ ] **Step 2-4：登出服务、接口与安全规则**
+- [x] **Step 2-4：登出服务、接口与安全规则**
 
 在 `src/main/java/org/song/forum/service/AuthService.java` 的 `login` 之后插入登出方法（`@Transactional` 靠脏检查落库，不要多写一次 `save`）：
 
@@ -789,7 +789,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 说明：`/api/auth/logout` 是 POST，理论上会落到 `.anyRequest().authenticated()`；这里显式列出，是为了将来放宽 `anyRequest` 时不会漏掉它（登出必须携带 token，否则无法知道该递增谁）。
 
-- [ ] **Step 2-5：封禁时递增版本**
+- [x] **Step 2-5：封禁时递增版本**
 
 修改 `src/main/java/org/song/forum/service/AdminUserService.java` 的 `switch`：
 
@@ -812,7 +812,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=AuthInvalidationIntegrationTest
 
 预期（GREEN）：`Tests run: 6, Failures: 0, Errors: 0, Skipped: 0`、`BUILD SUCCESS`。
 
-- [ ] **Step 2-6：Task 2 全量回归并提交**
+- [x] **Step 2-6：Task 2 全量回归并提交**
 
 ```bash
 cd /e/JavaSpace/forum && mvn -B clean test
@@ -865,7 +865,7 @@ git commit -m "feat: 让封禁与登出即时失效旧 token"
 - Create: `src/test/java/org/song/forum/security/LoginRateLimiterTest.java`
 - Create: `src/test/java/org/song/forum/controller/LoginRateLimitIntegrationTest.java`
 
-- [ ] **Step 3-1：先写 `ClientIpResolver` 的失败测试（RED）**
+- [x] **Step 3-1：先写 `ClientIpResolver` 的失败测试（RED）**
 
 新建 `src/test/java/org/song/forum/security/ClientIpResolverTest.java`：
 
@@ -959,7 +959,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=ClientIpResolverTest
   symbol:   class ClientIpResolver
 ```
 
-- [ ] **Step 3-2：实现 `ClientIpResolver` 并跑绿**
+- [x] **Step 3-2：实现 `ClientIpResolver` 并跑绿**
 
 新建 `src/main/java/org/song/forum/security/ClientIpResolver.java`：
 
@@ -1057,7 +1057,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=ClientIpResolverTest
 
 预期（GREEN）：`Tests run: 6, Failures: 0, Errors: 0, Skipped: 0`、`BUILD SUCCESS`。
 
-- [ ] **Step 3-3：先写限流器与 429 异常的失败测试（RED）**
+- [x] **Step 3-3：先写限流器与 429 异常的失败测试（RED）**
 
 新建 `src/test/java/org/song/forum/security/LoginRateLimiterTest.java`。时间用可变 `Clock` 推进，整个类不出现 `Thread.sleep`，在 CI 上稳定且毫秒级完成。
 
@@ -1247,7 +1247,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=LoginRateLimiterTest
   symbol:   class TooManyLoginAttemptsException
 ```
 
-- [ ] **Step 3-4：实现异常、Clock、限流器与 429 处理器**
+- [x] **Step 3-4：实现异常、Clock、限流器与 429 处理器**
 
 新建 `src/main/java/org/song/forum/exception/TooManyLoginAttemptsException.java`：
 
@@ -1468,7 +1468,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=LoginRateLimiterTest
 
 预期（GREEN）：`Tests run: 9, Failures: 0, Errors: 0, Skipped: 0`、`BUILD SUCCESS`。
 
-- [ ] **Step 3-5：先写限流集成测试（RED）**
+- [x] **Step 3-5：先写限流集成测试（RED）**
 
 新建 `src/test/java/org/song/forum/controller/LoginRateLimitIntegrationTest.java`。阈值与窗口用测试专用属性调小，避免测试等 15 分钟。
 
@@ -1607,7 +1607,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=LoginRateLimitIntegrationTest
 
 预期（RED）：`Tests run: 4, Failures: 1, Errors: 0, Skipped: 0`、`BUILD FAILURE`。失败的是 `thirdFailureLocksIpAndBlocksCorrectPassword`——此时还没有限流，第 4 次正确密码返回 200；断言期望 429。
 
-- [ ] **Step 3-6：接入控制器与配置（GREEN）**
+- [x] **Step 3-6：接入控制器与配置（GREEN）**
 
 把 `src/main/java/org/song/forum/controller/AuthController.java` 替换为：
 
@@ -1733,7 +1733,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=LoginRateLimitIntegrationTest
 
 预期（GREEN）：`Tests run: 4, Failures: 0, Errors: 0, Skipped: 0`、`BUILD SUCCESS`。
 
-- [ ] **Step 3-7：Task 3 全量回归并提交**
+- [x] **Step 3-7：Task 3 全量回归并提交**
 
 ```bash
 cd /e/JavaSpace/forum && mvn -B clean test
@@ -1786,7 +1786,7 @@ git commit -m "feat: 登录失败按 IP 限流并返回 429"
 - Create: `frontend/src/stores/auth.spec.js`
 - Modify: `frontend/src/api/index.spec.js`
 
-- [ ] **Step 4-1：先写 auth store 的失败测试（RED）**
+- [x] **Step 4-1：先写 auth store 的失败测试（RED）**
 
 新建 `frontend/src/stores/auth.spec.js`。三个用例覆盖：成功后清态、失败也清态、未登录不抛错。
 
@@ -1865,7 +1865,7 @@ FAIL  src/stores/auth.spec.js > auth store 登出 > 调用后端登出接口并�
 AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
 ```
 
-- [ ] **Step 4-2：补 API 层测试（RED）**
+- [x] **Step 4-2：补 API 层测试（RED）**
 
 修改 `frontend/src/api/index.spec.js` 第 49 行，把 `authApi` 加入解构：
 
@@ -1916,7 +1916,7 @@ cd /e/JavaSpace/forum/frontend && pnpm vitest run src/api/index.spec.js
 TypeError: authApi.logout is not a function
 ```
 
-- [ ] **Step 4-3：API 增加登出方法**
+- [x] **Step 4-3：API 增加登出方法**
 
 修改 `frontend/src/api/index.js` 的 `authApi`（第 73–79 行），在 `me` 之后插入一行：
 
@@ -1939,7 +1939,7 @@ cd /e/JavaSpace/forum/frontend && pnpm vitest run src/api/index.spec.js
 
 预期（GREEN）：`Tests  15 passed (15)`。
 
-- [ ] **Step 4-4：store 登出改为异步并抽出 `clearAuth()`**
+- [x] **Step 4-4：store 登出改为异步并抽出 `clearAuth()`**
 
 把 `frontend/src/stores/auth.js` 的 `logout()` 替换为：
 
@@ -1975,7 +1975,7 @@ cd /e/JavaSpace/forum/frontend && pnpm vitest run src/stores/auth.spec.js
 
 预期（GREEN）：`Tests  3 passed (3)`。
 
-- [ ] **Step 4-5：前端全量测试、构建并提交**
+- [x] **Step 4-5：前端全量测试、构建并提交**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && pnpm test
@@ -2022,7 +2022,7 @@ git commit -m "feat: 前端登出调用后端失效接口"
 
 > 文档任务的 TDD 等价物是「先用 grep 断言旧数字还在，再改，再断言新数字出现」。每一步都给出前后两条命令。
 
-- [ ] **Step 5-1：README 增加功能条目、V4 迁移与四个配置项**
+- [x] **Step 5-1：README 增加功能条目、V4 迁移与四个配置项**
 
 先确认旧文本存在：
 
@@ -2081,7 +2081,7 @@ grep -n '会话安全\|V4__add_user_token_version\|LOGIN_MAX_FAILURES\|20 个测
 
 预期：6 条命中；`grep -c '^| 20 个' README.md` 不再命中旧句子（旧句已被替换）。
 
-- [ ] **Step 5-2：DEVELOPMENT 更新进度、代码规模、测试基线、迁移与接口清单**
+- [x] **Step 5-2：DEVELOPMENT 更新进度、代码规模、测试基线、迁移与接口清单**
 
 （1）§2.2 迭代轮次表：在第六轮那一行（第 123 行）之后追加：
 
@@ -2168,7 +2168,7 @@ grep -n '第七轮\|161\|314\|V4__add_user_token_version\|39 个端点\|/api/aut
 
 预期：至少 8 条命中，且 `grep -n '133 个用例 / 16 个测试类' docs/DEVELOPMENT.md` 无输出。
 
-- [ ] **Step 5-3：DEVELOPMENT 新增 §4.12**
+- [x] **Step 5-3：DEVELOPMENT 新增 §4.12**
 
 在 §4.11 的 `---`（第 545 行）之前、§4.11 最后一段之后插入下面整节：
 
@@ -2225,7 +2225,7 @@ grep -n '第七轮\|161\|314\|V4__add_user_token_version\|39 个端点\|/api/aut
 
 > `<hash>`/`<N>` 在 Task 6 的 Step 6-7 回填，与本轮其它计划一致，属执行期事实。
 
-- [ ] **Step 5-4：DEVELOPMENT 关闭 T4/T5、补候选、决策与变更日志**
+- [x] **Step 5-4：DEVELOPMENT 关闭 T4/T5、补候选、决策与变更日志**
 
 （1）§5.1：T4、T5 两行（第 556、557 行）改为：
 
@@ -2279,7 +2279,7 @@ grep -n 'T4 |\|T5 |\|限流改共享存储\|token_version 版本号\|第七轮�
 
 预期：至少 5 条命中；`grep -n 'JWT 无法主动失效\*\*' docs/DEVELOPMENT.md` 仍命中（删除线包裹的原文保留，便于追溯）。
 
-- [ ] **Step 5-5：部署手册新增「登录限流与真实客户端 IP」并补排障**
+- [x] **Step 5-5：部署手册新增「登录限流与真实客户端 IP」并补排障**
 
 在 `docs/deployment/README.md` 的 SSE 小节最后一行（`> stream 端点的鉴权在 ticket 内部完成…`，第 189 行）之后、`## 6. 排障` 之前插入：
 
@@ -2352,7 +2352,7 @@ grep -n '登录限流与真实客户端 IP\|Retry-After\|token_version' docs/dep
 
 预期：至少 6 条命中。
 
-- [ ] **Step 5-6：勾选计划复选框并提交**
+- [x] **Step 5-6：勾选计划复选框并提交**
 
 把本计划 Task 1–5 的全部步骤勾上（Task 6 保持未勾，等上线回填后再勾）：
 

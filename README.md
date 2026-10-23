@@ -16,6 +16,7 @@
 - 帖子：板块内发帖、编辑、删除（软删除），分页列表与关键词搜索，浏览量统计
 - 互动：点赞、收藏与「我的收藏」；评论支持楼中楼，删除后保留占位
 - 权限：管理员 / 版主 / 普通用户三级角色，支持置顶、加精、禁言、封禁
+- **会话安全**：登出与封禁会让旧 JWT 立即失效（`users.token_version` 版本号校验，过滤器每请求比对一次）；登录失败按客户端 IP 计数，`LOGIN_MAX_FAILURES`（默认 5）次密码错误后锁定 `LOGIN_LOCK_MS`（默认 15 分钟），锁定期间返回 429 并带 `Retry-After` 秒数，即使密码正确也拒绝
 - 通知：点赞、收藏、回复三类通知（另有 `SYSTEM` 预留类型），未读角标与单条已读，点击跳转到帖子或具体评论；新通知经 SSE 实时到达（顶栏角标即时 +1、右上角轻提示），断线按 1s→30s 退避自动重连，重连后校准未读数
 - **Markdown 渲染**：帖子正文按 CommonMark + 表格/删除线（`markdown-it`）渲染（标题、列表、表格、代码块高亮、链接、图片），编辑页提供实时预览；渲染结果经 DOMPurify 白名单过滤、外链补 `target`/`rel`、图片懒加载后才插入 DOM，服务端仍只存纯文本
 - **标签检索**：帖子可带多个标签，`/tags` 展示标签云（按帖子数降序，支持关键词检索与分页），点击标签进入 `/tags/:name` 查看该标签下的帖子
@@ -42,6 +43,7 @@ CREATE DATABASE javaforum WITH ENCODING 'UTF8';
 - `V1__init_schema.sql`：初始表结构与角色种子数据
 - `V2__notification_comment_id.sql`：通知表新增可空的 `comment_id` 列，用于把 REPLY 通知定位到具体评论
 - `V3__post_search_trgm_index.sql`：安装 `pg_trgm` 扩展，并为 `LOWER(title)`/`LOWER(content)` 建 GIN 三元组部分索引（`WHERE deleted = false`），支撑全文搜索的「包含」语义
+- `V4__add_user_token_version.sql`：`users` 加 `token_version BIGINT NOT NULL DEFAULT 0`，登出/封禁时 +1，用于让已签发的 JWT 立即失效（旧 token 没有 `ver` 声明时按 0 处理，升级不强制重登）
 
 后端 `spring.jpa.hibernate.ddl-auto` 设为 `validate`：Hibernate 只校验实体与表结构是否一致，不建表也不改表，因此任何实体变更都必须配套一条迁移脚本。
 
@@ -118,6 +120,10 @@ java -jar target/forum-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 | `SSE_HEARTBEAT_MS` | `15000`（心跳事件间隔，用于穿透代理的空闲超时） |
 | `SSE_TICKET_TTL_MS` | `60000`（一次性连接凭证有效期） |
 | `SSE_MAX_CONNECTIONS_PER_USER` | `5`（每用户并发连接上限，超出时挤掉最早的一条） |
+| `LOGIN_MAX_FAILURES` | `5`（同一 IP 在失败窗口内允许的错误密码次数，达到即锁定） |
+| `LOGIN_WINDOW_MS` | `900000`（失败计数窗口，15 分钟；窗口外的失败自动作废） |
+| `LOGIN_LOCK_MS` | `900000`（锁定时长，15 分钟；锁定内即使密码正确也返回 429） |
+| `LOGIN_CLEANUP_INTERVAL_MS` | `60000`（清理过期窗口的间隔；只为回收内存，不影响判定） |
 
 ### 5. 验证启动
 
@@ -232,7 +238,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 16 个测试类、133 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 20 个测试类、161 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 
@@ -242,7 +248,7 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 30 个 spec、309 个用例，覆盖：
+当前为 31 个 spec、314 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
@@ -288,6 +294,7 @@ pnpm build       # 生产构建
 - **REPLY 通知的评论锚点只覆盖第一页评论**：帖子详情页每页加载 10 条根评论（后端按 `createTime` 升序只返回根评论，子回复随父评论平铺渲染）。若通知指向的根评论排在第 11 条之后，页面里不存在对应元素。此时不再静默失败：当该帖评论数大于 10 时会提示「目标评论可能在后面的评论分页里，可翻页查看」，需手动翻页定位。评论已删除也会命中同一条提示（该提示无法区分两种情况），这是本轮接受的误报。彻底修法是按 `commentId` 逐页回溯后再选中目标页——其代价（每次通知跳转最多多出若干次请求，且仍受页数上限约束）见 `docs/superpowers/specs/2026-10-16-experience-iteration-design.md` §5。
 - **全文搜索按子串匹配**：中文没有分词，「关键词 + 相关度排序」的能力有限；1–2 个字的关键词用不上 pg_trgm 索引，会退化为顺序扫描（数据量小时无感）。
 - **实时通知是单实例的**：SSE 连接注册表在应用内存里，多实例部署时事件只从产生通知的那个实例推给连在它上面的客户端（JavaForum 目前单容器部署，不构成问题）；重启/发版会让在线连接断开，客户端自动换票重连，断线期间发出的事件不补推，只校准未读数，刷新或重新进入通知页即可看到。
+- **登录限流是单实例的**：失败计数存在应用内存（`LoginRateLimiter` 的 `ConcurrentHashMap`），多实例部署时每个实例各算各的，重启即清零。当前单容器部署不构成问题；要跨实例一致需换成 Redis 之类的共享窗口（见 `docs/DEVELOPMENT.md` §5.2）。
 - **SSE 需要反向代理配合**：nginx 必须给 `location = /forum/api/notifications/stream` 单独关掉 `proxy_buffering`、把 `proxy_read_timeout` 放大到 3600s 并透传 `$is_args$args`；漏配时表现为「通知要等十几秒/一分钟才到」或「每分钟断一次」。`deploy/deploy.sh` 的冒烟会检查该端点返回 401，但「是否真的实时」仍需手工验证（部署手册有 curl 与双账号验收步骤）。
 
 ## 目录结构

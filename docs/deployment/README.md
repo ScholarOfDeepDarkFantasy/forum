@@ -188,6 +188,51 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' \
 
 > `stream` 端点的鉴权在 ticket 内部完成，`SecurityConfig` 对它单独 `permitAll`；`POST /stream-ticket` 仍需 JWT。
 
+### 登录限流与真实客户端 IP（V4）
+
+V4 在 `forum-backend` 启动时由 Flyway 自动执行，给 `users` 加 `token_version`；后端过滤器每次带 token 的请求都会回查该列，因此封禁/登出立即生效（响应仍是既有的 401 `{"success":false,"message":"未登录或登录已过期"}`）。
+
+```bash
+# 1) 迁移与列类型
+sudo -u pi podman exec postgresql psql -U postgres -d javaforum -tAc \
+  "SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1"
+# 期望：4|add user token version|t
+sudo -u pi podman exec postgresql psql -U postgres -d javaforum -tAc \
+  "SELECT data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name='users' AND column_name='token_version'"
+# 期望：bigint|NO|0
+
+# 2) 登出立即失效：拿 token → 登出 → 旧 token 立刻 401
+TOKEN=$(curl -fsS -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123456"}' \
+  http://127.0.0.1:8086/api/auth/login | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:8086/api/auth/me                              # 期望 200
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:8086/api/auth/logout                          # 期望 200
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:8086/api/auth/me                              # 期望 401
+
+# 3) 限流：换一个从未失败过的 IP，连续错密码到 429，并确认 Retry-After
+for i in 1 2 3 4 5; do
+  curl -s -o /dev/null -w '%{http_code} ' -H 'Content-Type: application/json' \
+    -H 'X-Real-IP: 203.0.113.9' \
+    -d '{"username":"admin","password":"wrong-password"}' \
+    http://127.0.0.1:8086/api/auth/login
+done; echo
+# 期望：401 401 401 401 401（第 5 次错密码把窗口打满）
+curl -s -D - -o /dev/null -H 'Content-Type: application/json' -H 'X-Real-IP: 203.0.113.9' \
+  -d '{"username":"admin","password":"admin123456"}' \
+  http://127.0.0.1:8086/api/auth/login | grep -Ei '^(HTTP/|retry-after)'
+# 期望：HTTP/1.1 429 与 Retry-After: 900（锁定内正确密码同样被拒）
+
+# 4) 其它 IP 不受影响（经 nginx 时必须带 Host，nginx 会用自己的 $remote_addr 覆盖 X-Real-IP）
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123456"}' \
+  http://127.0.0.1/forum/api/auth/login                      # 期望 200
+```
+
+> 直连 `127.0.0.1:8086` 时 `remoteAddr` 是环回地址，后端会读 `X-Real-IP`，所以上面的 `-H 'X-Real-IP: ...'` 能模拟任意客户端；经 nginx 时该头被覆盖为真实 `$remote_addr`，客户端无法伪造。若不希望影响本机管理员，冒烟可改用一次性用户（见计划 Task 6）。
+
 ## 6. 排障
 
 | 现象 | 排查 |
@@ -212,6 +257,8 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' \
 | `/forum/api/notifications/stream` 返回 200 HTML | 精确 location 缺失，请求被 `try_files` 兜到 `/forum/index.html`；`deploy.sh` 冒烟会因此失败 |
 | 取票 401「通知连接凭证无效或已过期」 | ticket 60 秒过期或已被消费（刷新页面会重新取票）；确认前端与后端版本配套、`app.sse.ticket-ttl-ms` 未被改小 |
 | Jenkins 起不来 | `sudo journalctl -u jenkins -n 100 --no-pager`；job config.xml 写坏时先移走 `/var/lib/jenkins/jobs/javaforum` 再重启 |
+| 登录返回 429 | 该 IP 的失败窗口已打满：等 `Retry-After` 秒（默认 900）或重启容器（内存计数清零）；确认不是 NAT 后整栋楼共用一个出口 IP 导致互相牵连 |
+| 所有用户看到同一个 IP / 限流失效 | 反代链路上 `X-Real-IP` 被覆盖或缺失：确认 snippet 的两个 `location` 都有 `proxy_set_header X-Real-IP $remote_addr;`；直连 8086 时后端只认 `remoteAddr` 之外的 `X-Real-IP`，需自行带上 |
 
 ## 7. 已知限制
 
@@ -226,6 +273,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' \
 - **中文按子串匹配，无分词与相关度排序**：搜索是「标题/正文包含关键词」，不区分词边界，也不做相关度打分；排序规则固定为「标题命中优先、同档按时间倒序」。
 - **实时通知是单实例的**：SSE 连接注册表在应用内存中，多实例部署时事件只从产生通知的实例推给连在它上面的客户端；升级/重启会让在线连接断开，客户端自动换票重连并校准未读数。单容器部署下无影响。
 - **SSE 依赖反向代理配置**：必须命中 `/forum/api/notifications/stream` 的精确 location（`proxy_buffering off`、`proxy_read_timeout 3600s`、`$is_args$args`）。漏配时通知会延迟或每分钟断连；`deploy.sh` 只断言「无 ticket 返回 401」，「是否真正实时」需按第 5 节手工验证。
+- **登录限流的计数在进程内**：容器重启即清零，多实例部署时各实例独立计数；如需跨实例一致，需按 `docs/DEVELOPMENT.md` §5.2 换成共享存储。
 
 ## 附录 A：Jenkins job `config.xml`
 
