@@ -140,7 +140,7 @@ cd frontend && pnpm test --run
 
 后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 9、`service/` 11、`security/` 7（+`ClientIpResolver`、`LoginRateLimiter`，`exception/` 另加 `TooManyLoginAttemptsException`）、`config/` 7（+`ClockConfig`）、`util/` 4、`exception/` 4。
 
-前端目录（文件数）：`views/` 20（11 个页面 + 9 个 spec）、`components/` 11（6 个组件 + 5 个 spec）、`composables/` 8（4 个组合式函数 + 4 个 spec）、`styles/` 7（4 个 css + 3 个 spec）、`utils/` 10（5 个纯函数 + 5 个 spec）、`stores/` 3（2 个 store + 1 个 spec）、`api/` 2（1 个封装 + 1 个 spec）、`router/` 1、根目录 5（`App.vue`、`main.js`、`style.css`、`viteConfig.spec.js`、`App.spec.js`）。
+前端目录（文件数）：`views/` 20（11 个页面 + 9 个 spec）、`components/` 11（6 个组件 + 5 个 spec）、`composables/` 8（4 个组合式函数 + 4 个 spec）、`styles/` 7（4 个 css + 3 个 spec）、`utils/` 10（5 个纯函数 + 5 个 spec）、`stores/` 4（2 个 store + 2 个 spec）、`api/` 2（1 个封装 + 1 个 spec）、`router/` 1、根目录 5（`App.vue`、`main.js`、`style.css`、`viteConfig.spec.js`、`App.spec.js`）。
 
 ### 3.2 测试基线
 
@@ -559,7 +559,7 @@ cd frontend && pnpm test --run
 | --- | --- | --- |
 | 后端 | `db/migration/V4__add_user_token_version.sql` | `users` 加 `token_version BIGINT NOT NULL DEFAULT 0`，历史用户与旧 token 都从 0 开始 |
 | 后端 | `entity/User.java` | `@Column(name = "token_version", nullable = false) @Builder.Default private long tokenVersion = 0L` |
-| 后端 | `security/JwtTokenProvider.java` | `createToken(..., long tokenVersion)` 写 `ver` 声明；`static long tokenVersion(Claims)` 用 `Number` 读（jjwt 对小数返回 `Integer`），缺声明按 0 |
+| 后端 | `security/JwtTokenProvider.java` | `createToken(..., long tokenVersion)` 写 `ver` 声明；`static long tokenVersion(Claims)` 用 `Number` 读（jjwt 对小整数返回 `Integer`，超出 int 范围为 `Long`；代码统一按 `Number` 读），缺声明按 0 |
 | 后端 | `repository/UserRepository.java` | 只读投影 `UserTokenState { getId / getStatus / getTokenVersion }` + `findTokenStateById`，不加载 roles 集合 |
 | 后端 | `security/JwtAuthenticationFilter.java` | 解析签名后回查一次库：用户不存在 / `BANNED` / `ver` 与库中版本不符 → 不建立认证态 |
 | 后端 | `service/AuthService.java`、`controller/AuthController.java` | `logout(userId)` 在事务内 `tokenVersion + 1`（脏检查即可，不 save）；`POST /api/auth/logout` 需要登录 |
@@ -569,7 +569,7 @@ cd frontend && pnpm test --run
 | 后端 | `security/LoginRateLimiter.java`、`config/ClockConfig.java` | `ConcurrentHashMap<String, Window>`（`Deque<Long> failures` + `lockedUntil`），`Clock` 注入；`@Scheduled` 定期清理过期窗口 |
 | 后端 | `exception/TooManyLoginAttemptsException.java`、`exception/GlobalExceptionHandler.java` | 锁定抛异常 → 429 + `Retry-After` + `Result.fail("登录失败次数过多，请 X 分钟后再试")` |
 | 后端 | `controller/AuthController.java` | `login` 先 `check(ip)` 再验密；`BadCredentialsException` 才 `recordFailure`，成功 `recordSuccess`（账号不存在也算凭据失败） |
-| 后端 | `application.yml` | `app.security.login.{max-failures,window-ms,lock-ms,cleanup-interval-ms}`，全部可用 `LOGIN_*` 覆盖 |
+| 后端 | `application.yml` | `app.security.login.{max-failures,window-ms,lock-ms,cleanup-interval-ms}`，全部可用 `LOGIN_*` 覆盖（生产 compose 未透传，需同时改 `docker-compose.yml`，见下方第 7 条） |
 | 前端 | `api/index.js`、`stores/auth.js` | `authApi.logout()`；`logout()` 改异步、尽力而为地调后端，`finally` 里统一清态 |
 | 前端 | `stores/auth.spec.js` | 新增 3 例：成功清态、后端失败仍清态、未登录不抛错 |
 | 文档 | `README.md`、`docs/DEVELOPMENT.md`、`docs/deployment/README.md` | 功能、迁移、配置项、测试基线、接口清单、上线记录 |
@@ -603,9 +603,11 @@ cd frontend && pnpm test --run
 
 上线验收（2026-10-23）：
 
-- 推送 `<hash>` 后 Jenkins Build **#<N>** **SUCCESS**，`forum-backend` 重建后 `Up (healthy)`。
-- Flyway 自动执行 V4：`flyway_schema_history` 最新记录 `version=4 / description=add user token version / success=t`；`\d users` 显示 `token_version bigint not null default 0`。
-- 冒烟：管理员 `POST /api/auth/logout` 返回 200，旧 token 再访问 `/api/auth/me` 返回 401；新建用户被管理员封禁后其 token 立即 401；`X-Real-IP: 203.0.113.9` 连续 5 次错密码后第 6 次返回 **429** 且响应头 `Retry-After: 900`，锁定期间用正确密码仍 429。
+- 推送 `14ceda7` 后 Jenkins Build **#12** **SUCCESS**（轮询文件系统看到 `builds/12` 与 `Finished: SUCCESS`），`forum-backend` 重建后 `Up (healthy)`，镜像 `localhost/forum-backend:12` 与构建号一致。
+- Flyway 自动执行 V4：`flyway_schema_history` 最新记录 `4|add user token version|t`；`information_schema.columns` 显示 `token_version` 为 `bigint / is_nullable=NO / column_default=0`；`SELECT count(*) FROM users WHERE token_version IS NULL` 返回 **0**。
+- 冒烟：`GET /api/health` 直连 8086 返回 `{"success":true,"data":{"status":"UP"}}`，经 nginx（`Host: raspi`，`/forum/api/health`）返回 200；管理员 `POST /api/auth/logout` 返回 200，旧 token 再访问 `/api/auth/me` 返回 401，重新登录 200；新注册用户被封禁（`PUT /api/admin/users/11/status`）返回 200，其原 token 立即 401。
+- 限流：`X-Real-IP: 203.0.113.9` 连续 5 次错密码，第 6 次返回 **429** 且响应头 `Retry-After: 89x~900`（锁定后立即执行为 900，稍等几秒为 899/89x，属正常；本次实测 900）。
+- 环境偏差（如实记录）：在本机 `127.0.0.1:8086` 直连时，podman 端口映射（`127.0.0.1:${HOST_PORT:-8086}:8080`）让后端看到的 `remoteAddr` 是容器网关地址 `10.89.3.15` 而非环回，`ClientIpResolver` 因此忽略代理头，**所有客户端共用一个计数桶**：换 IP（198.51.100.7/8/9）仍是 429，经 nginx 登录同样 429。改用容器内环回直连复核后逻辑本身正确——`X-Real-IP: 203.0.113.11` 连续 5 次失败后该 IP 被锁（日志 `IP 203.0.113.11 登录失败 5 次，锁定 900000 ms`），换 `X-Real-IP: 203.0.113.12` 用正确密码返回 200。生产链路要让按 IP 限流真正生效，需让 nginx→后端连接保留环回源地址（或把信任条件放宽到容器私网段），已记入上方「已知取舍」第 4 条。
 - 全量测试：后端 20 个测试类 / 161 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 31 个 spec / 314 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
 
 ---
@@ -665,6 +667,7 @@ cd frontend && pnpm test --run
 | 实时通知是单实例的 | SSE 连接注册表在应用内存中；多实例部署时事件只从产生通知的那个实例推给连在它上面的客户端 | 当前单容器部署不构成问题；发版/重启时在线连接断开，客户端自动换票重连并校准未读数 |
 | SSE 依赖反向代理正确配置 | 漏配 `proxy_buffering off` 表现为通知要等十几秒才到，漏配 `proxy_read_timeout` 表现为连接每分钟断一次 | snippet 内置精确 location + `deploy.sh` 冒烟断言 401；部署手册有「通知延迟」排障条目 |
 | SSE 断开期间的新通知不补推 | 断线期间发出的事件已丢失，重连只校准未读数，不重放列表 | 已接受：刷新或重新进入通知页即可看到；不做服务端离线队列（T16） |
+| 登录限流是单实例的 | 失败计数在应用内存（`LoginRateLimiter` 的 `ConcurrentHashMap`），多实例部署时各实例独立计数、重启清零 | 当前单容器部署不构成问题；要跨实例一致需换共享存储（§5.2） |
 
 ---
 
@@ -709,12 +712,12 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-23 | docs | 第七轮安全加固上线验收（JWT 主动失效与登录限流、Build #<N>）与变更日志回填 | 本次提交 |
-| 2026-10-23 | docs | 记录第七轮安全加固（README、开发记录、部署手册、测试基线） | `<hash5>` |
-| 2026-10-23 | feat | 第七轮前端：登出调用后端失效接口，失败也清本地态 | `<hash4>` |
-| 2026-10-23 | feat | 第七轮后端：登录失败按 IP 限流并返回 429 | `<hash3>` |
-| 2026-10-23 | feat | 第七轮后端：封禁与登出即时失效旧 token | `<hash2>` |
-| 2026-10-23 | feat | 第七轮后端：用户 token 增加版本号并写入 JWT | `<hash1>` |
+| 2026-10-23 | docs | 第七轮安全加固上线验收（JWT 主动失效与登录限流、Build #13）与变更日志回填 | 本次提交 |
+| 2026-10-23 | docs | 记录第七轮安全加固（README、开发记录、部署手册、测试基线） | `14ceda7` |
+| 2026-10-23 | feat | 第七轮前端：登出调用后端失效接口，失败也清本地态 | `ff99b73` |
+| 2026-10-23 | feat | 第七轮后端：登录失败按 IP 限流并返回 429 | `3cc36af` |
+| 2026-10-23 | feat | 第七轮后端：封禁与登出即时失效旧 token | `1fe3098` |
+| 2026-10-23 | feat | 第七轮后端：用户 token 增加版本号并写入 JWT | `b700803` |
 | 2026-10-22 | docs | 第六轮实时通知上线验收（Build #10、SSE 全链路实测）与变更日志回填 | 本次提交 |
 | 2026-10-22 | docs | 记录第六轮实时通知（SSE）功能（README、开发记录、部署手册、计划验收步骤） | `9ead0d0` |
 | 2026-10-22 | fix | 修正通知横幅令牌与点击断言强度 | `b3a50a5` |

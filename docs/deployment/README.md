@@ -223,7 +223,7 @@ done; echo
 curl -s -D - -o /dev/null -H 'Content-Type: application/json' -H 'X-Real-IP: 203.0.113.9' \
   -d '{"username":"admin","password":"admin123456"}' \
   http://127.0.0.1:8086/api/auth/login | grep -Ei '^(HTTP/|retry-after)'
-# 期望：HTTP/1.1 429 与 Retry-After: 900（锁定内正确密码同样被拒）
+# 期望：HTTP/1.1 429 与 Retry-After: 89x~900（锁定后立即执行为 900，稍等几秒为 899/89x，属正常；锁定内正确密码同样被拒）
 
 # 4) 其它 IP 不受影响（经 nginx 时必须带 Host，nginx 会用自己的 $remote_addr 覆盖 X-Real-IP）
 curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' -H 'Content-Type: application/json' \
@@ -231,7 +231,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' -H 'Content-Type: appl
   http://127.0.0.1/forum/api/auth/login                      # 期望 200
 ```
 
-> 直连 `127.0.0.1:8086` 时 `remoteAddr` 是环回地址，后端会读 `X-Real-IP`，所以上面的 `-H 'X-Real-IP: ...'` 能模拟任意客户端；经 nginx 时该头被覆盖为真实 `$remote_addr`，客户端无法伪造。若不希望影响本机管理员，冒烟可改用一次性用户（见计划 Task 6）。
+> 后端只在 `remoteAddr` 是环回地址时才读 `X-Real-IP`。本机用 rootless podman 发布 `127.0.0.1:${HOST_PORT:-8086}:8080`，端口映射会让后端看到的 `remoteAddr` 变成容器网关地址（2026-10-23 实测 `10.89.3.15`，不是 `127.0.0.1`），所以上面的 `-H 'X-Real-IP: ...'` 在本机**不会**被采信：`203.0.113.9` 打满后换 `198.51.100.7/8/9` 仍是 429，经 nginx 登录也是 429（所有客户端共用一个桶，第 4 步实测为 429 而非 200）。要看按 IP 隔离的效果，可进容器直连环回：`podman exec forum-backend curl ... http://127.0.0.1:8080/api/auth/login`（此时 `remoteAddr=127.0.0.1`，`X-Real-IP` 生效，实测 5 次失败锁定后换 IP 返回 200）。经 nginx 时该头会被覆盖为真实 `$remote_addr`，客户端无法伪造；但若后端看到的源地址不是环回，覆盖后的头同样被忽略。若不希望影响本机管理员，冒烟可改用一次性用户（见计划 Task 6）。
 
 ## 6. 排障
 
@@ -258,7 +258,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' -H 'Content-Type: appl
 | 取票 401「通知连接凭证无效或已过期」 | ticket 60 秒过期或已被消费（刷新页面会重新取票）；确认前端与后端版本配套、`app.sse.ticket-ttl-ms` 未被改小 |
 | Jenkins 起不来 | `sudo journalctl -u jenkins -n 100 --no-pager`；job config.xml 写坏时先移走 `/var/lib/jenkins/jobs/javaforum` 再重启 |
 | 登录返回 429 | 该 IP 的失败窗口已打满：等 `Retry-After` 秒（默认 900）或重启容器（内存计数清零）；确认不是 NAT 后整栋楼共用一个出口 IP 导致互相牵连 |
-| 所有用户看到同一个 IP / 限流失效 | 反代链路上 `X-Real-IP` 被覆盖或缺失：确认 snippet 的两个 `location` 都有 `proxy_set_header X-Real-IP $remote_addr;`；直连 8086 时后端只认 `remoteAddr` 之外的 `X-Real-IP`，需自行带上 |
+| 所有用户看到同一个 IP / 限流失效 | 反代链路上 `X-Real-IP` 被覆盖或缺失：确认 snippet 的两个 `location` 都有 `proxy_set_header X-Real-IP $remote_addr;`；直连 `127.0.0.1:8086` 时 `remoteAddr` 是环回地址，后端才会读 `X-Real-IP`（测试时需自行带上）；从其它地址直连 8086 则只认 `remoteAddr`，`X-Real-IP` 会被忽略。 |
 
 ## 7. 已知限制
 
