@@ -13,20 +13,25 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.song.forum.entity.UserStatus;
+import org.song.forum.repository.UserRepository;
 import org.song.forum.util.JwtAuthUtil;
 
 import java.io.IOException;
 import java.util.List;
 
 /**
- * JWT 认证过滤器：从 Authorization: Bearer <token> 恢复认证态
- * 无 Token 或无效 Token 不阻断请求，交由后续授权规则决定（公开接口可匿名访问）
+ * JWT 认证过滤器：从 Authorization: Bearer &lt;token&gt; 恢复认证态。
+ * <p>第七轮起，签名有效不再等于会话有效：每个请求都要回查用户当前状态与 token 版本，
+ * 封禁（status=BANNED）或登出/封禁导致的版本 +1 都会让旧 token 当场失效。
+ * 不建立认证态后由 SecurityConfig 的 entry point 统一返回 401，不在这里写响应体。</p>
  */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider tokenProvider;
+    private final UserRepository userRepository;
 
     @Value("${jwt.header:Authorization}")
     private String headerName;
@@ -42,7 +47,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(header) && header.startsWith(prefix)) {
             String token = header.substring(prefix.length()).trim();
             Claims claims = tokenProvider.validate(token);
-            if (claims != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (claims != null
+                    && SecurityContextHolder.getContext().getAuthentication() == null
+                    && isSessionAlive(claims)) {
                 Long userId = Long.valueOf(claims.getSubject());
                 String username = claims.get("username", String.class);
                 List<String> roles = JwtAuthUtil.claimRoles(claims);
@@ -54,5 +61,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 会话是否仍然有效：用户存在、未被封禁、且 token 版本与库中一致。
+     * <p>旧 token 没有 ver claim 时 {@link JwtTokenProvider#tokenVersion(Claims)} 返回 0，
+     * 因此版本为 0 的老用户不会被强制重登；一旦版本变成 1，旧 token 立即被拒。</p>
+     */
+    private boolean isSessionAlive(Claims claims) {
+        Long userId;
+        try {
+            userId = Long.valueOf(claims.getSubject());
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        return userRepository.findTokenStateById(userId)
+                .filter(state -> state.getStatus() != UserStatus.BANNED)
+                .map(state -> state.getTokenVersion() == JwtTokenProvider.tokenVersion(claims))
+                .orElse(false);
     }
 }

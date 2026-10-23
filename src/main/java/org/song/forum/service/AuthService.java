@@ -74,6 +74,15 @@ public class AuthService {
         return buildAuthResponse(user);
     }
 
+    /** 登出：递增 token 版本号，该用户已签发的所有 token 在下一个请求即失效 */
+    @Transactional
+    public void logout(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("用户不存在"));
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        log.info("用户 {} 已登出，token 版本升为 {}", user.getUsername(), user.getTokenVersion());
+    }
+
     /** 当前登录用户信息 */
     @Transactional(readOnly = true)
     public AuthResponse me(Long userId) {

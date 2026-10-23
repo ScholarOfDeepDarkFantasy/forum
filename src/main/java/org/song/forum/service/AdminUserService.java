@@ -63,6 +63,8 @@ public class AdminUserService {
             case BANNED -> {
                 user.setStatus(UserStatus.BANNED);
                 user.setMutedUntil(null);
+                // 封禁要立刻踢掉已签发的 token：只改 status 的话过滤器要等版本变化才拒绝
+                user.setTokenVersion(user.getTokenVersion() + 1);
             }
             case ACTIVE -> {
                 user.setStatus(UserStatus.ACTIVE);

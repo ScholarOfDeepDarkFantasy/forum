@@ -68,7 +68,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/notifications/stream").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         // 必须先于下面的 GET 放行规则声明，否则匿名请求会直达 Controller 抛 500
-                        .requestMatchers("/api/auth/me", "/api/auth/profile").authenticated()
+                        .requestMatchers("/api/auth/me", "/api/auth/profile", "/api/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.GET).permitAll()  // MVP：其余 GET 浏览公开
                         .anyRequest().authenticated()                 // 其余（POST/PUT/DELETE）需登录
                 )

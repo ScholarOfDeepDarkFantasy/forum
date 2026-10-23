@@ -36,6 +36,13 @@ public class AuthController {
         return Result.ok(authService.login(req), "登录成功");
     }
 
+    /** 登出（需登录）：递增 token 版本，旧 token 立即失效 */
+    @PostMapping("/logout")
+    public Result<Void> logout() {
+        authService.logout(SecurityUtils.currentUserId());
+        return Result.ok(null, "已退出登录");
+    }
+
     /** 当前登录用户信息（需携带 Token） */
     @GetMapping("/me")
     public Result<AuthResponse> me() {
