@@ -2107,7 +2107,7 @@ git ls-files 'frontend/src/**/*.js' 'frontend/src/**/*.vue' 'frontend/src/**/*.c
 git ls-files 'frontend/src/*.spec.js' 'frontend/src/**/*.spec.js' | wc -l
 ```
 
-注意：`src/test/java/**/*.java` 目前是 17 个文件，其中 16 个测试类 + `util/TestImageFixtures.java` 非测试辅助类；填「测试类数」时用 16，不要直接填 17。
+注意：`src/test/java/**/*.java` 目前是 21 个文件，其中 20 个测试类 + `util/TestImageFixtures.java` 非测试辅助类；填「测试类数」时用 20，不要直接填 21。
 
 把四个数字填进表格：后端新增 4 个类（`ClientIpResolver`、`LoginRateLimiter`、`TooManyLoginAttemptsException`、`ClockConfig`）、新增 4 个测试类（`AuthInvalidationIntegrationTest`、`LoginRateLimitIntegrationTest`、`ClientIpResolverTest`、`LoginRateLimiterTest`）、前端新增 1 个 spec（`stores/auth.spec.js`）；行数用同法统计：
 
@@ -2389,7 +2389,7 @@ git commit -m "docs: 记录第七轮安全加固（JWT 主动失效与登录限�
 
 > 本任务不产生新代码，只做验证、发布与回填。所有 `<hash>`/`<N>` 都是执行期事实，由下面的命令产出后再写回文档。
 
-- [ ] **Step 6-1：后端全量测试**
+- [x] **Step 6-1：后端全量测试**
 
 ```bash
 cd /e/JavaSpace/forum && mvn -B clean test 2>&1 | tail -25
@@ -2410,7 +2410,7 @@ cd /e/JavaSpace/forum && git status --short
 
 预期：无输出。
 
-- [ ] **Step 6-2：前端全量测试与生产构建**
+- [x] **Step 6-2：前端全量测试与生产构建**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && pnpm test 2>&1 | tail -8
@@ -2435,7 +2435,7 @@ cd /e/JavaSpace/forum && git status --short
 
 预期：无输出。
 
-- [ ] **Step 6-3：推送 master（含网络受限时的回退）**
+- [x] **Step 6-3：推送 master（含网络受限时的回退）**
 
 ```bash
 cd /e/JavaSpace/forum
@@ -2463,7 +2463,7 @@ git -c http.version=HTTP/1.1 push \
 
 预期：`master -> master`。注意三点：token 只出现在命令行、不写进 `git remote`（用完当前 shell 即丢弃）；`gh-proxy.org` 只用于 Jenkins 侧拉取代码，**不能推送**；`ghfast.top` 若也拒绝写入，改用 SSH（`git@github.com:ScholarOfDeepDarkFantasy/forum.git`）或换网络，不要改写历史。
 
-- [ ] **Step 6-4：等 Jenkins 构建并做 raspi 冒烟**
+- [x] **Step 6-4：等 Jenkins 构建并做 raspi 冒烟**
 
 ```bash
 PREV=$(curl -fsS 'http://raspi:8080/job/javaforum/lastBuild/api/json' | sed -n 's/.*"number":\([0-9]*\).*/\1/p')
@@ -2503,7 +2503,7 @@ python /tmp/forum-ssh.py 'sudo -u pi podman exec postgresql psql -U postgres -d 
 
 其余步骤（登出失效、封禁失效、限流 429 与 `Retry-After: 900`、锁定内正确密码仍 429、`token_version` 列定义）逐条见 **附录 B**，全部通过后再进入 Step 6-5。
 
-- [ ] **Step 6-5：回填 §4.12 验收与 §8 哈希**
+- [x] **Step 6-5：回填 §4.12 验收与 §8 哈希**
 
 ```bash
 cd /e/JavaSpace/forum && git log --format='%h %s' -5
@@ -2530,7 +2530,7 @@ grep -n '<hash>\|<N>\|<hash[0-9]>' docs/DEVELOPMENT.md
 
 预期：只剩 §8 第一行的「本次提交」不含哈希，无任何 `<...>` 尖括号占位。
 
-- [ ] **Step 6-6：提交回填、二次推送与第二次构建**
+- [x] **Step 6-6：提交回填、二次推送与第二次构建**
 
 ```bash
 cd /e/JavaSpace/forum && git status --short && git diff --stat
@@ -2547,7 +2547,7 @@ git -c http.version=HTTP/1.1 push origin master
 
 预期：第二次构建被 `pollSCM` 拾起（编号 +1），`"result":"SUCCESS"`。若第一次推送用了 `ghfast.top`，这次同样用带 token 的 URL 推送。
 
-- [ ] **Step 6-7：勾选 Task 6 并输出最终报告**
+- [x] **Step 6-7：勾选 Task 6 并输出最终报告**
 
 ```bash
 cd /e/JavaSpace/forum
@@ -2718,12 +2718,12 @@ grep -n '`<hash>`\|<N>\|<hash[0-9]>' docs/superpowers/plans/2026-10-23-round7-se
 
 ## 11. Execution Handoff
 
-- [ ] Task 1：数据模型与签发版本
-- [ ] Task 2：请求态校验、登出与封禁
-- [ ] Task 3：登录失败限流
-- [ ] Task 4：前端登出
-- [ ] Task 5：文档
-- [ ] Task 6：全量验证与上线
+- [x] Task 1：数据模型与签发版本
+- [x] Task 2：请求态校验、登出与封禁
+- [x] Task 3：登录失败限流
+- [x] Task 4：前端登出
+- [x] Task 5：文档
+- [x] Task 6：全量验证与上线
 
 计划完成后，会话应交接给新的执行者（`docs/superpowers/plans/` 下的文件即交接物），执行者按 Task 顺序逐任务「读计划 → 写测试 → 跑红 → 实现 → 跑绿 → 提交」。
 
