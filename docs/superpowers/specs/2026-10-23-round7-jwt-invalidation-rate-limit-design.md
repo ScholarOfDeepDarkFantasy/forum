@@ -191,6 +191,9 @@ app:
       cleanup-interval-ms: 300000                    # 5 分钟
 ```
 
+> 实现裁决：清理间隔默认取 `60000`、环境变量统一为 `LOGIN_*` 命名（`LOGIN_MAX_FAILURES` / `LOGIN_WINDOW_MS` / `LOGIN_LOCK_MS` / `LOGIN_CLEANUP_INTERVAL_MS`），原因见实现计划 `docs/superpowers/plans/2026-10-23-round7-security-hardening.md` §0。
+
+
 ### 7.3 客户端 IP 解析 `ClientIpResolver`
 
 ```java
