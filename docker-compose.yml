@@ -30,6 +30,11 @@ services:
       LOG_FILE: /app/logs/javaforum.log
       UPLOAD_DIR: /app/uploads
       TZ: ${TZ:-Asia/Shanghai}
+      # 登录限流阈值（application.yml 有同名默认值；改 .env 后 `podman-compose up -d` 即生效）
+      LOGIN_MAX_FAILURES: ${LOGIN_MAX_FAILURES:-5}
+      LOGIN_WINDOW_MS: ${LOGIN_WINDOW_MS:-900000}
+      LOGIN_LOCK_MS: ${LOGIN_LOCK_MS:-900000}
+      LOGIN_CLEANUP_INTERVAL_MS: ${LOGIN_CLEANUP_INTERVAL_MS:-60000}
       # 显式 -Xmx 而不是 -XX:MaxRAMPercentage：raspi 内核 cmdline 带 cgroup_disable=memory，
       # 容器看不到内存上限，MaxRAMPercentage 会按整机内存算，反而容易 OOM 整机
       JAVA_OPTS: ${JAVA_OPTS:--Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError}

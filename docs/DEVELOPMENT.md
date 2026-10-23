@@ -146,11 +146,11 @@ cd frontend && pnpm test --run
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **161** 个用例 / 20 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 后端 | **163** 个用例 / 20 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
 | 前端 | **314** 个用例 / 31 个 spec | 全绿 |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布（合计 161）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`NotificationServiceTest` 10、`LoginRateLimiterTest` 9、`RepositoryTests` 9、`TagFlowIntegrationTest` 8、`ClientIpResolverTest` 6、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`AuthInvalidationIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`PostFlowIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
+后端测试类分布（合计 163）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`NotificationServiceTest` 10、`LoginRateLimiterTest` 9、`RepositoryTests` 9、`TagFlowIntegrationTest` 8、`ClientIpResolverTest` 8、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`AuthInvalidationIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`PostFlowIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
 
 前端 spec 分布（合计 314）：`search` 30、`useNotificationStream` 22、`SearchView` 19、`ProfileView` 18、`useTheme` 17、`notifications` 16、`index`（api）15、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 3、`useResponsive` 3、`PostEditView` 3、`App` 2。
 
@@ -565,7 +565,7 @@ cd frontend && pnpm test --run
 | 后端 | `service/AuthService.java`、`controller/AuthController.java` | `logout(userId)` 在事务内 `tokenVersion + 1`（脏检查即可，不 save）；`POST /api/auth/logout` 需要登录 |
 | 后端 | `service/AdminUserService.java` | `case BANNED` 分支在 `save` 前同样 `tokenVersion + 1`；`MUTED`/`ACTIVE` 不动版本 |
 | 后端 | `config/SecurityConfig.java` | `/api/auth/logout` 与 `/api/auth/me`、`/api/auth/profile` 并列 `authenticated()` |
-| 后端 | `security/ClientIpResolver.java` | 非环回地址直接信任；环回（nginx 反代）时取 `X-Real-IP`，非法再退 `X-Forwarded-For` 首个合法字面量；全程正则校验，不做 DNS |
+| 后端 | `security/ClientIpResolver.java` | 非环回、非私网地址直接信任；环回（nginx 反代）或 RFC1918 私网（容器网关）时取 `X-Real-IP`，非法再退 `X-Forwarded-For` 首个合法字面量；全程正则校验，不做 DNS |
 | 后端 | `security/LoginRateLimiter.java`、`config/ClockConfig.java` | `ConcurrentHashMap<String, Window>`（`Deque<Long> failures` + `lockedUntil`），`Clock` 注入；`@Scheduled` 定期清理过期窗口 |
 | 后端 | `exception/TooManyLoginAttemptsException.java`、`exception/GlobalExceptionHandler.java` | 锁定抛异常 → 429 + `Retry-After` + `Result.fail("登录失败次数过多，请 X 分钟后再试")` |
 | 后端 | `controller/AuthController.java` | `login` 先 `check(ip)` 再验密；`BadCredentialsException` 才 `recordFailure`，成功 `recordSuccess`（账号不存在也算凭据失败） |
@@ -580,10 +580,10 @@ cd frontend && pnpm test --run
 - **版本校验放在过滤器而不是业务 Service**：认证态只在请求入口建立一次，后续 `@PreAuthorize` 与 `SecurityUtils.currentUserId()` 都读同一份认证态，不会出现「一半请求看到新状态、一半看到旧状态」。
 - **旧 token 缺 `ver` 按 0**：上线时不必强制所有人重新登录；只要用户没登出/被封禁，版本仍是 0，旧 token 继续可用。
 - **计数放在 Controller 而不是认证过滤器**：只有 `BadCredentialsException`（用户名不存在或密码错）才计入失败，其它 401（token 过期、格式错）不污染登录失败窗口；锁定判断发生在验密之前，锁定期间不消耗 CPU 做 BCrypt。
-- **信任 `X-Real-IP` 的前提是 nginx 覆盖写**：`deploy/nginx/forum.conf` 两个 `location` 都写了 `proxy_set_header X-Real-IP $remote_addr;`，客户端自带的同名头会被覆盖；因此只在 `remoteAddr` 是环回地址时才读它，直连 8086 无法伪造成任意 IP。
+- **信任 `X-Real-IP` 的前提是 nginx 覆盖写**：`deploy/nginx/forum.conf` 两个 `location` 都写了 `proxy_set_header X-Real-IP $remote_addr;`，客户端自带的同名头会被覆盖；后端只在 `remoteAddr` 是环回或 RFC1918 私网时才读它。代价是后端端口只绑宿主机回环，本机进程可直连 8086 伪造该头；若将来扩大端口发布范围，这个信任模型必须重新评估。
 - **限流用内存窗口而不是 Bucket4j**：与「不新增依赖」的既有约定一致，5 次/15 分钟的粗粒度窗口不需要令牌桶的精度；窗口淘汰靠时间戳裁剪 + 定时清理，`MutableClock` 让单测无需 sleep。
 
-测试与验证：后端新增 `AuthInvalidationIntegrationTest`（真实登出/封禁/版本不符/旧 token/禁言仍可用，6 例）、`ClientIpResolverTest`（6 例）、`LoginRateLimiterTest`（9 例）、`LoginRateLimitIntegrationTest`（429 与 `Retry-After`、锁定内正确密码仍 429、其它 IP 不受影响、成功登录清零，4 例）；`JwtTokenProviderTest` 加 `ver` 断言、`RepositoryTests` 加默认值断言。前端 `auth.spec.js` 3 例、`index.spec.js` 加 2 例（登出请求路径、429 不清登录态）。基线数字见 §3.2。
+测试与验证：后端新增 `AuthInvalidationIntegrationTest`（真实登出/封禁/版本不符/旧 token/禁言仍可用，6 例）、`ClientIpResolverTest`（8 例）、`LoginRateLimiterTest`（9 例）、`LoginRateLimitIntegrationTest`（429 与 `Retry-After`、锁定内正确密码仍 429、其它 IP 不受影响、成功登录清零，4 例）；`JwtTokenProviderTest` 加 `ver` 断言、`RepositoryTests` 加默认值断言。前端 `auth.spec.js` 3 例、`index.spec.js` 加 2 例（登出请求路径、429 不清登录态）。基线数字见 §3.2。
 
 已知限制：见 §6「登录限流是单实例的」与 §5.2 的候选「限流改共享存储」。
 
@@ -594,10 +594,10 @@ cd frontend && pnpm test --run
 1. `JwtAuthenticationFilter` 的会话校验只捕获 `NumberFormatException`；数据库异常（`DataAccessException`）会导致 500 且响应体不是统一 `Result` 结构。
 2. 封禁的双保险（过滤器内 `status != BANNED` 判断 + `AdminUserService` 递增 token_version）没有互相独立的测试用例锁定，任一失效现有 6 个集成用例仍会通过。
 3. 重复登出不幂等：token 已失效时 `POST /api/auth/logout` 返回 401，前端在「已退出登录」成功提示之后还会收到「请先登录」并整页跳转 `/login`（静默请求配置留待后续统一处理）。
-4. `ClientIpResolver`：X-Real-IP 缺失时 X-Forwarded-For 兜底取**第一个**合法字面量，攻击者可用伪造首段更换计数桶；IPv4-mapped loopback（`::ffff:127.0.0.1`）未被识别；无代理头且来源非环回时回落到共享桶（NAT 下可能整栋楼共用一个桶）。
+4. `ClientIpResolver` 的信任范围已从「仅环回」放宽到「环回 + RFC1918 私网」（修复容器端口映射下 `remoteAddr` 为网关导致的全站共桶）；残留：`X-Forwarded-For` 兜底仍取**第一个**合法字面量（攻击者可用伪造首段更换计数桶）、IPv4-mapped loopback（`::ffff:127.0.0.1`）未被识别、无代理头且来源非环回时仍回落到共享桶。
 5. `LoginRateLimiter`：`cleanupExpired()` 迭代时按 key 删除存在竞态，极端情况下可能少计一次失败；4 个阈值配置无合法性校验（如 lock-ms<=0 会静默关闭锁定）。
 6. 每个 429 都会打一条不含客户端 IP 的 WARN 日志，锁定期间可被低成本流量刷日志。
-7. `docker-compose.yml` 未透传 `LOGIN_*` 环境变量，生产要调阈值必须同时改 compose（只改 `.env` 无效）——需要作为上线备注。
+7. `docker-compose.yml` 已透传 `LOGIN_*`（默认值与 `application.yml` 一致），只改 `.env` 重启容器即可生效（修复前需同时改 compose）。
 8. SSE 长连接不会因 token 失效立即断开（最长 30 分钟超时兜底）；前端登出时本地清态等待后端响应（最长全局 15s 超时），该窗口内界面仍显示已登录。
 9. 测试加固项未做：token_version 非零值持久化、`validate()` 成功路径、登出「先调后端后清本地」不变量均无独立断言。
 
@@ -609,6 +609,8 @@ cd frontend && pnpm test --run
 - 限流：`X-Real-IP: 203.0.113.9` 连续 5 次错密码，第 6 次返回 **429** 且响应头 `Retry-After: 89x~900`（锁定后立即执行为 900，稍等几秒为 899/89x，属正常；本次实测 900）。
 - 环境偏差（如实记录）：在本机 `127.0.0.1:8086` 直连时，podman 端口映射（`127.0.0.1:${HOST_PORT:-8086}:8080`）让后端看到的 `remoteAddr` 是容器网关地址 `10.89.3.15` 而非环回，`ClientIpResolver` 因此忽略代理头，**所有客户端共用一个计数桶**：换 IP（198.51.100.7/8/9）仍是 429，经 nginx 登录同样 429。改用容器内环回直连复核后逻辑本身正确——`X-Real-IP: 203.0.113.11` 连续 5 次失败后该 IP 被锁（日志 `IP 203.0.113.11 登录失败 5 次，锁定 900000 ms`），换 `X-Real-IP: 203.0.113.12` 用正确密码返回 200。生产链路要让按 IP 限流真正生效，需让 nginx→后端连接保留环回源地址（或把信任条件放宽到容器私网段），已记入上方「已知取舍」第 4 条。
 - 全量测试：后端 20 个测试类 / 161 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 31 个 spec / 314 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
+
+修复记录（2026-10-24）：B.5 冒烟发现容器部署下限流失效——本机直连 `127.0.0.1:8086` 时换 `X-Real-IP`（198.51.100.7/8/9）仍是 429，改经 nginx 登录同样 429，日志为 `IP 10.89.3.15 登录失败 5 次`。根因：podman 端口映射使后端看到的 `remoteAddr` 是容器网关 `10.89.3.15`（私网），旧 `ClientIpResolver` 只在环回源时才读代理头，于是所有客户端落进同一个计数桶。修复：信任范围从「仅环回」放宽到「环回 + RFC1918 私网」（新增 `isTrustedProxy` / `isPrivateIpv4`），并让 `docker-compose.yml` 透传 4 个 `LOGIN_*` 阈值。测试：`ClientIpResolverTest` 6→8 例（新增私网网关采信 `X-Real-IP`、无私网代理头回落 `remoteAddr`），后端全量 163 例。部署验证见 Build **#15**（发布后回填）。
 
 ---
 
@@ -712,6 +714,7 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-10-24 | fix | 修复容器部署下登录限流未按真实客户端 IP 隔离（信任私网代理源 + compose 透传 LOGIN_*） | 本次提交 |
 | 2026-10-23 | docs | 第七轮安全加固上线验收（JWT 主动失效与登录限流、Build #13）与变更日志回填 | 本次提交 |
 | 2026-10-23 | docs | 记录第七轮安全加固（README、开发记录、部署手册、测试基线） | `14ceda7` |
 | 2026-10-23 | feat | 第七轮前端：登出调用后端失效接口，失败也清本地态 | `ff99b73` |

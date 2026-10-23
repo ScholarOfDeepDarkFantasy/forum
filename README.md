@@ -125,6 +125,8 @@ java -jar target/forum-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 | `LOGIN_LOCK_MS` | `900000`（锁定时长，15 分钟；锁定内即使密码正确也返回 429） |
 | `LOGIN_CLEANUP_INTERVAL_MS` | `60000`（清理过期窗口的间隔；只为回收内存，不影响判定） |
 
+以上 4 个 `LOGIN_*` 已由 `docker-compose.yml` 透传（默认值同上表），生产改 `.env` 后 `podman-compose up -d` 即生效。
+
 ### 5. 验证启动
 
 - 健康检查：http://localhost:8080/api/health
@@ -238,7 +240,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 20 个测试类、161 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 20 个测试类、163 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 

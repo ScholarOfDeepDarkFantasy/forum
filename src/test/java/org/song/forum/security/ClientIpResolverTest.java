@@ -6,21 +6,38 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 客户端 IP 解析：只信环回跳数进来的 X-Real-IP；非环回请求一律用 remoteAddr，
- * 防止客户端自己塞一个 X-Real-IP 就绕过限流。
+ * 客户端 IP 解析：只信环回或 RFC1918 私网来源的 X-Real-IP（私网覆盖 rootless podman 端口映射的
+ * 容器网关）；公网来源一律用 remoteAddr，防止客户端自己塞一个 X-Real-IP 就绕过限流。
  */
 class ClientIpResolverTest {
 
     private final ClientIpResolver resolver = new ClientIpResolver();
 
     @Test
-    void nonLoopbackRemoteAddrWinsAndProxyHeadersAreIgnored() {
+    void publicRemoteAddrWinsAndProxyHeadersAreIgnored() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setRemoteAddr("10.20.30.40");
+        request.setRemoteAddr("203.0.113.9");
         request.addHeader("X-Real-IP", "203.0.113.7");
         request.addHeader("X-Forwarded-For", "198.51.100.1");
 
-        assertThat(resolver.resolve(request)).isEqualTo("10.20.30.40");
+        assertThat(resolver.resolve(request)).isEqualTo("203.0.113.9");
+    }
+
+    @Test
+    void privateGatewayAddrUsesRealIp() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("10.89.3.15");
+        request.addHeader("X-Real-IP", "203.0.113.7");
+
+        assertThat(resolver.resolve(request)).isEqualTo("203.0.113.7");
+    }
+
+    @Test
+    void privateGatewayWithoutProxyHeadersFallsBackToRemoteAddr() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("10.89.3.15");
+
+        assertThat(resolver.resolve(request)).isEqualTo("10.89.3.15");
     }
 
     @Test
