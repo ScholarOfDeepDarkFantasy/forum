@@ -44,6 +44,11 @@ public class User extends BaseEntity {
     @Column(name = "muted_until")
     private LocalDateTime mutedUntil;
 
+    /** JWT 版本号：登出/封禁时 +1，旧 token 立即失效。 */
+    @Column(name = "token_version", nullable = false)
+    @Builder.Default
+    private long tokenVersion = 0L;
+
     /** 用户角色（关联表 user_roles） */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "user_roles",

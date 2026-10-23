@@ -126,7 +126,7 @@ docs: 回填第七轮提交哈希与上线验收
 - Modify: `src/test/java/org/song/forum/repository/RepositoryTests.java`
 - Add to commit: `docs/superpowers/plans/2026-10-23-round7-security-hardening.md`
 
-- [ ] **Step 1-1：先写失败测试（RED）**
+- [x] **Step 1-1：先写失败测试（RED）**
 
 把 `src/test/java/org/song/forum/security/JwtTokenProviderTest.java` 整个替换为下面内容。改动点：`createToken` 多传版本号；新增「`ver` 能往返」与「没有 `ver` 的旧 token 读作 0」两个用例。
 
@@ -233,7 +233,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=RepositoryTests#userTokenVersionDefa
 
 预期：同样是 `COMPILATION ERROR`（`User` 还没有 `getTokenVersion()`）。
 
-- [ ] **Step 1-2：加数据库迁移**
+- [x] **Step 1-2：加数据库迁移**
 
 新建 `src/main/resources/db/migration/V4__add_user_token_version.sql`。H2 测试库关闭了 Flyway（V3 的 `pg_trgm` 在 H2 上不可用），因此这条脚本只在 PostgreSQL 上跑；`COMMENT ON` 是 PostgreSQL 语法，写在这里是安全的。
 
@@ -251,7 +251,7 @@ ALTER TABLE users ADD COLUMN token_version BIGINT NOT NULL DEFAULT 0;
 COMMENT ON COLUMN users.token_version IS 'JWT 版本号：登出或封禁时 +1，旧 token 的 ver 不等于该值即失效';
 ```
 
-- [ ] **Step 1-3：实体增加 `tokenVersion`**
+- [x] **Step 1-3：实体增加 `tokenVersion`**
 
 修改 `src/main/java/org/song/forum/entity/User.java`，在 `mutedUntil` 之后、`roles` 之前插入字段（字段顺序与 V1 的列顺序无关，但保持可读）：
 
@@ -295,7 +295,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=RepositoryTests#userTokenVersionDefa
 
 预期：`Tests run: 1, Failures: 0, Errors: 0, Skipped: 0`、`BUILD SUCCESS`。
 
-- [ ] **Step 1-4：签发 token 时写入 `ver`，并加读取工具**
+- [x] **Step 1-4：签发 token 时写入 `ver`，并加读取工具**
 
 修改 `src/main/java/org/song/forum/security/JwtTokenProvider.java`：
 
@@ -347,7 +347,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=JwtTokenProviderTest
 
 预期：`Tests run: 4, Failures: 0, Errors: 0, Skipped: 0`、`BUILD SUCCESS`。
 
-- [ ] **Step 1-5：Task 1 全量回归并提交**
+- [x] **Step 1-5：Task 1 全量回归并提交**
 
 ```bash
 cd /e/JavaSpace/forum && mvn -B clean test

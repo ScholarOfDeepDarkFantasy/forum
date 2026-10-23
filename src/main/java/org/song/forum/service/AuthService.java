@@ -120,7 +120,8 @@ public class AuthService {
 
     private AuthResponse buildAuthResponse(User user) {
         List<String> roles = user.getRoles().stream().map(r -> r.getName()).toList();
-        String token = jwtTokenProvider.createToken(user.getId(), user.getUsername(), roles);
+        String token = jwtTokenProvider.createToken(
+                user.getId(), user.getUsername(), roles, user.getTokenVersion());
         return AuthResponse.builder()
                 .token(token)
                 .tokenType("Bearer")

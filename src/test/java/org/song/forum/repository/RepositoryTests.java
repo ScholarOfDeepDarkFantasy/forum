@@ -336,4 +336,14 @@ class RepositoryTests {
         assertThat(escaped.getTotalElements()).isEqualTo(1);
         assertThat(escaped.getContent().get(0).getId()).isEqualTo(percent.getId());
     }
+
+    @Test
+    void userTokenVersionDefaultsToZero() {
+        User saved = user("version_zero");
+        em.flush();
+        em.clear();
+
+        User reloaded = userRepository.findById(saved.getId()).orElseThrow();
+        assertThat(reloaded.getTokenVersion()).isZero();
+    }
 }

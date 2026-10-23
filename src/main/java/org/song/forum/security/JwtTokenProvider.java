@@ -30,14 +30,15 @@ public class JwtTokenProvider {
         this.expirationMs = expirationMs;
     }
 
-    /** 签发 Token：subject=用户ID，claims 携带用户名与角色 */
-    public String createToken(Long userId, String username, List<String> roles) {
+    /** 签发 Token：subject=用户ID，claims 携带用户名、角色与 token 版本号 */
+    public String createToken(Long userId, String username, List<String> roles, long tokenVersion) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("username", username)
                 .claim("roles", roles)
+                .claim("ver", tokenVersion)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
@@ -46,6 +47,16 @@ public class JwtTokenProvider {
 
     public long getExpirationMs() {
         return expirationMs;
+    }
+
+    /**
+     * 读取 token 里的版本号。
+     * <p>第七轮之前签发的 token 没有 {@code ver} claim，按 0 处理；jjwt 反序列化小整数给的是
+     * {@link Integer}，因此统一按 {@link Number} 取 long。</p>
+     */
+    public static long tokenVersion(Claims claims) {
+        Object raw = claims.get("ver");
+        return raw instanceof Number number ? number.longValue() : 0L;
     }
 
     /** 解析全部 Claims；无效或过期抛 JwtException */
