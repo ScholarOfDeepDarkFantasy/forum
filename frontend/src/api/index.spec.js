@@ -46,7 +46,7 @@ const elMessageError = vi.fn()
 vi.mock('element-plus', () => ({ ElMessage: { error: (...a) => elMessageError(...a) } }))
 
 // 动态 import：确保上面的 mock 在模块求值前已生效
-const { tagApi, userApi, postApi } = await import('./index.js')
+const { tagApi, userApi, postApi, authApi } = await import('./index.js')
 
 /** 构造一个 axios 错误对象，模拟后端返回 Result.fail 的响应体 */
 function httpError(status, message, url) {
@@ -125,6 +125,18 @@ describe('api 拦截器', () => {
 
     expect(elMessageError).toHaveBeenCalledWith('板块名已存在')
     expect(localStorage.getItem('jf_token')).toBe('token')
+  })
+
+  it('登录限流 429 展示后端文案、保留登录态、不跳转', async () => {
+    localStorage.setItem('jf_token', 'still-valid')
+    const err = httpError(429, '登录失败次数过多，请 1 分钟后再试', '/auth/login')
+
+    await expect(handlers.responseError(err)).rejects.toBe(err)
+
+    expect(elMessageError).toHaveBeenCalledWith('登录失败次数过多，请 1 分钟后再试')
+    expect(elMessageError).not.toHaveBeenCalledWith('请先登录')
+    expect(localStorage.getItem('jf_token')).toBe('still-valid')
+    expect(window.location.href).toBe('/')
   })
 
   it('业务失败（HTTP 200 + success:false）走响应成功分支并弹出消息', async () => {
@@ -208,5 +220,16 @@ describe('userApi 请求路径', () => {
     userApi.removeAvatar()
 
     expect(apiDelete).toHaveBeenCalledWith('/users/me/avatar')
+  })
+})
+
+describe('authApi 请求路径', () => {
+  it('logout 调用 POST /auth/logout', async () => {
+    apiPost.mockResolvedValueOnce(undefined)
+
+    await authApi.logout()
+
+    expect(apiPost).toHaveBeenCalledTimes(1)
+    expect(apiPost).toHaveBeenCalledWith('/auth/logout')
   })
 })

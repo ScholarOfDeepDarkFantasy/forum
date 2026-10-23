@@ -44,7 +44,22 @@ export const useAuthStore = defineStore('auth', {
       await this.fetchMe()
     },
 
-    logout() {
+    /**
+     * 登出：先尽力通知后端把 token 版本 +1，再清本地状态。
+     * 后端不可达/已过期也必须清本地——否则用户以为退出了，实际 token 还在。
+     */
+    async logout() {
+      try {
+        await authApi.logout()
+      } catch {
+        // 忽略：本地登出不能因为服务端失败而失败
+      } finally {
+        this.clearAuth()
+      }
+    },
+
+    /** 只清本地登录态（401 拦截器与 logout 共用同一套清理逻辑） */
+    clearAuth() {
       this.token = ''
       this.user = null
       localStorage.removeItem('jf_token')
