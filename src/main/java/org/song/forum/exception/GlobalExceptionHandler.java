@@ -1,6 +1,7 @@
 package org.song.forum.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -134,6 +135,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleInvalidStreamTicket(InvalidStreamTicketException e) {
         log.warn("SSE 订阅凭证校验失败: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Result.fail(e.getMessage()));
+    }
+
+    /**
+     * 登录失败限流 → 429 + Retry-After。
+     * <p>不能返回 200 或 401：429 才能让客户端与网关区分「凭据错了」与「先别试了」；
+     * Retry-After 给的是秒数，前端可据此提示，运维也能在压测脚本里据此退避。</p>
+     */
+    @ExceptionHandler(TooManyLoginAttemptsException.class)
+    public ResponseEntity<Result<Void>> handleTooManyLoginAttempts(TooManyLoginAttemptsException e) {
+        log.warn("登录失败次数超限: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()))
+                .body(Result.fail(e.getMessage()));
     }
 
     /**

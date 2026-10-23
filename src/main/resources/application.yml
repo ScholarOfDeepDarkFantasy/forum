@@ -69,6 +69,13 @@ app:
     max-connections-per-user: ${SSE_MAX_CONNECTIONS_PER_USER:5}
     # 订阅 ticket 有效期：一次性、60 秒，避免 JWT 出现在 URL / nginx access log 里
     ticket-ttl-ms: ${SSE_TICKET_TTL_MS:60000}
+  # ---- 登录失败限流（按客户端 IP，单实例内存实现） ----
+  security:
+    login:
+      max-failures: ${LOGIN_MAX_FAILURES:5}
+      window-ms: ${LOGIN_WINDOW_MS:900000}
+      lock-ms: ${LOGIN_LOCK_MS:900000}
+      cleanup-interval-ms: ${LOGIN_CLEANUP_INTERVAL_MS:60000}
 
 # ---- 公共日志基线：只保留应用自身的业务日志，SQL 明细交给 profile ----
 logging:
