@@ -197,4 +197,47 @@ class PostFlowIntegrationTest {
                         new ParameterizedTypeReference<>() {});
         assertThat(after.getBody().getData().totalElements()).isEqualTo(0);
     }
+
+    @Test
+    @Order(5)
+    void stage5_keywordWildcardsAreLiteral() {
+        // 四篇标题两两成对：若 % 或 _ 被当成通配符，会误命中对照组
+        createPost("1000 items");     // 若 % 通配，"100%" 会命中它
+        createPost("100% done");      // 唯一应被 "100%" 命中的
+        createPost("a_b note");       // 唯一应被 "a_b" 命中的
+        createPost("axb note");       // 若 _ 通配，"a_b" 会命中它
+
+        // 用 URI 模板变量传关键词，由 RestTemplate 统一编码（与 stage3 的写法一致）
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> percent =
+                rest.exchange(url("/api/posts?keyword={kw}"), HttpMethod.GET, null,
+                        new ParameterizedTypeReference<>() {},
+                        java.util.Map.of("kw", "100%"));
+        assertThat(percent.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(percent.getBody().getData().totalElements()).isEqualTo(1);
+        assertThat(percent.getBody().getData().content())
+                .extracting(PostSummaryResponse::getTitle)
+                .containsExactly("100% done");
+
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> underscore =
+                rest.exchange(url("/api/posts?keyword={kw}"), HttpMethod.GET, null,
+                        new ParameterizedTypeReference<>() {},
+                        java.util.Map.of("kw", "a_b"));
+        assertThat(underscore.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(underscore.getBody().getData().totalElements()).isEqualTo(1);
+        assertThat(underscore.getBody().getData().content())
+                .extracting(PostSummaryResponse::getTitle)
+                .containsExactly("a_b note");
+    }
+
+    /** stage5 建帖：正文刻意不含 % 与 _，避免正文命中干扰标题断言 */
+    private void createPost(String title) {
+        PostRequest req = new PostRequest();
+        req.setBoardId(boardId);
+        req.setTitle(title);
+        req.setContent("第八轮转义用例正文 " + System.nanoTime());
+        ResponseEntity<Result<PostDetailResponse>> resp = rest.exchange(url("/api/posts"),
+                HttpMethod.POST, new HttpEntity<>(req, bearer(adminToken)),
+                new ParameterizedTypeReference<>() {});
+        assertThat(resp.getStatusCode().value()).isEqualTo(201);
+    }
 }

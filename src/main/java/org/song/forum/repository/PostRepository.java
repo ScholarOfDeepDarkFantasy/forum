@@ -21,13 +21,14 @@ public interface PostRepository extends JpaRepository<Post, Long> {
      * {@code HHH90003004} 并把全部匹配行读进内存再截取。</p>
      * <p>boardId 为 null 查全部；keyword 传空串表示无关键字（不能传 null，
      * 见 {@code PostService.list} 里关于 pgJDBC 的注释）。</p>
+     * <p>keyword 已由 service 用 '!' 转义，因此这里必须带 ESCAPE '!'，否则 %/_ 仍被当通配符。</p>
      */
     @Query("""
             SELECT p FROM Post p
             WHERE p.deleted = false
               AND (:boardId IS NULL OR p.board.id = :boardId)
-              AND (:keyword = '' OR LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                                 OR LOWER(p.content) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:keyword = '' OR LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!'
+                                 OR LOWER(p.content) LIKE LOWER(CONCAT('%', :keyword, '%')) ESCAPE '!')
             """)
     @EntityGraph(attributePaths = {"board", "author"})
     Page<Post> searchIds(@Param("boardId") Long boardId,

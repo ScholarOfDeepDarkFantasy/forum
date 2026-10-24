@@ -133,6 +133,11 @@ public class PostService {
         // 若直接在 tags 集合上 EntityGraph + Pageable，Hibernate 会打印 HHH90003004
         // 并把全部匹配行读进内存再截取，数据量一大就是性能事故。
         String kw = blankToEmpty(keyword);
+        if (!kw.isEmpty()) {
+            // 与 GET /api/posts/search 一致：%/_/! 按字面量匹配（转义后 JPQL 用 ESCAPE '!'）。
+            // 空串必须保持空串：JPQL 用 :keyword = '' 表示「无关键字」，转义成 '!!' 会让条件永远为假。
+            kw = escapeLike(kw.toLowerCase(Locale.ROOT));
+        }
         Page<Post> skeletons = postRepository.searchIds(boardId, kw, pageable);
         return PageResponse.of(mapSummaries(hydrate(skeletons)));
     }
