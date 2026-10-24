@@ -100,6 +100,28 @@ watchEffect(() => {
   applyClass(isDark.value)
 })
 
+// 跨标签页同步：其他标签页 setMode() 后会触发本页的 storage 事件。
+// 不信任 event.newValue：key 被删除（removeItem/clear）时它是 null，坏值也需要回退 system，
+// 统一从 storage 回读一次，与模块初始化走同一段判定（readStoredMode）。
+function onStorageChange(event) {
+  if (event.storageArea && event.storageArea !== localStorage) return
+  if (event.key !== null && event.key !== STORAGE_KEY) return
+  // 故意不写回 localStorage：写回会再次触发其他标签页的 storage 事件，形成回环。
+  mode.value = readStoredMode()
+}
+
+let storageListenerBound = false
+
+// 绑在模块顶层：useTheme() 被 App / ThemeToggle / 路由守卫多处调用，
+// 绑在函数里会重复注册监听器。
+function bindStorageListener() {
+  if (storageListenerBound || typeof window === 'undefined') return
+  window.addEventListener('storage', onStorageChange)
+  storageListenerBound = true
+}
+
+bindStorageListener()
+
 export function initTheme() {
   applyClass(isDark.value)
   return isDark.value

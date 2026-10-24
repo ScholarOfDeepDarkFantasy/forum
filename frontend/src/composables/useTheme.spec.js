@@ -244,4 +244,56 @@ describe('useTheme', () => {
     expect(mod.initTheme()).toBe(true)
     expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
+
+  it('其他标签页切到 dark 后本页同步（storage 事件）', async () => {
+    const theme = await loadTheme()
+
+    localStorage.setItem(STORAGE_KEY, 'dark')
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: STORAGE_KEY,
+        newValue: 'dark',
+        storageArea: localStorage
+      })
+    )
+    await nextTick()
+
+    expect(theme.mode.value).toBe('dark')
+    expect(theme.isDark.value).toBe(true)
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+  })
+
+  it('其他标签页清空主题（key 为 null）时回退 system', async () => {
+    localStorage.setItem(STORAGE_KEY, 'dark')
+    const theme = await loadTheme()
+    expect(theme.mode.value).toBe('dark')
+
+    localStorage.removeItem(STORAGE_KEY)
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: null, newValue: null, storageArea: localStorage })
+    )
+    await nextTick()
+
+    expect(theme.mode.value).toBe('system')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+  })
+
+  it('其他标签页写入坏值时回退 system，且不把坏值写回 localStorage', async () => {
+    const theme = await loadTheme()
+
+    localStorage.setItem(STORAGE_KEY, 'purple')
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: STORAGE_KEY,
+        newValue: 'purple',
+        storageArea: localStorage
+      })
+    )
+    await nextTick()
+
+    expect(theme.mode.value).toBe('system')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    // 不写回：写回会再次触发其他标签页的 storage 事件，形成回环
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('purple')
+  })
 })
