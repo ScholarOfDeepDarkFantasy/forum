@@ -227,14 +227,35 @@ class PostFlowIntegrationTest {
         assertThat(underscore.getBody().getData().content())
                 .extracting(PostSummaryResponse::getTitle)
                 .containsExactly("a_b note");
+
+        // 正文分支守护：上面两个用例只让标题命中，content 那行的 ESCAPE 被删掉也照样绿。
+        // 这里标题刻意不含 %，只让正文命中："500%" 若被当通配符，会连带命中正文含 "5000" 的对照组。
+        createPost("body pct one", "进度 500% 完成");
+        createPost("body pct two", "进度 5000 完成");
+
+        // size=1 让翻页只取 1 行，从而强制 count 查询也走同一条 WHERE（totalElements 仍须为 1）
+        ResponseEntity<Result<PageResponse<PostSummaryResponse>>> bodyPercent =
+                rest.exchange(url("/api/posts?keyword={kw}&size=1"), HttpMethod.GET, null,
+                        new ParameterizedTypeReference<>() {},
+                        java.util.Map.of("kw", "500%"));
+        assertThat(bodyPercent.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(bodyPercent.getBody().getData().totalElements()).isEqualTo(1);
+        assertThat(bodyPercent.getBody().getData().content())
+                .extracting(PostSummaryResponse::getTitle)
+                .containsExactly("body pct one");
     }
 
     /** stage5 建帖：正文刻意不含 % 与 _，避免正文命中干扰标题断言 */
     private void createPost(String title) {
+        createPost(title, "第八轮转义用例正文 " + System.nanoTime());
+    }
+
+    /** stage5 建帖（可指定正文）：正文分支守护用例需要正文命中，标题保持无通配符 */
+    private void createPost(String title, String content) {
         PostRequest req = new PostRequest();
         req.setBoardId(boardId);
         req.setTitle(title);
-        req.setContent("第八轮转义用例正文 " + System.nanoTime());
+        req.setContent(content);
         ResponseEntity<Result<PostDetailResponse>> resp = rest.exchange(url("/api/posts"),
                 HttpMethod.POST, new HttpEntity<>(req, bearer(adminToken)),
                 new ParameterizedTypeReference<>() {});

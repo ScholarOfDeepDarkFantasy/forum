@@ -135,7 +135,8 @@ public class PostService {
         String kw = blankToEmpty(keyword);
         if (!kw.isEmpty()) {
             // 与 GET /api/posts/search 一致：%/_/! 按字面量匹配（转义后 JPQL 用 ESCAPE '!'）。
-            // 空串必须保持空串：JPQL 用 :keyword = '' 表示「无关键字」，转义成 '!!' 会让条件永远为假。
+            // 空串保持空串：JPQL 用 :keyword = '' 表示无关键字；escapeLike 对空串本就是恒等，
+            // 这里只是显式表明哨兵值不参与转义。
             kw = escapeLike(kw.toLowerCase(Locale.ROOT));
         }
         Page<Post> skeletons = postRepository.searchIds(boardId, kw, pageable);
