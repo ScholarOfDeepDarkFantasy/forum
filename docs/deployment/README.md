@@ -275,7 +275,8 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' -H 'Content-Type: appl
 - **SSE 依赖反向代理配置**：必须命中 `/forum/api/notifications/stream` 的精确 location（`proxy_buffering off`、`proxy_read_timeout 3600s`、`$is_args$args`）。漏配时通知会延迟或每分钟断连；`deploy.sh` 只断言「无 ticket 返回 401」，「是否真正实时」需按第 5 节手工验证。
 - **登录限流的计数在进程内**：容器重启即清零，多实例部署时各实例独立计数；如需跨实例一致，需按 `docs/DEVELOPMENT.md` §5.2 换成共享存储。
 - **限流键是单个 IP 字面量，双栈下存在绕过面**：若 nginx 同时监听 IPv6，公网 IPv6 客户端可在一个 /64 内轮换源地址，使每次失败落到不同计数桶从而绕过锁定；只监听 IPv4 的现有部署不受影响，双栈部署建议按 /64 归并限流键或只监听 IPv4。
-- **成功登录会清空该 IP 的整个失败窗口**：`POST /api/auth/register` 公开，攻击者可「4 次错密码 + 1 次自己账号成功登录」循环让窗口永不锁定；单 IP 触发全站锁定已在 Build #15 修复，但此绕过面仍在，见 `docs/DEVELOPMENT.md` §4.12 已知取舍第 10 条。
+- **成功登录会清空该 IP 的整个失败窗口**：`POST /api/auth/register` 公开，攻击者可「4 次错密码 + 1 次自己账号成功登录」循环让窗口永不锁定；单 IP 触发全站锁定已在 Build #15 修复，但此绕过面仍在，见 `docs/DEVELOPMENT.md` §4.12 已知取舍第 5 条。
+- **第八轮（2026-10-24 质量加固）没有新增部署要求**：无数据库迁移、无新配置项、无 nginx/location 改动；发布即镜像替换（Jenkins 自动构建 + `deploy.sh`）。回滚只需把镜像 tag 切到上一版并重跑 `deploy.sh`。
 
 ## 附录 A：Jenkins job `config.xml`
 

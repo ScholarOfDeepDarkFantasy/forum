@@ -240,7 +240,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 20 个测试类、163 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 21 个测试类、176 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 
@@ -250,7 +250,7 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 31 个 spec、314 个用例，覆盖：
+当前为 31 个 spec、321 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页

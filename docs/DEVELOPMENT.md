@@ -127,16 +127,16 @@ cd frontend && pnpm test --run
 
 ---
 
-## 3. 当前状态快照（2026-10-23）
+## 3. 当前状态快照（2026-10-24）
 
 ### 3.1 代码规模
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 82 | 4988 |
-| 后端测试（`src/test/java`） | 21 | 4743 |
-| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4712 |
-| 前端测试（`*.spec.js`） | 31 | 5505 |
+| 后端主代码（`src/main/java`） | 82 | 5062 |
+| 后端测试（`src/test/java`） | 22 | 5064 |
+| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4742 |
+| 前端测试（`*.spec.js`） | 31 | 5701 |
 
 后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 9、`service/` 11、`security/` 7（+`ClientIpResolver`、`LoginRateLimiter`，`exception/` 另加 `TooManyLoginAttemptsException`）、`config/` 7（+`ClockConfig`）、`util/` 4、`exception/` 4。
 
@@ -146,13 +146,15 @@ cd frontend && pnpm test --run
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **163** 个用例 / 20 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
-| 前端 | **314** 个用例 / 31 个 spec | 全绿 |
+| 后端 | **176** 个用例 / 21 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 前端 | **321** 个用例 / 31 个 spec | 全绿 |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布（合计 163）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`NotificationServiceTest` 10、`LoginRateLimiterTest` 9、`RepositoryTests` 9、`TagFlowIntegrationTest` 8、`ClientIpResolverTest` 8、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`AuthInvalidationIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`PostFlowIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
+后端测试类分布（合计 176）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 8、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
 
-前端 spec 分布（合计 314）：`search` 30、`useNotificationStream` 22、`SearchView` 19、`ProfileView` 18、`useTheme` 17、`notifications` 16、`index`（api）15、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 3、`useResponsive` 3、`PostEditView` 3、`App` 2。
+前端 spec 分布（合计 321）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）17、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3。
+
+> 分布行在此前的记录里与实际总数对不上（2026-10-24 复核时后端、前端两行均已按 `target/surefire-reports` 与 `pnpm test` 输出重新点数并对齐）；此后以本行标注的合计与 `mvn` / `vitest` 的实际输出为准。
 
 ### 3.3 数据库
 
@@ -194,7 +196,7 @@ cd frontend && pnpm test --run
 | --- | --- | --- |
 | `GET /api/posts/search` | `keyword`（必填，去首尾空白后 1~50 个 code point）、`page`（默认 0，负数按 0）、`size`（默认 10，钳制到 1~50） | `PageResponse<PostSummaryResponse>`；标题命中优先、同档按 `createTime` 倒序（同时间再按 `id` 倒序），软删除不出现；错误统一 400：`缺少必需参数: keyword`、`搜索关键词不能为空`、`搜索关键词不能超过 50 个字符`、`参数格式不正确: page`（`size` 同理） |
 
-`PostSummaryResponse` 在搜索接口里额外带一个可空字段 `snippet`：正文命中处左右各 80 字符的纯文本窗口（**不清洗 Markdown、不含省略号**，由前端 `utils/search.js` 的 `buildSnippet` 完成清洗与省略号）；窗口端点吸附到 code point 边界，不会劈开 emoji/生僻字；标题命中且正文不含关键词时是空串，其它列表接口通过 `@JsonInclude(NON_NULL)` 省略该键（而非 `null`）。关键词里的 `%`、`_`、`!` 按字面量匹配（服务端统一转义后 SQL 用 `ESCAPE '!'`）。
+`PostSummaryResponse` 在搜索接口里额外带一个可空字段 `snippet`：正文命中处左右各 80 字符的纯文本窗口（**不清洗 Markdown、不含省略号**，由前端 `utils/search.js` 的 `buildSnippet` 完成清洗与省略号）；窗口端点吸附到 code point 边界，不会劈开 emoji/生僻字；标题命中且正文不含关键词时是空串，其它列表接口通过 `@JsonInclude(NON_NULL)` 省略该键（而非 `null`）。关键词里的 `%`、`_`、`!` 按字面量匹配（服务端统一转义后 SQL 用 `ESCAPE '!'`；首页 `GET /api/posts?keyword=` 在第八轮起同样如此）。
 
 头像端点由 `UserController`（`@RequestMapping("/api/users")`）提供，只操作当前登录用户，`DELETE` 幂等：
 
@@ -591,17 +593,14 @@ cd frontend && pnpm test --run
 
 本轮 Task 1–4 的两阶段审查（规格符合性 + 代码质量）接受并延后以下问题，均不阻塞本轮上线，后续迭代择机处理：
 
-1. `JwtAuthenticationFilter` 的会话校验只捕获 `NumberFormatException`；数据库异常（`DataAccessException`）会导致 500 且响应体不是统一 `Result` 结构。
-2. 封禁的双保险（过滤器内 `status != BANNED` 判断 + `AdminUserService` 递增 token_version）没有互相独立的测试用例锁定，任一失效现有 6 个集成用例仍会通过。
-3. 重复登出不幂等：token 已失效时 `POST /api/auth/logout` 返回 401，前端在「已退出登录」成功提示之后还会收到「请先登录」并整页跳转 `/login`（静默请求配置留待后续统一处理）。
-4. `ClientIpResolver` 的信任范围已从「仅环回」放宽到「环回 + RFC1918 私网」（修复容器端口映射下 `remoteAddr` 为网关导致的全站共桶）；残留：`X-Forwarded-For` 兜底仍取**第一个**合法字面量（攻击者可用伪造首段更换计数桶）、IPv4-mapped loopback（`::ffff:127.0.0.1`）未被识别、无代理头且来源非环回时仍回落到共享桶。
-5. `LoginRateLimiter`：`cleanupExpired()` 迭代时按 key 删除存在竞态，极端情况下可能少计一次失败；4 个阈值配置无合法性校验（如 lock-ms<=0 会静默关闭锁定）；锁定瞬间已通过 `check` 的在途请求仍可能把 `lockedUntil` 顺延（有界，最多一个 `lock-ms`）。
-6. 每个 429 都会打一条不含客户端 IP 的 WARN 日志，锁定期间可被低成本流量刷日志。
-7. `docker-compose.yml` 已透传 `LOGIN_*`（默认值与 `application.yml` 一致），只改 `.env` 重启容器即可生效（修复前需同时改 compose）。
-8. SSE 长连接不会因 token 失效立即断开（最长 30 分钟超时兜底）；前端登出时本地清态等待后端响应（最长全局 15s 超时），该窗口内界面仍显示已登录。
-9. 测试加固项未做：token_version 非零值持久化、`validate()` 成功路径、登出「先调后端后清本地」不变量均无独立断言。
-10. 成功登录会清空该 IP 的**全部**失败记录（`LoginRateLimiter.recordSuccess` 直接 `remove(ip)`），而 `POST /api/auth/register` 是公开接口：攻击者可「4 次错密码 + 1 次自己账号成功登录」循环，使失败窗口永远归零、锁定永不触发（这是 spec 的既定语义，不是实现偏差）。后续可考虑按 `(IP, username)` 计数，或只在该窗口的失败都指向同一账号时清零。
-11. 前端登出在后端失败时静默：断网 / 5xx / 15s 超时时 `authApi.logout()` 的异常被 `catch {}` 吞掉，本地态已清且界面提示「已退出登录」，但服务端 `token_version` 未 +1，被窃 token 在剩余有效期内仍可用（默认 24h）；用户看不到任何失败提示。后续应在失败时提示「服务端会话未能失效，建议修改密码」或自动重试一次。
+1. `ClientIpResolver` 的信任范围已从「仅环回」放宽到「环回 + RFC1918 私网」（修复容器端口映射下 `remoteAddr` 为网关导致的全站共桶）；残留：`X-Forwarded-For` 兜底仍取**第一个**合法字面量（攻击者可用伪造首段更换计数桶）、IPv4-mapped loopback（`::ffff:127.0.0.1`）未被识别、无代理头且来源非环回时仍回落到共享桶。
+2. `docker-compose.yml` 已透传 `LOGIN_*`（默认值与 `application.yml` 一致），只改 `.env` 重启容器即可生效（修复前需同时改 compose）。
+3. SSE 长连接不会因 token 失效立即断开（最长 30 分钟超时兜底）；前端登出时本地清态等待后端响应（最长全局 15s 超时），该窗口内界面仍显示已登录。
+4. 测试加固仍缺两处：`token_version` 非零值持久化的端到端断言、`validate()` 成功路径的独立单测；「登出先调后端后清本地」已由 `stores/auth.spec.js` 覆盖（第八轮）。
+5. 成功登录会清空该 IP 的**全部**失败记录（`LoginRateLimiter.recordSuccess` 直接 `remove(ip)`），而 `POST /api/auth/register` 是公开接口：攻击者可「4 次错密码 + 1 次自己账号成功登录」循环，使失败窗口永远归零、锁定永不触发（这是 spec 的既定语义，不是实现偏差）。后续可考虑按 `(IP, username)` 计数，或只在该窗口的失败都指向同一账号时清零。
+6. 前端登出在后端失败时静默：断网 / 5xx / 15s 超时时 `authApi.logout()` 的异常被 `catch {}` 吞掉，本地态已清且界面提示「已退出登录」，但服务端 `token_version` 未 +1，被窃 token 在剩余有效期内仍可用（默认 24h）；用户看不到任何失败提示。后续应在失败时提示「服务端会话未能失效，建议修改密码」或自动重试一次。
+
+上述编号 1–6 依次对应本轮修复前的第 4、7、8、9、10、11 条；原第 1、2、3、5、6 条已在第八轮修复，修复记录见 §4.13；本轮新暴露的取舍也记在那里。
 
 上线验收（2026-10-23）：
 
@@ -613,6 +612,42 @@ cd frontend && pnpm test --run
 - 全量测试：后端 20 个测试类 / 161 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 31 个 spec / 314 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过。
 
 修复记录（2026-10-24）：B.5 冒烟发现容器部署下限流失效——本机直连 `127.0.0.1:8086` 时换 `X-Real-IP`（198.51.100.7/8/9）仍是 429，改经 nginx 登录同样 429，日志为 `IP 10.89.3.15 登录失败 5 次`。根因：podman 端口映射使后端看到的 `remoteAddr` 是容器网关 `10.89.3.15`（私网），旧 `ClientIpResolver` 只在环回源时才读代理头，于是所有客户端落进同一个计数桶。修复：信任范围从「仅环回」放宽到「环回 + RFC1918 私网」（新增 `isTrustedProxy` / `isPrivateIpv4`），并让 `docker-compose.yml` 透传 4 个 `LOGIN_*` 阈值。测试：`ClientIpResolverTest` 6→8 例（新增私网网关采信 `X-Real-IP`、无私网代理头回落 `remoteAddr`），后端全量 163 例。部署验证：推送 `419be00` 后 Jenkins Build **#15** SUCCESS（镜像 `localhost/forum-backend:15`，容器 `Up (healthy)`）；重跑冒烟 B.5：`X-Real-IP: 203.0.113.9` 连续 5 次错密码均 401、第 6 次 **429** 且 `Retry-After: 892`；换 `X-Real-IP: 198.51.100.7` 用正确密码 **200**；经 nginx 正确密码 **200**；容器内 `LOGIN_*` 4 个变量均已注入（`LOGIN_MAX_FAILURES=5`、`LOGIN_WINDOW_MS=900000`、`LOGIN_LOCK_MS=900000`、`LOGIN_CLEANUP_INTERVAL_MS=60000`）。
+
+### 4.13 第八轮：质量加固（2026-10-24）
+
+- 设计：[2026-10-24-round8-quality-hardening-design.md](superpowers/specs/2026-10-24-round8-quality-hardening-design.md)
+- 计划：[2026-10-24-round8-quality-hardening.md](superpowers/plans/2026-10-24-round8-quality-hardening.md)
+
+**目标**：收敛第七轮双审遗留的 Important 项与 T12/T13 两条技术债；不新增用户可见功能（主题跨标签同步是唯一 UX 修复）。
+
+**修复清单**：
+
+| # | 问题 | 修法 | 提交 |
+| --- | --- | --- | --- |
+| 1 | 过滤器会话回查遇 `DataAccessException` 抛 500，响应体不是统一 `Result` | `isSessionAlive` 外层 catch → `log.debug` + `return false`（fail-closed，401 由 entry point 返回） | `f141928` |
+| 2 | 封禁双保险没有各自独立的用例 | 直接改 `status`（不动版本）→ 401；封禁 → 解封 → 旧 token 仍 401（版本不回退） | `f141928` |
+| 3 | 限流器阈值无校验；`cleanupExpired` 按 key 盲删 | 构造器 fail fast（消息含配置全名）；`windows.remove(key, window)` 身份 CAS | `31a320d` |
+| 4 | 每条 429 一条不含 IP 的 WARN | 处理器降为 `log.debug`；事实日志保留在 `recordFailure` | `31a320d` |
+| 5 | `Retry-After` 断言依赖「同一秒」（`isIn("59","60")`） | 解析为 long 后 `isBetween(1L, 60L)` | `31a320d` |
+| 6 | 首页 `keyword` 不转义 LIKE 通配符（T13） | service 先 `escapeLike`，`searchIds` 两处 LIKE 加 `ESCAPE '!'` | `71a2c47` |
+| 7 | 重复登出：双提示 + 整页跳转 | `authApi.logout` 带 `{ silent: true }`；401 静默分支仍清本地态 | `9b502dd` |
+| 8 | 登出不 await，后端未返回就提示成功 | `handleUserCommand` 改 `async`，`await auth.logout()` 后再提示与跳转 | `9b502dd` |
+| 9 | 主题选择不跨标签页同步（T12） | `useTheme` 模块级 `storage` 监听，回读 `localStorage`、不写回（避免回环） | `8de656b` |
+| 10 | 首页搜索正文分支的 `ESCAPE` 无独立回归守护 | stage5 追加「仅正文含 `%`」命中对照（`body pct one/two`）并加 `&size=1` 覆盖 count 路径；`PostService` 空串注释纠正 | `ef791fb` |
+| 11 | 登出时序与主题跨标签的测试守护不足 | `auth.spec` 用 deferred promise 锁「清态等待响应」；`useTheme.spec` 覆盖真实 `removeItem`、无关键忽略、坏值从显式 dark 起步 | `94b1970` |
+
+**测试与验证**：后端 163 → **176** 用例 / 20 → **21** 类（新增 `JwtAuthenticationFilterTest` 7 例；`AuthInvalidationIntegrationTest` +2、`LoginRateLimiterTest` +3、`PostFlowIntegrationTest` +1）；前端 314 → **321** 用例 / 31 spec 不变（`api/index.spec` +2、`stores/auth.spec` +1、`App.spec` +1、`useTheme.spec` +3）。其中第 10、11 行对应的两个提交（`ef791fb`、`94b1970`）为规格/质量双审后追加的 test-only 收尾，只加固断言与用例写法，不改变上述用例数。端点 39 个不变，无迁移、无新配置项、无新增依赖。
+
+**已知限制**：本轮没有新增部署要求（无迁移、无配置项、无 nginx 改动），见 `docs/deployment/README.md` §7 末尾。除 §4.12 保留的取舍外，本轮双审还记录以下遗留项（均不阻塞上线）：
+
+1. `LoginRateLimiter` 的第 4 个阈值 `cleanup-interval-ms` **没有**构造器显式校验：它由 `@Scheduled` 的占位符消费，而不是构造器参数，因此 `=0` 不会得到前三个阈值那样的 fail fast 消息，而是在启动时抛裸 `IllegalArgumentException`（其余三个阈值已按第 3 行修法校验）。
+2. `TagRepository.findWithPostCounts` 的 tag 关键词 LIKE 仍未转义（本轮 T13 只覆盖首页 `GET /api/posts?keyword=` 与既有的 `/api/posts/search`）；建议作为技术债 T16 记入 §5.1。
+3. `App.spec.js` 的登出用例会触发一次真实 jsdom XHR（`notifications.refreshUnread`，异常被 store 吞掉，不会产生未处理 rejection）；`auth.spec` 的「无关键忽略」断言依赖 `vi.resetModules()` 提供的模块实例隔离，而非真实的多标签页环境。
+4. `api/index.js` 的成功分支（HTTP 200 + `success: false`）不识别 `silent`，仍会弹提示；后端目前没有这条返回路径，属防御性缺口。
+5. `JwtAuthenticationFilter` 的 `DataAccessException` 分支 debug 日志未带 `userId`（生产默认 info 级，不可见），排障时需临时调级。
+6. 本轮不处理 chunk 分包，构建仍会出现 `index-*.js` 约 878 kB 的体积警告（预期，见 spec §2.2）。
+
+**上线验收**：（Task 6 上线后回填：Build 号、镜像 tag、冒烟结果）
 
 ---
 
@@ -633,8 +668,8 @@ cd frontend && pnpm test --run
 | T9 | ~~Docker 镜像未经实际构建验证~~ | 已关闭 | 2026-10-19 起在 raspi 上由 Jenkins 用 podman 实际构建并部署（`--format docker` 保留 HEALTHCHECK），见 §4.7 |
 | T10 | ~~前端未容器化~~ | 已关闭 | 需求明确前端不进容器：由主机 nginx 直接托管 dist（见 §4.7），不再作为技术债 |
 | T11 | **头像文件不在备份范围** | 中 | 头像落在宿主机 `/pd/Program/forum/uploads/`，数据库备份不含它；恢复时需单独 `tar` 该目录并保留属主，再跑 `deploy.sh` 修正权限（`podman unshare chmod a+rX`）。孤儿文件（换头像/删号后残留）目前无清理任务，见 §4.9 |
-| T12 | **主题选择不跨标签页同步** | 低 | 主题存 `localStorage` 的 `jf_theme`，但未监听 `storage` 事件；同源多标签下切换主题不会互相更新，刷新后一致。修法：在 `useTheme` 里监听 `window.addEventListener('storage', ...)` |
-| T13 | **首页关键词过滤不转义 LIKE 通配符** | 低 | 首页 `GET /api/posts?keyword=` 走 `searchIds` 的 `LOWER(...) LIKE LOWER(CONCAT('%', :keyword, '%'))`，未转义 `%`/`_`，搜「100%」会命中「1000」。本轮只给新搜索接口做了转义；修首页需同步改 JPQL 与前端提示，属独立小改动 |
+| T12 | ~~**主题选择不跨标签页同步**~~ | 已关闭 | 2026-10-24 第八轮：`useTheme` 增加模块级 `storage` 监听，回读 localStorage 且不写回（避免回环），坏值/清空回退 system（见 §4.13）。原记录：主题存 localStorage 的 jf_theme，但未监听 storage 事件；同源多标签下切换主题不会互相更新，刷新后一致。修法：在 useTheme 里监听 window.addEventListener('storage', ...) |
+| T13 | ~~**首页关键词过滤不转义 LIKE 通配符**~~ | 已关闭 | 2026-10-24 第八轮：`PostService.list` 先 `escapeLike`，`searchIds` 两处 LIKE 加 `ESCAPE '!'`，与 `/api/posts/search` 同一约定（见 §4.13）。原记录：首页 GET /api/posts?keyword= 走 searchIds 的 LOWER(...) LIKE LOWER(CONCAT('%', :keyword, '%'))，未转义 %/_，搜「100%」会命中「1000」。本轮只给新搜索接口做了转义；修首页需同步改 JPQL 与前端提示，属独立小改动 |
 | T14 | **搜索无分词、无相关度排序** | 中 | 采用 pg_trgm 子串匹配：中文不分词，1–2 个字的关键词的 trigram 覆盖不足，规划器会放弃索引改走顺序扫描；排序只有「标题命中优先 + 时间倒序」，没有 `ts_rank`/`similarity` 之类相关度。数据量增长后的升级路径是 `tsvector`（需分词扩展）或两阶段检索 |
 | T15 | **`posts.content` 无长度上限** | 低 | 正文列是 `TEXT` 且无应用层长度校验；超长正文会放大 `snippet` 截取与索引维护成本，也让 `pg_trgm` 的 GIN 索引更大。可加与标题一致的长度提示或截断策略 |
 
@@ -653,6 +688,8 @@ cd frontend && pnpm test --run
 | 限流改共享存储（多实例） | 中 | 中 | 当前 `LoginRateLimiter` 的失败计数在单实例内存，多实例部署时各算各的、重启清零（§4.12、§6）。改法：把 `Window` 换成 Redis 的 `INCR`+`EXPIRE` 或 Bucket4j 的分布式后端，接口保持不变 |
 
 第三轮已取前两项（见 §4.8），第四轮已取头像上传与深色模式（见 §4.9），第五轮已取全文搜索（见 §4.10），第六轮已取实时通知（见 §4.11），第七轮不再新增业务功能、只做安全加固（见 §4.12）；「限流改共享存储」是加固后新暴露的运维型候选，等到真的多实例部署时再取。后续新功能需重新评估价值与工作量，按同样的「审计 → 计划 → 逐任务执行 → 验证 → 提交」流程推进。
+
+> 第八轮同样不加业务功能，只做质量加固（见 §4.13）；「限流改共享存储」仍是多实例部署的前置条件。
 
 ---
 
@@ -716,6 +753,14 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-10-24 | docs | 记录第八轮质量加固（测试基线、已知限制与变更日志） | 本次提交 |
+| 2026-10-24 | test | 加固登出时序与主题跨标签的回归守护 | `94b1970` |
+| 2026-10-24 | test | 补齐首页搜索正文分支的通配符转义守护 | `ef791fb` |
+| 2026-10-24 | feat | 主题选择跨标签页同步（T12） | `8de656b` |
+| 2026-10-24 | fix | 前端登出静默处理 401 并保证清态时序 | `9b502dd` |
+| 2026-10-24 | fix | 首页关键词过滤转义 LIKE 通配符（T13） | `71a2c47` |
+| 2026-10-24 | fix | 登录限流清理竞态与配置校验加固 | `31a320d` |
+| 2026-10-24 | fix | JWT 过滤器会话回查失败按未认证处理并补测试 | `f141928` |
 | 2026-10-24 | docs | 第七轮终审记录（已知取舍补第 10/11 条、计划实施偏差、文档订正） | 本次提交 |
 | 2026-10-24 | docs | 回填第七轮登录限流修复验证（Build #15 与 B.5 重跑） | `4afc9d7` |
 | 2026-10-24 | fix | 修复容器部署下登录限流未按真实客户端 IP 隔离（信任私网代理源 + compose 透传 LOGIN_*） | `419be00` |
