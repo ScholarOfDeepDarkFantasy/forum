@@ -49,9 +49,9 @@ vi.mock('element-plus', () => ({ ElMessage: { error: (...a) => elMessageError(..
 const { tagApi, userApi, postApi, authApi } = await import('./index.js')
 
 /** 构造一个 axios 错误对象，模拟后端返回 Result.fail 的响应体 */
-function httpError(status, message, url) {
+function httpError(status, message, url, extraConfig = {}) {
   return {
-    config: { url },
+    config: { url, ...extraConfig },
     response: { status, data: { success: false, message } },
     message: 'Request failed'
   }
@@ -139,6 +139,34 @@ describe('api 拦截器', () => {
     expect(window.location.href).toBe('/')
   })
 
+  it('silent 请求 401 仍清登录态，但不弹提示、不跳转（重复登出场景）', async () => {
+    localStorage.setItem('jf_token', 'expired')
+    localStorage.setItem('jf_user', '{"id":1}')
+    const err = httpError(401, '未登录或登录已过期', '/auth/logout', { silent: true })
+
+    await expect(handlers.responseError(err)).rejects.toBe(err)
+
+    // 清理是正确副作用：留着死 token 会让后续请求继续带 Bearer 并继续 401
+    expect(localStorage.getItem('jf_token')).toBeNull()
+    expect(localStorage.getItem('jf_user')).toBeNull()
+    // 但不应再制造「已退出登录 + 请先登录」两条矛盾提示，也不整页跳转
+    expect(elMessageError).not.toHaveBeenCalled()
+    // 用「没有跳到登录页」而不是断言具体值：各 spec 的 location 桩初始 href 可能不同
+    expect(window.location.href).not.toContain('/login')
+  })
+
+  it('silent 请求的 429 与网络错误也不弹提示', async () => {
+    const tooMany = httpError(429, '登录失败次数过多，请 1 分钟后再试', '/auth/logout', {
+      silent: true
+    })
+    await expect(handlers.responseError(tooMany)).rejects.toBe(tooMany)
+
+    const network = { config: { url: '/auth/logout', silent: true }, message: 'Network Error' }
+    await expect(handlers.responseError(network)).rejects.toBe(network)
+
+    expect(elMessageError).not.toHaveBeenCalled()
+  })
+
   it('业务失败（HTTP 200 + success:false）走响应成功分支并弹出消息', async () => {
     const rejected = handlers.response({
       data: { success: false, message: '只能操作自己的帖子' }
@@ -224,12 +252,12 @@ describe('userApi 请求路径', () => {
 })
 
 describe('authApi 请求路径', () => {
-  it('logout 调用 POST /auth/logout', async () => {
+  it('logout 以 silent 方式 POST /auth/logout', async () => {
     apiPost.mockResolvedValueOnce(undefined)
 
     await authApi.logout()
 
     expect(apiPost).toHaveBeenCalledTimes(1)
-    expect(apiPost).toHaveBeenCalledWith('/auth/logout')
+    expect(apiPost).toHaveBeenCalledWith('/auth/logout', null, { silent: true })
   })
 })

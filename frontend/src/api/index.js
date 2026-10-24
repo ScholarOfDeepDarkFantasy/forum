@@ -54,14 +54,20 @@ api.interceptors.response.use(
     const status = error.response?.status
     const message = error.response?.data?.message || error.message || '网络错误'
     const url = error.config?.url || ''
+    // 静默请求（用户主动登出）：语义与普通请求一致（401 仍清本地态），只是不弹提示、不跳转。
+    // 重复登出时服务端返回 401，若按普通 401 处理，用户会先看到「已退出登录」再看到
+    // 「请先登录」并被整页刷回登录页。
+    const silent = error.config?.silent === true
     if (status === 401 && !isCredentialEndpoint(url)) {
       localStorage.removeItem('jf_token')
       localStorage.removeItem('jf_user')
-      ElMessage.error('请先登录')
-      if (!location.pathname.startsWith(LOGIN_PATH)) {
-        location.href = LOGIN_PATH
+      if (!silent) {
+        ElMessage.error('请先登录')
+        if (!location.pathname.startsWith(LOGIN_PATH)) {
+          location.href = LOGIN_PATH
+        }
       }
-    } else {
+    } else if (!silent) {
       // 凭据接口的 401 也走这里：显示后端原文（如「用户名或密码错误」），不动登录态
       ElMessage.error(message)
     }
@@ -74,7 +80,7 @@ export const authApi = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
   me: () => api.get('/auth/me'),
-  logout: () => api.post('/auth/logout'),
+  logout: () => api.post('/auth/logout', null, { silent: true }),
   updateProfile: (data) => api.put('/auth/profile', data),
   publicProfile: (id) => api.get(`/auth/users/${id}`)
 }

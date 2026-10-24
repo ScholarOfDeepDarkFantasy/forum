@@ -34,6 +34,21 @@ describe('auth store 登出', () => {
     expect(localStorage.getItem('jf_user')).toBeNull()
   })
 
+  it('先调用后端登出、后清本地态（顺序反转会让服务端收到已清掉的 token）', async () => {
+    localStorage.setItem('jf_token', 'token-order')
+    const store = useAuthStore()
+    let tokenAtRequestTime = null
+    // 在「请求发出」的那一刻读 localStorage：此时 token 必须还在
+    authApi.logout.mockImplementationOnce(async () => {
+      tokenAtRequestTime = localStorage.getItem('jf_token')
+    })
+
+    await store.logout()
+
+    expect(tokenAtRequestTime).toBe('token-order')
+    expect(localStorage.getItem('jf_token')).toBeNull()
+  })
+
   it('后端登出失败也清空本地状态', async () => {
     const store = useAuthStore()
     store.token = 'token-2'

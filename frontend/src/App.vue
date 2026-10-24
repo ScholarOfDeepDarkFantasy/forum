@@ -17,13 +17,15 @@ const notifications = useNotificationStore()
 // 实时通知：登录后自动连 SSE，登出/卸载自动断开；断线退避与兜底轮询都在 composable 内
 useNotificationStream()
 
-function handleUserCommand(command) {
+async function handleUserCommand(command) {
   if (command === 'profile') {
     router.push('/profile')
   } else if (command === 'admin') {
     router.push('/admin')
   } else if (command === 'logout') {
-    auth.logout()
+    // 等后端尽力（成功或失败都已在 store 内部处理完）再宣布结果，
+    // 否则后端 15s 超时窗口里提示已经出现，与事实不符。
+    await auth.logout()
     // 角标/列表/分页等会话状态由 useNotificationStream 的 token watch 统一清空，
     // 这里不再各自清一半，避免登出/换号两条路径的重置逻辑漂移。
     ElMessage.success('已退出登录')
