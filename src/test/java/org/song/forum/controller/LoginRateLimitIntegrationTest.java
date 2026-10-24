@@ -68,7 +68,10 @@ class LoginRateLimitIntegrationTest {
         ResponseEntity<String> locked = login(ip, USER, PASSWORD);
 
         assertThat(locked.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
-        assertThat(locked.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isIn("59", "60");
+        // lock-ms=60000：剩余时间 <= 60s，向上取整后恒在 [1, 60]。
+        // 原来断言 "59"/"60" 隐含「3 次失败与第 4 次请求在同一秒」，慢 CI 上会假红。
+        long retryAfterSeconds = Long.parseLong(locked.getHeaders().getFirst(HttpHeaders.RETRY_AFTER));
+        assertThat(retryAfterSeconds).isBetween(1L, 60L);
         assertThat(locked.getBody()).contains("登录失败次数过多，请 1 分钟后再试");
     }
 

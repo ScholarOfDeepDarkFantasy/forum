@@ -9,7 +9,6 @@ import org.song.forum.exception.TooManyLoginAttemptsException;
 import java.time.Clock;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -41,6 +40,21 @@ public class LoginRateLimiter {
                             @Value("${app.security.login.max-failures:5}") int maxFailures,
                             @Value("${app.security.login.window-ms:900000}") long windowMs,
                             @Value("${app.security.login.lock-ms:900000}") long lockMs) {
+        // 配置写错时启动即失败，而不是在生产表现为「限流悄悄失效」：
+        // maxFailures < 1 会让每次失败都立刻锁定；windowMs <= 0 让窗口永远为空；
+        // lockMs <= 0 让锁定瞬间到期（等于没有锁定）。
+        if (maxFailures < 1) {
+            throw new IllegalArgumentException(
+                    "app.security.login.max-failures 必须 >= 1，当前 " + maxFailures);
+        }
+        if (windowMs <= 0) {
+            throw new IllegalArgumentException(
+                    "app.security.login.window-ms 必须 > 0，当前 " + windowMs);
+        }
+        if (lockMs <= 0) {
+            throw new IllegalArgumentException(
+                    "app.security.login.lock-ms 必须 > 0，当前 " + lockMs);
+        }
         this.clock = clock;
         this.maxFailures = maxFailures;
         this.windowMs = windowMs;
@@ -105,17 +119,17 @@ public class LoginRateLimiter {
     public int cleanupExpired() {
         long now = clock.millis();
         int removed = 0;
-        Iterator<Map.Entry<String, Window>> iterator = windows.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Window window = iterator.next().getValue();
+        for (Map.Entry<String, Window> entry : windows.entrySet()) {
+            Window window = entry.getValue();
             synchronized (window) {
                 if (window.lockedUntil > now) {
                     continue;
                 }
                 Long lastFailure = window.failures.peekLast();
                 boolean stale = lastFailure == null || lastFailure <= now - windowMs;
-                if (stale) {
-                    iterator.remove();
+                // 按 key + 实例身份删除：上面的判断与这里之间可能被 recordSuccess/recordFailure
+                // 换成了新窗口，ConcurrentHashMap 的迭代器 remove 只认 key，会误删新窗口。
+                if (stale && windows.remove(entry.getKey(), window)) {
                     removed++;
                 }
             }

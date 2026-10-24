@@ -120,6 +120,27 @@ class LoginRateLimiterTest {
         assertThat(limiter.cleanupExpired()).isEqualTo(2);
     }
 
+    @Test
+    void rejectsMaxFailuresBelowOne() {
+        assertThatThrownBy(() -> new LoginRateLimiter(clock, 0, WINDOW_MS, LOCK_MS))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("app.security.login.max-failures");
+    }
+
+    @Test
+    void rejectsNonPositiveWindow() {
+        assertThatThrownBy(() -> new LoginRateLimiter(clock, MAX_FAILURES, 0, LOCK_MS))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("app.security.login.window-ms");
+    }
+
+    @Test
+    void rejectsNonPositiveLockWindow() {
+        assertThatThrownBy(() -> new LoginRateLimiter(clock, MAX_FAILURES, WINDOW_MS, -1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("app.security.login.lock-ms");
+    }
+
     // ---------- 辅助 ----------
 
     private void failTimes(int times) {

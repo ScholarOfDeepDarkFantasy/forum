@@ -144,7 +144,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(TooManyLoginAttemptsException.class)
     public ResponseEntity<Result<Void>> handleTooManyLoginAttempts(TooManyLoginAttemptsException e) {
-        log.warn("登录失败次数超限: {}", e.getMessage());
+        // 事实日志在 LoginRateLimiter.recordFailure（带 IP、阈值与锁定时长）；
+        // 这里每条 429 都打 WARN 不带 IP，锁定期间等于给流量刷日志的放大器。
+        log.debug("登录失败次数超限: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()))
                 .body(Result.fail(e.getMessage()));
