@@ -6,7 +6,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -26,6 +28,7 @@ import java.util.List;
  * 封禁（status=BANNED）或登出/封禁导致的版本 +1 都会让旧 token 当场失效。
  * 不建立认证态后由 SecurityConfig 的 entry point 统一返回 401，不在这里写响应体。</p>
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -67,6 +70,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * 会话是否仍然有效：用户存在、未被封禁、且 token 版本与库中一致。
      * <p>旧 token 没有 ver claim 时 {@link JwtTokenProvider#tokenVersion(Claims)} 返回 0，
      * 因此版本为 0 的老用户不会被强制重登；一旦版本变成 1，旧 token 立即被拒。</p>
+     * <p>数据库不可用时按<b>未认证</b>处理（fail-closed）：受保护接口由 entry point 返回 401，
+     * 公开 GET 仍匿名可用。这里不修改任何持久化状态，因此库恢复后同一 token 依然有效——
+     * 与「登出会让 token 永久失效」是两回事。</p>
      */
     private boolean isSessionAlive(Claims claims) {
         Long userId;
@@ -75,9 +81,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (NumberFormatException e) {
             return false;
         }
-        return userRepository.findTokenStateById(userId)
-                .filter(state -> state.getStatus() != UserStatus.BANNED)
-                .map(state -> state.getTokenVersion() == JwtTokenProvider.tokenVersion(claims))
-                .orElse(false);
+        try {
+            return userRepository.findTokenStateById(userId)
+                    .filter(state -> state.getStatus() != UserStatus.BANNED)
+                    .map(state -> state.getTokenVersion() == JwtTokenProvider.tokenVersion(claims))
+                    .orElse(false);
+        } catch (DataAccessException e) {
+            // 只吞数据访问异常：NPE 之类的编程错误仍应冒出来，不能被伪装成「未登录」。
+            // 用 debug 而不是 warn：库故障期间每请求一条 WARN 会刷屏，真正的失败在数据源层已有日志。
+            log.debug("回查会话状态失败，按未认证处理: {}", e.toString());
+            return false;
+        }
     }
 }

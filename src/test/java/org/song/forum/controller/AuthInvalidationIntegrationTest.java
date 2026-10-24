@@ -132,6 +132,36 @@ class AuthInvalidationIntegrationTest {
         assertThat(me(legacy).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    @Test
+    void bannedStatusWithoutVersionBumpRejectsToken() {
+        AuthResponse victim = register("inval_status_only");
+
+        // 只改 status、不动 token_version：版本仍然匹配，401 只能来自过滤器自己对 status 的检查
+        jdbcTemplate.update("update users set status = 'BANNED' where id = ?", victim.getId());
+
+        ResponseEntity<String> resp = me(victim.getToken());
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(resp.getBody()).contains("未登录或登录已过期");
+    }
+
+    @Test
+    void unbanDoesNotReviveOldToken() {
+        AuthResponse victim = register("inval_unban");
+        AuthResponse admin = login("admin", "admin123456");
+
+        // 走管理 API 封禁：服务端会把 token_version +1
+        changeStatus(admin.getToken(), victim.getId(), "BANNED", null);
+        assertThat(me(victim.getToken()).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // 解封只改状态，版本不回退 → 旧 token 不能复活
+        changeStatus(admin.getToken(), victim.getId(), "ACTIVE", null);
+        assertThat(me(victim.getToken()).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // 对照：重新登录拿到的新 token 可用，证明上面的 401 来自版本而不是账号不可用
+        AuthResponse fresh = login("inval_unban", "password123");
+        assertThat(me(fresh.getToken()).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
     // ---------- 辅助方法 ----------
 
     private String url(String path) {
