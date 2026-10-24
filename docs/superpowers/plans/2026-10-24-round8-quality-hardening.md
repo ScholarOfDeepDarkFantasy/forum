@@ -1716,12 +1716,12 @@ grep -n '待填' docs/superpowers/specs/2026-10-24-round8-quality-hardening-desi
 
 ## 11. Execution Handoff
 
-- [ ] Task 1：JWT 过滤器会话回查失败按未认证处理
-- [ ] Task 2：限流器清理竞态与配置校验加固
-- [ ] Task 3：首页关键词过滤转义 LIKE 通配符
-- [ ] Task 4：前端登出静默处理 401 并保证清态时序
-- [ ] Task 5：主题选择跨标签页同步
-- [ ] Task 6：文档、全量验证与上线
+- [x] Task 1：JWT 过滤器会话回查失败按未认证处理
+- [x] Task 2：限流器清理竞态与配置校验加固
+- [x] Task 3：首页关键词过滤转义 LIKE 通配符
+- [x] Task 4：前端登出静默处理 401 并保证清态时序
+- [x] Task 5：主题选择跨标签页同步
+- [x] Task 6：文档、全量验证与上线
 
 执行时最容易写错的 7 个点：
 
@@ -1832,5 +1832,7 @@ python /tmp/forum-ssh.py "curl -s -o /dev/null -w '%{http_code}\n' http://127.0.
 1. 计划 Task 3 的示意查询是 `select p.id` + `Page<Long>`，与 Step 3-2 及基线实现（`SELECT p` + `EntityGraph`）矛盾；实现按基线走，只给既有查询加 `escapeLike` 与 `ESCAPE '!'`，不改查询形状（改形状会破坏既有分页与排序断言）。
 2. 计划示意整段替换 `searchIds` 的 javadoc，但同一段正文又要求「不要删原注释」，两者矛盾；实现保留原注释，只做必要订正（`PostService` 空串分支的注释在 `ef791fb` 纠正）。
 3. 计划 Task 5 预测 RED 为 3 红：实际必然只有 2 红，第 3 例（「坏值从显式 dark 起步」）在没有实现时是平凡成立的；已在 `94b1970` 把该例改为从显式 dark 起步，使它在无实现时不成立，恢复 RED 的有效性。
+
+**上线记录（2026-10-24）**：回填提交前，`0e691b9` 已由 Jenkins Build **#18** 部署（镜像 `localhost/forum-backend:18`、容器 healthy），附录 B 的 B.1–B.6 冒烟全部通过；回填细节见 `docs/DEVELOPMENT.md` §4.13「上线验收（2026-10-24）」。本计划 checkbox 由回填提交勾选。
 
 **文档编辑偏差**：计划 Step 6-4 标注的行号基于 `d56a8aa`，本轮编辑前均先 `grep -n` 实测再改；§8 变更日志按实际 9 次提交写成 8 行（docs 行「本次提交」+ 7 个已有哈希），§4.13 修复清单写成 11 行。另：README/DEVELOPMENT 的代码规模与测试分布数字按 `find` / `target/surefire-reports` / `pnpm test` 实测填写，未采用计划里的估算增量。

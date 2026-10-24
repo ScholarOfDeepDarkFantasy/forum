@@ -641,13 +641,25 @@ cd frontend && pnpm test --run
 **已知限制**：本轮没有新增部署要求（无迁移、无配置项、无 nginx 改动），见 `docs/deployment/README.md` §7 末尾。除 §4.12 保留的取舍外，本轮双审还记录以下遗留项（均不阻塞上线）：
 
 1. `LoginRateLimiter` 的第 4 个阈值 `cleanup-interval-ms` **没有**构造器显式校验：它由 `@Scheduled` 的占位符消费，而不是构造器参数，因此 `=0` 不会得到前三个阈值那样的 fail fast 消息，而是在启动时抛裸 `IllegalArgumentException`（其余三个阈值已按第 3 行修法校验）。
-2. `TagRepository.findWithPostCounts` 的 tag 关键词 LIKE 仍未转义（本轮 T13 只覆盖首页 `GET /api/posts?keyword=` 与既有的 `/api/posts/search`）；建议作为技术债 T16 记入 §5.1。
+2. `TagRepository.findWithPostCounts` 的 tag 关键词 LIKE 仍未转义（本轮 T13 只覆盖首页 `GET /api/posts?keyword=` 与既有的 `/api/posts/search`）；已作为技术债 T17 记入 §5.1。
 3. `App.spec.js` 的登出用例会触发一次真实 jsdom XHR（`notifications.refreshUnread`，异常被 store 吞掉，不会产生未处理 rejection）；`auth.spec` 的「无关键忽略」断言依赖 `vi.resetModules()` 提供的模块实例隔离，而非真实的多标签页环境。
 4. `api/index.js` 的成功分支（HTTP 200 + `success: false`）不识别 `silent`，仍会弹提示；后端目前没有这条返回路径，属防御性缺口。
 5. `JwtAuthenticationFilter` 的 `DataAccessException` 分支 debug 日志未带 `userId`（生产默认 info 级，不可见），排障时需临时调级。
 6. 本轮不处理 chunk 分包，构建仍会出现 `index-*.js` 约 878 kB 的体积警告（预期，见 spec §2.2）。
 
-**上线验收**：（Task 6 上线后回填：Build 号、镜像 tag、冒烟结果）
+**上线验收（2026-10-24）**：
+
+- 推送 `0e691b9` 后 Jenkins Build **#18** **SUCCESS**（pollSCM 触发，16:42:11–16:45:55 +08:00，约 3m44s）；`forum-backend` 重建后 `Up (healthy)`，镜像 `localhost/forum-backend:18` 与构建号一致；`localhost/forum-backend:17` 保留为回滚目标（部署脚本按 KeepLast2 清理，`:16` 已删除属预期）。
+- 健康检查：直连 `127.0.0.1:8086/api/health` 与经 nginx（`Host: raspi`，`/forum/api/health`）均返回 200，`status":"UP"`。
+- 登出回归：`me=200 → logout=200 → me(旧 token)=401 → 重复 logout=401`，与第七轮行为一致。
+- 首页关键词（第八轮修复）：`GET /api/posts?keyword=100%25` 只命中标题含 `100%` 的帖子（`totalElements=1`），未命中 `1000`；`keyword=a_b` 只命中真正含字面量 `a_b` 的帖子，只含 `axb`/`acb` 的对照帖未被命中；`keyword=100` 命中 2 条（`1000` + `100%`），符合子串语义。
+- 登录限流回归：`X-Real-IP: 203.0.113.9` 连续 5 次错密码均 401、第 6 次 **429** 且 `Retry-After: 900`（`登录失败次数过多，请 15 分钟后再试`）；换 `X-Real-IP: 198.51.100.7` 用正确密码 **200**，按 IP 隔离正常（只有测试保留网段被锁 15 分钟，不影响真实客户端）。
+- Flyway：最新迁移 `4|add user token version|t`；`token_version` 为 `bigint / NO / 0`、无 NULL 值（第八轮无新迁移）。
+- 部署面：容器内 `LOGIN_MAX_FAILURES=5`、`LOGIN_WINDOW_MS=900000`、`LOGIN_LOCK_MS=900000`、`LOGIN_CLEANUP_INTERVAL_MS=60000` 均生效；`/app` 含 `app.jar`、`logs`、`uploads`；`/forum/` 与 `/forum/posts/1` 返回 200，`/forum/assets/` 前缀正确，`/forum/api/notifications/stream` 无票据 401。
+- 说明：raspi 的 `.env` 目前没有写 `LOGIN_*` 覆盖项，阈值来自 `docker-compose.yml` 的 `${LOGIN_...:-默认值}` 链；要调整阈值仍只需在 `.env` 追加对应键并重启容器（无需改镜像）。
+- 冒烟测试数据：`admin` 在板块 1 新增 6 帖（id 21–26，标题以「R8冒烟-」开头），未新建用户；已在 §5.1 T8 记录，演示前可清理。
+- 全量测试：后端 21 个测试类 / 176 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 31 个 spec / 321 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过（既有 `index-*.js` 约 878 kB 警告为本轮预期）。
+- 主题跨标签同步无法用 curl 验证（由 `useTheme.spec.js` 的 3 例 + 变异测试锁定）；人工验收：两个 `/forum/` 标签页在 A 页切换主题，B 页应立即跟随、无需刷新。
 
 ---
 
@@ -664,7 +676,7 @@ cd frontend && pnpm test --run
 | T5 | ~~**登录接口无速率限制**~~ | 已关闭 | 2026-10-23 第七轮：按客户端 IP 的失败窗口 + 锁定，429 带 `Retry-After`（见 §4.12）。计数在单实例内存里，多实例需换共享存储（见 §5.2） |
 | T6 | **REPLY 通知锚点只覆盖第一页评论** | 低 | 详见 §6 |
 | T7 | **数据库连接串硬编码 `raspi`** | 低 | `application.yml` 默认值仍是 `localhost`（面向本地开发）；实际部署形态已写入 `.env.example` 与 `docs/deployment/README.md`（容器内 `host.containers.internal:5432`）。代码内默认值没有改成 `raspi`，避免本地开发被污染 |
-| T8 | **残留的冒烟测试数据** | 低 | 真实库中存在 `smoke_user`、`t4_op`、`t4_ap`、板块「冒烟测试板块」等手工测试数据，交付演示前应清理 |
+| T8 | **残留的冒烟测试数据** | 低 | 真实库中存在 `smoke_user`、`t4_op`、`t4_ap`、板块「冒烟测试板块」等手工测试数据；第八轮冒烟又在板块 1 新增 6 帖（id 21–26，标题前缀「R8冒烟-」）。交付演示前应一并清理 |
 | T9 | ~~Docker 镜像未经实际构建验证~~ | 已关闭 | 2026-10-19 起在 raspi 上由 Jenkins 用 podman 实际构建并部署（`--format docker` 保留 HEALTHCHECK），见 §4.7 |
 | T10 | ~~前端未容器化~~ | 已关闭 | 需求明确前端不进容器：由主机 nginx 直接托管 dist（见 §4.7），不再作为技术债 |
 | T11 | **头像文件不在备份范围** | 中 | 头像落在宿主机 `/pd/Program/forum/uploads/`，数据库备份不含它；恢复时需单独 `tar` 该目录并保留属主，再跑 `deploy.sh` 修正权限（`podman unshare chmod a+rX`）。孤儿文件（换头像/删号后残留）目前无清理任务，见 §4.9 |
@@ -672,6 +684,7 @@ cd frontend && pnpm test --run
 | T13 | ~~**首页关键词过滤不转义 LIKE 通配符**~~ | 已关闭 | 2026-10-24 第八轮：`PostService.list` 先 `escapeLike`，`searchIds` 两处 LIKE 加 `ESCAPE '!'`，与 `/api/posts/search` 同一约定（见 §4.13）。原记录：首页 GET /api/posts?keyword= 走 searchIds 的 LOWER(...) LIKE LOWER(CONCAT('%', :keyword, '%'))，未转义 %/_，搜「100%」会命中「1000」。本轮只给新搜索接口做了转义；修首页需同步改 JPQL 与前端提示，属独立小改动 |
 | T14 | **搜索无分词、无相关度排序** | 中 | 采用 pg_trgm 子串匹配：中文不分词，1–2 个字的关键词的 trigram 覆盖不足，规划器会放弃索引改走顺序扫描；排序只有「标题命中优先 + 时间倒序」，没有 `ts_rank`/`similarity` 之类相关度。数据量增长后的升级路径是 `tsvector`（需分词扩展）或两阶段检索 |
 | T15 | **`posts.content` 无长度上限** | 低 | 正文列是 `TEXT` 且无应用层长度校验；超长正文会放大 `snippet` 截取与索引维护成本，也让 `pg_trgm` 的 GIN 索引更大。可加与标题一致的长度提示或截断策略 |
+| T17 | **标签检索的 LIKE 通配符未转义** | 低 | 第八轮 T13 只覆盖首页 `GET /api/posts?keyword=` 与既有的 `/api/posts/search`；`TagRepository.findWithPostCounts` 的标签关键词 LIKE 仍把 `%`/`_` 当通配符（`GET /api/tags?keyword=`），搜「a_b」会命中「axb」。修法同 T13：service 先 `escapeLike`，JPQL 加 `ESCAPE '!'` |
 
 ### 5.2 候选功能（第七轮新增「限流共享存储」一项）
 
@@ -753,7 +766,8 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-24 | docs | 记录第八轮质量加固（测试基线、已知限制与变更日志） | 本次提交 |
+| 2026-10-24 | docs | 回填第八轮上线验收（Build #18、冒烟结果与提交哈希） | 本次提交 |
+| 2026-10-24 | docs | 记录第八轮质量加固（测试基线、已知限制与变更日志） | `0e691b9` |
 | 2026-10-24 | test | 加固登出时序与主题跨标签的回归守护 | `94b1970` |
 | 2026-10-24 | test | 补齐首页搜索正文分支的通配符转义守护 | `ef791fb` |
 | 2026-10-24 | feat | 主题选择跨标签页同步（T12） | `8de656b` |
@@ -761,7 +775,7 @@ cd frontend && pnpm test --run
 | 2026-10-24 | fix | 首页关键词过滤转义 LIKE 通配符（T13） | `71a2c47` |
 | 2026-10-24 | fix | 登录限流清理竞态与配置校验加固 | `31a320d` |
 | 2026-10-24 | fix | JWT 过滤器会话回查失败按未认证处理并补测试 | `f141928` |
-| 2026-10-24 | docs | 第七轮终审记录（已知取舍补第 10/11 条、计划实施偏差、文档订正） | 本次提交 |
+| 2026-10-24 | docs | 第七轮终审记录（已知取舍补第 10/11 条、计划实施偏差、文档订正） | `d56a8aa` |
 | 2026-10-24 | docs | 回填第七轮登录限流修复验证（Build #15 与 B.5 重跑） | `4afc9d7` |
 | 2026-10-24 | fix | 修复容器部署下登录限流未按真实客户端 IP 隔离（信任私网代理源 + compose 透传 LOGIN_*） | `419be00` |
 | 2026-10-23 | docs | 第七轮安全加固上线验收（JWT 主动失效与登录限流、Build #13）与变更日志回填 | `68d4e10` |
