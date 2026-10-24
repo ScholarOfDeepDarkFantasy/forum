@@ -34,18 +34,29 @@ describe('auth store 登出', () => {
     expect(localStorage.getItem('jf_user')).toBeNull()
   })
 
-  it('先调用后端登出、后清本地态（顺序反转会让服务端收到已清掉的 token）', async () => {
+  it('先调用后端登出、后清本地态（清态必须等待响应，否则服务端收到已清掉的 token）', async () => {
     localStorage.setItem('jf_token', 'token-order')
     const store = useAuthStore()
+    let releaseRequest = null
     let tokenAtRequestTime = null
-    // 在「请求发出」的那一刻读 localStorage：此时 token 必须还在
-    authApi.logout.mockImplementationOnce(async () => {
-      tokenAtRequestTime = localStorage.getItem('jf_token')
-    })
+    // 请求保持挂起，才能区分「调用顺序」和「是否等待响应」
+    authApi.logout.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          tokenAtRequestTime = localStorage.getItem('jf_token')
+          releaseRequest = resolve
+        })
+    )
 
-    await store.logout()
+    const logoutPromise = store.logout()
 
+    // 后端尚未响应：token 必须还在（顺序反转或丢掉 await 都会让这里变红）
     expect(tokenAtRequestTime).toBe('token-order')
+    expect(localStorage.getItem('jf_token')).toBe('token-order')
+
+    releaseRequest()
+    await logoutPromise
+
     expect(localStorage.getItem('jf_token')).toBeNull()
   })
 

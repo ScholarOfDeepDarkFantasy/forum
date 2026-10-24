@@ -263,23 +263,58 @@ describe('useTheme', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
 
-  it('其他标签页清空主题（key 为 null）时回退 system', async () => {
-    localStorage.setItem(STORAGE_KEY, 'dark')
+  it('其他标签页删除键或 clear() 时回退 system，无关键忽略', async () => {
     const theme = await loadTheme()
+    expect(theme.mode.value).toBe('system')
+
+    // 无关键（例如登出时清 token）不应改变主题：
+    // 此时 localStorage 里已有显式 dark，但对 jf_token 事件的正确处理是「忽略」。
+    localStorage.setItem(STORAGE_KEY, 'dark')
+    localStorage.setItem('jf_token', 'token-1')
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: 'jf_token', newValue: 'token-1', storageArea: localStorage })
+    )
+    await nextTick()
+    expect(theme.mode.value).toBe('system')
+
+    // 同一个键的事件才生效
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: STORAGE_KEY, newValue: 'dark', storageArea: localStorage })
+    )
+    await nextTick()
     expect(theme.mode.value).toBe('dark')
 
+    // 真实路径：另一标签页选「跟随系统」= removeItem，事件是 key=STORAGE_KEY、newValue=null
     localStorage.removeItem(STORAGE_KEY)
     window.dispatchEvent(
-      new StorageEvent('storage', { key: null, newValue: null, storageArea: localStorage })
+      new StorageEvent('storage', { key: STORAGE_KEY, newValue: null, storageArea: localStorage })
     )
     await nextTick()
 
     expect(theme.mode.value).toBe('system')
     expect(document.documentElement.classList.contains('dark')).toBe(false)
+
+    // clear() 路径：key 为 null
+    localStorage.setItem(STORAGE_KEY, 'dark')
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: STORAGE_KEY, newValue: 'dark', storageArea: localStorage })
+    )
+    await nextTick()
+    expect(theme.mode.value).toBe('dark')
+
+    localStorage.clear()
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: null, newValue: null, storageArea: localStorage })
+    )
+    await nextTick()
+    expect(theme.mode.value).toBe('system')
   })
 
   it('其他标签页写入坏值时回退 system，且不把坏值写回 localStorage', async () => {
+    // 从显式 dark 起步，才能区分「回退 system」与「根本没有监听」
+    localStorage.setItem(STORAGE_KEY, 'dark')
     const theme = await loadTheme()
+    expect(theme.mode.value).toBe('dark')
 
     localStorage.setItem(STORAGE_KEY, 'purple')
     window.dispatchEvent(
@@ -292,6 +327,7 @@ describe('useTheme', () => {
     await nextTick()
 
     expect(theme.mode.value).toBe('system')
+    expect(theme.isDark.value).toBe(false)
     expect(document.documentElement.classList.contains('dark')).toBe(false)
     // 不写回：写回会再次触发其他标签页的 storage 事件，形成回环
     expect(localStorage.getItem(STORAGE_KEY)).toBe('purple')
