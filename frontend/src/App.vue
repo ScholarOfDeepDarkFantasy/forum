@@ -2,6 +2,8 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+// 语言包随组件树提供（第九轮：不再 app.use(ElementPlus, { locale: zhCn })）
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { Bell, User, SwitchButton, Connection, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notifications'
@@ -43,58 +45,60 @@ onMounted(() => {
 </script>
 
 <template>
-  <el-container class="layout">
-    <el-header class="header">
-      <div class="header-inner">
-        <router-link to="/" class="brand">
-          <el-icon :size="22"><Connection /></el-icon>
-          <span>JavaForum</span>
-        </router-link>
+  <el-config-provider :locale="zhCn">
+    <el-container class="layout">
+      <el-header class="header">
+        <div class="header-inner">
+          <router-link to="/" class="brand">
+            <el-icon :size="22"><Connection /></el-icon>
+            <span>JavaForum</span>
+          </router-link>
 
-        <router-link to="/tags" class="nav-link">标签</router-link>
+          <router-link to="/tags" class="nav-link">标签</router-link>
 
-        <HeaderSearch />
+          <HeaderSearch />
 
-        <div class="nav-actions">
-          <ThemeToggle />
-          <template v-if="auth.isLoggedIn">
-            <el-badge :value="notifications.unreadCount" :hidden="notifications.unreadCount === 0" class="bell-badge">
-              <el-button :icon="Bell" circle text @click="router.push('/notifications')" />
-            </el-badge>
-            <el-dropdown @command="handleUserCommand">
-              <span class="user-chip">
-                <UserAvatar
-                  :url="auth.user?.avatarUrl"
-                  :name="auth.user?.nickname || auth.user?.username"
-                  :size="28"
-                />
-                <span class="username">{{ auth.user?.nickname || auth.user?.username }}</span>
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="profile" :icon="User">个人中心</el-dropdown-item>
-                  <el-dropdown-item v-if="auth.isAdmin" command="admin" :icon="Setting">管理后台</el-dropdown-item>
-                  <el-dropdown-item command="logout" :icon="SwitchButton" divided>退出登录</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </template>
-          <template v-else>
-            <el-button text @click="router.push('/login')">登录</el-button>
-            <el-button type="primary" @click="router.push('/register')">注册</el-button>
-          </template>
+          <div class="nav-actions">
+            <ThemeToggle />
+            <template v-if="auth.isLoggedIn">
+              <el-badge :value="notifications.unreadCount" :hidden="notifications.unreadCount === 0" class="bell-badge">
+                <el-button :icon="Bell" circle text @click="router.push('/notifications')" />
+              </el-badge>
+              <el-dropdown @command="handleUserCommand">
+                <span class="user-chip">
+                  <UserAvatar
+                    :url="auth.user?.avatarUrl"
+                    :name="auth.user?.nickname || auth.user?.username"
+                    :size="28"
+                  />
+                  <span class="username">{{ auth.user?.nickname || auth.user?.username }}</span>
+                </span>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="profile" :icon="User">个人中心</el-dropdown-item>
+                    <el-dropdown-item v-if="auth.isAdmin" command="admin" :icon="Setting">管理后台</el-dropdown-item>
+                    <el-dropdown-item command="logout" :icon="SwitchButton" divided>退出登录</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </template>
+            <template v-else>
+              <el-button text @click="router.push('/login')">登录</el-button>
+              <el-button type="primary" @click="router.push('/register')">注册</el-button>
+            </template>
+          </div>
         </div>
-      </div>
-    </el-header>
+      </el-header>
 
-    <el-main class="main">
-      <router-view :key="$route.fullPath" />
-    </el-main>
+      <el-main class="main">
+        <router-view :key="$route.fullPath" />
+      </el-main>
 
-    <el-footer class="footer">
-      JavaForum · Spring Boot 3 + Vue 3 MVP
-    </el-footer>
-  </el-container>
+      <el-footer class="footer">
+        JavaForum · Spring Boot 3 + Vue 3 MVP
+      </el-footer>
+    </el-container>
+  </el-config-provider>
 </template>
 
 <style scoped>

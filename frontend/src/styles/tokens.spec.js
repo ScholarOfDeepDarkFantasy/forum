@@ -105,9 +105,17 @@ const INDEX_HTML = resolve(process.cwd(), 'index.html')
 
 describe('main.js 样式导入顺序', () => {
   const source = readFileSync(MAIN_FILE, 'utf8')
+  // 第九轮：Element Plus 改为按需引入，入口样式 = 基础变量 + 暗色变量 + 4 条编程式 API 样式
+  // + 项目自己的令牌与工具类（base/dark/4 条程序式 = 6 条 Element Plus 样式 + 6 条本地样式 = 12 条）。
+  // 顺序要求：base.css 必须最先（tokens.css 覆盖 --el-color-primary
+  // 依赖它先加载），暗色变量次之，token 层排在所有 Element Plus 样式之后。
   const order = [
-    'element-plus/dist/index.css',
+    'element-plus/theme-chalk/base.css',
     'element-plus/theme-chalk/dark/css-vars.css',
+    'element-plus/es/components/message/style/css',
+    'element-plus/es/components/message-box/style/css',
+    'element-plus/es/components/notification/style/css',
+    'element-plus/es/components/loading/style/css',
     './styles/tokens.css',
     './styles/common.css',
     './styles/markdown.css',
@@ -116,7 +124,7 @@ describe('main.js 样式导入顺序', () => {
     './style.css'
   ]
 
-  it('8 个样式导入按设计顺序出现', () => {
+  it('12 条样式导入按设计顺序出现', () => {
     const positions = order.map((path) => source.indexOf(path))
     for (const [index, position] of positions.entries()) {
       expect(position, `${order[index]} 未导入`).toBeGreaterThan(-1)

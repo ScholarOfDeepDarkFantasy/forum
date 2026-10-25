@@ -135,7 +135,13 @@ function cancelReply() {
 }
 
 async function removeComment(comment) {
-  await ElMessageBox.confirm('确定删除该评论吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm('确定删除该评论吗？', '提示', {
+    type: 'warning',
+    // 第九轮：按需引入后 ElMessageBox 拿不到 <el-config-provider>，显式给中文按钮文案
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    distinguishCancelAndClose: true
+  })
   await commentApi.remove(comment.id)
   ElMessage.success('已删除')
   await loadComments(commentPage.value)
@@ -164,7 +170,13 @@ async function toggleFavorite() {
 }
 
 async function removePost() {
-  await ElMessageBox.confirm('确定删除该帖子吗？（软删除，不可恢复显示）', '提示', { type: 'warning' })
+  await ElMessageBox.confirm('确定删除该帖子吗？（软删除，不可恢复显示）', '提示', {
+    type: 'warning',
+    // 第九轮：按需引入后 ElMessageBox 拿不到 <el-config-provider>，显式给中文按钮文案
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    distinguishCancelAndClose: true
+  })
   await postApi.remove(post.value.id)
   ElMessage.success('已删除')
   router.push('/')

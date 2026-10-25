@@ -56,7 +56,13 @@ async function saveBoard() {
 }
 
 async function removeBoard(b) {
-  await ElMessageBox.confirm(`确定删除板块「${b.name}」吗？（板块下有帖子时会被拒绝）`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(`确定删除板块「${b.name}」吗？（板块下有帖子时会被拒绝）`, '提示', {
+    type: 'warning',
+    // 第九轮：按需引入后 ElMessageBox 拿不到 <el-config-provider>，显式给中文按钮文案
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    distinguishCancelAndClose: true
+  })
   await boardApi.remove(b.id)
   ElMessage.success('已删除')
   await loadBoards()

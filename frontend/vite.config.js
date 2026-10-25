@@ -1,6 +1,8 @@
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 /**
  * 部署路径。
@@ -18,9 +20,22 @@ const basePath = process.env.VITE_BASE_PATH || '/'
 const apiPrefix = `${basePath === '/' ? '' : basePath.replace(/\/+$/, '')}/api`
 
 // 开发环境代理到后端 8080，前端统一走同一前缀的相对路径，避免 CORS
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   base: basePath,
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    // 关键：vitest 下保持「不解析组件」——测试用 global.stubs 拦截 el-* 标签；
+    // 若测试期也注入组件，stub 不再命中，既有 321 个用例会大面积失效（实测 63 例 / 7 spec 失败）。
+    // 构建期才挂按需解析：模板里的 <el-*> 在编译期变成
+    //   import { ElButton } from 'element-plus/es'
+    //   import 'element-plus/es/components/button/style/css'
+    // importStyle: 'css' 复用官方 theme-chalk 的 css 产物，不引入 sass 编译链。
+    // dirs: [] 关闭目录扫描（不把 src/components 全部注册成全局组件；自有组件都显式 import）。
+    // dts: false —— 仓库没有 TypeScript，不生成 components.d.ts。
+    ...(mode === 'test'
+      ? []
+      : [Components({ resolvers: [ElementPlusResolver({ importStyle: 'css' })], dirs: [], dts: false })])
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
@@ -40,4 +55,4 @@ export default defineConfig({
     globals: true,
     include: ['src/**/*.spec.js']
   }
-})
+}))
