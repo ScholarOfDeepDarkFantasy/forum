@@ -1491,7 +1491,7 @@ git show --stat --oneline HEAD
 
 ### Step 5-1：`README.md` 更新
 
-- [ ] **Step 5-1a：替换「样式与设计令牌」段里的导入顺序描述**
+- [x] **Step 5-1a：替换「样式与设计令牌」段里的导入顺序描述**
 
 `README.md` 的「样式与设计令牌」段里（`README.md:289`，即以「第四轮起颜色令牌分成两套」开头的那一段），要改的是**其中的一句话**（原文逐字）：
 
@@ -1511,7 +1511,7 @@ git show --stat --oneline HEAD
 `base.css` 必须先于 `tokens.css`：`tokens.css` 覆盖 `--el-color-primary` 依赖基础变量先加载。模板里的 `<el-*>` 与 `v-loading` 由 `unplugin-vue-components` 在编译期解析（见 `frontend/vite.config.js`）；`loading` 的样式服务 `v-loading` 指令（`ElLoading.directive` 在 `main.js` 全局注册）。新增编程式 API（如后续的 `ElTooltip` 单例）时，除了从 `element-plus` 具名导入，还要在 `frontend/src/main.js` 补一条 `element-plus/es/components/<name>/style/css`——这是按需引入唯一的「手工账」。
 ```
 
-- [ ] **Step 5-1b：在「测试」段补体积检查命令**
+- [x] **Step 5-1b：在「测试」段补体积检查命令**
 
 在 `README.md` 前端测试小节（`### 前端测试` 之后）追加：
 
@@ -1530,7 +1530,7 @@ node scripts/check-bundle.mjs --dist /tmp/some-dist   # 也可以检查任意一
 
 ### Step 5-2：`docs/DEVELOPMENT.md` 更新
 
-- [ ] **Step 5-2a：改进度行与快照日期**
+- [x] **Step 5-2a：改进度行与快照日期**
 
 把 `:126` 的：
 
@@ -1556,13 +1556,13 @@ node scripts/check-bundle.mjs --dist /tmp/some-dist   # 也可以检查任意一
 ## 3. 当前状态快照（2026-10-25）
 ```
 
-- [ ] **Step 5-2b：更新 §3.2 测试基线表里的数字**
+- [x] **Step 5-2b：更新 §3.2 测试基线表里的数字**
 
 把表中前端一行与后端一行的用例数改成：后端 `177`（21 个测试类，1 例 POSIX 权限用例 Windows 跳过）、前端 `323`（32 个 spec）。同时更新紧随其后的「前端 spec 分布」合计为 `323`。
 
 > 若前端产品/测试**行数**（§3.1 表）也顺手统计了一遍，可以只改用例数不改行数——§3.1 是快照，不要求每轮重算。改与不改都要在 §4.14 的「测试与验证」里写明用例数与 spec 数，二者一致即可。
 
-- [ ] **Step 5-2c：新建 `### 4.14 第九轮：前端性能优化（2026-10-25）`**
+- [x] **Step 5-2c：新建 `### 4.14 第九轮：前端性能优化（2026-10-25）`**
 
 插在 §4.13 结束处（§5.1 之前，原 `#### 4.13` 段落末尾之后）。内容如下（`⟨…⟩` 是**上线后回填**的字段，第 6 次提交时先留成 `（待回填）`，第 7 次提交填数字）：
 
@@ -1632,7 +1632,7 @@ node scripts/check-bundle.mjs --dist /tmp/some-dist   # 也可以检查任意一
 ⟨待回填：Jenkins 构建号 / 镜像 tag / 提交范围 / 健康检查 / 缓存头实测 / 体积实测 / 人工回归结论⟩
 ````
 
-- [ ] **Step 5-2d：把 §5.1 的 T17 标为已关闭**
+- [x] **Step 5-2d：把 §5.1 的 T17 标为已关闭**
 
 `docs/DEVELOPMENT.md` §5.1 技术债表里 T17 那一行（`docs/DEVELOPMENT.md:687`，原文逐字）：
 
@@ -1646,7 +1646,7 @@ node scripts/check-bundle.mjs --dist /tmp/some-dist   # 也可以检查任意一
 | T17 | ~~**标签检索的 LIKE 通配符未转义**~~ | 已关闭 | 2026-10-25 第九轮：`TagService` 先 `escapeLike`（转义 `!`/`%`/`_`），`TagRepository.findWithPostCounts` 的 JPQL 加 `ESCAPE '!'`；`TagFlowIntegrationTest` 新增 `@Order(9)` 覆盖 `100%`、`a_b`、`!` 三个关键词（见 §4.14）。原记录：第八轮 T13 只覆盖首页 `GET /api/posts?keyword=` 与既有的 `/api/posts/search`；`TagRepository.findWithPostCounts` 的标签关键词 LIKE 仍把 `%`/`_` 当通配符（`GET /api/tags?keyword=`），搜「a_b」会命中「axb」。修法同 T13：service 先 `escapeLike`，JPQL 加 `ESCAPE '!'` |
 ```
 
-- [ ] **Step 5-2e：删掉 §6 已知限制里「构建产物 >500 kB 警告」那一条**
+- [x] **Step 5-2e：删掉 §6 已知限制里「构建产物 >500 kB 警告」那一条**
 
 `docs/DEVELOPMENT.md` §6 已知问题表里（`docs/DEVELOPMENT.md:718`，原文逐字）：
 
@@ -1664,13 +1664,13 @@ cd /e/JavaSpace/forum && grep -n "500kB\|chunk" docs/DEVELOPMENT.md
 
 ### Step 5-3：`docs/deployment/README.md` 更新
 
-- [ ] **Step 5-3a：§5 的冒烟小节已在 Task 3 加好**，本步只确认它在 `## 6. 排障` 之前
+- [x] **Step 5-3a：§5 的冒烟小节已在 Task 3 加好**，本步只确认它在 `## 6. 排障` 之前
 
 ```bash
 cd /e/JavaSpace/forum && grep -n "静态资源缓存头（第九轮）验证\|^## 6. 排障" docs/deployment/README.md
 ```
 
-- [ ] **Step 5-3b：在 §7 已知限制追加一条**
+- [x] **Step 5-3b：在 §7 已知限制追加一条**
 
 在 §7「已知限制」列表末尾追加：
 
@@ -1680,7 +1680,7 @@ cd /e/JavaSpace/forum && grep -n "静态资源缓存头（第九轮）验证\|^#
 
 ### Step 5-4：勾选本计划的 checkbox
 
-- [ ] **Step 5-4：把已完成的 `- [ ]` 改成 `- [x]`**
+- [x] **Step 5-4：把已完成的 `- [ ]` 改成 `- [x]`**
 
 ```bash
 cd /e/JavaSpace/forum && grep -c '^- \[ \] \*\*Step [1-4]-' docs/superpowers/plans/2026-10-25-round9-frontend-performance.md
@@ -1690,7 +1690,7 @@ cd /e/JavaSpace/forum && grep -c '^- \[ \] \*\*Step [1-4]-' docs/superpowers/pla
 
 ### Step 5-5：第 6 次提交 + 推送
 
-- [ ] **Step 5-5a：确认本轮 4 条代码提交都在**
+- [x] **Step 5-5a：确认本轮 4 条代码提交都在**
 
 ```bash
 cd /e/JavaSpace/forum && git log --oneline -5
@@ -1698,7 +1698,7 @@ cd /e/JavaSpace/forum && git log --oneline -5
 
 预期（`git log` 最新的在最上面）：`… fix: 标签搜索转义 LIKE 通配符`、`… perf: 静态资源长缓存与入口页禁用缓存`、`… perf: 增加产物预算检查并接入构建流程`、`… perf: 按需引入 Element Plus 并配置本地化提供者`，第五条是 `db16214`。四条代码提交之间的相对顺序取决于你实际执行 Task 的顺序（先做 Task 4 也行），只要 4 条都在 `db16214` 之上、且没有夹带别的提交即可。
 
-- [ ] **Step 5-5b：提交文档**
+- [x] **Step 5-5b：提交文档**
 
 ```bash
 cd /e/JavaSpace/forum
@@ -1710,7 +1710,7 @@ git show --stat --oneline HEAD
 
 预期改动面 4 项（三个既有文档 + 本计划）。
 
-- [ ] **Step 5-5c：推送**
+- [x] **Step 5-5c：推送**
 
 ```bash
 cd /e/JavaSpace/forum && git push git@github.com:ScholarOfDeepDarkFantasy/forum.git master:master
@@ -1720,15 +1720,15 @@ cd /e/JavaSpace/forum && git push git@github.com:ScholarOfDeepDarkFantasy/forum.
 
 ### Step 5-6：Jenkins 构建 + 部署
 
-- [ ] **Step 5-6a：确认轮询已触发（Jenkins `pollSCM('H/5 * * * *')`，最多等 5 分钟）**
+- [x] **Step 5-6a：确认轮询已触发（Jenkins `pollSCM('H/5 * * * *')`，最多等 5 分钟）**
 
 构建号应为 **#20**（第八轮 #18、回填 #19）。若 10 分钟没触发，去 Jenkins 手动 Build Now，并在 §12 记录「手动触发」。
 
-- [ ] **Step 5-6b：等构建结束后读结果**
+- [x] **Step 5-6b：等构建结束后读结果**
 
 必须全部 SUCCESS 的 stage：Checkout → Build Backend → **Build Frontend**（含新的 `pnpm check:bundle`）→ Build Image → Deploy。
 
-- [ ] **Step 5-6c：记录回填数据**
+- [x] **Step 5-6c：记录回填数据**
 
 ```bash
 cd /e/JavaSpace/forum
@@ -1740,21 +1740,21 @@ Jenkins 控制台里抄：构建号、镜像 tag（= 构建号）、`pnpm build`
 
 ### Step 5-7：上线冒烟
 
-- [ ] **Step 5-7：按附录 B 逐条执行并记录结果**
+- [x] **Step 5-7：按附录 B 逐条执行并记录结果**
 
 附录 B 里的命令都在 raspi 上跑（`ssh pi@raspi` 或 Jenkins 控制台 `Deploy` 阶段已自动跑过一部分）。**任何一条不符预期就停下**：先 `git revert` 对应提交并重新发布，再排查，不要在线上改 nginx。
 
 ### Step 5-8：第 7 次提交（回填）
 
-- [ ] **Step 5-8a：回填 `docs/DEVELOPMENT.md` §4.14 的 `⟨待回填⟩`**
+- [x] **Step 5-8a：回填 `docs/DEVELOPMENT.md` §4.14 的 `⟨待回填⟩`**
 
 至少填：构建号、四个体积数字与降幅、gzip、最大 chunk、JS 总量与 chunk 数、预算定稿值、构建耗时、上线验收段落（健康检查、缓存头、人工回归三条）。体积数字直接从 `frontend/dist/assets` 与 Jenkins 日志取，**不要估算**。
 
-- [ ] **Step 5-8b：回填本计划 §12 实施记录与偏差**
+- [x] **Step 5-8b：回填本计划 §12 实施记录与偏差**
 
 把 §12 表的「实际」列填上（每条：与计划是否一致、差在哪、为什么）。
 
-- [ ] **Step 5-8c：回填 `docs/deployment/README.md` §5 的验收日期与结果**
+- [x] **Step 5-8c：回填 `docs/deployment/README.md` §5 的验收日期与结果**
 
 在新增的「### 静态资源缓存头（第九轮）验证」小节末尾加一行：
 
@@ -1762,7 +1762,7 @@ Jenkins 控制台里抄：构建号、镜像 tag（= 构建号）、`pnpm build`
 > 2026-10-25 实测（构建 ⟨#20⟩）：`/forum/assets/⟨index-*.js⟩` → `cache-control: public, max-age=31536000, immutable`（1 条）、`content-encoding: gzip`；`/forum/` 与 `/forum/posts/1` → `cache-control: no-cache`。
 ```
 
-- [ ] **Step 5-8d：提交**
+- [x] **Step 5-8d：提交**
 
 ```bash
 cd /e/JavaSpace/forum
@@ -1772,7 +1772,7 @@ git commit -m "docs: 回填第九轮构建与冒烟验收"
 git push git@github.com:ScholarOfDeepDarkFantasy/forum.git master:master
 ```
 
-- [ ] **Step 5-9：收尾核对**
+- [x] **Step 5-9：收尾核对**
 
 ```bash
 cd /e/JavaSpace/forum && git status --short && git log --oneline -8
@@ -1937,7 +1937,7 @@ Task 1 → Task 2 有硬依赖（预算阈值要用 Task 1 的实测值；基线
 - [x] **Task 2**：增加产物预算检查并接入构建流程（Steps 2-1…2-11，提交 `perf: 增加产物预算检查并接入构建流程`）
 - [x] **Task 3**：静态资源长缓存与入口页禁用缓存（Steps 3-1…3-9，提交 `perf: 静态资源长缓存与入口页禁用缓存`）
 - [x] **Task 4**：标签搜索转义 LIKE 通配符（Steps 4-1…4-8，提交 `fix: 标签搜索转义 LIKE 通配符`）
-- [ ] **Task 5**：文档、上线与回填（Steps 5-1…5-9，提交 `docs: 记录第九轮前端性能优化（按需引入、产物预算与传输层）` 与 `docs: 回填第九轮构建与冒烟验收`）
+- [x] **Task 5**：文档、上线与回填（Steps 5-1…5-9，提交 `docs: 记录第九轮前端性能优化（按需引入、产物预算与传输层）` 与 `docs: 回填第九轮构建与冒烟验收`）
 
 **最容易写错的 7 个点**
 
@@ -1969,7 +1969,7 @@ docs: 回填第九轮构建与冒烟验收
 
 ### B.1 发布面
 
-- [ ] **B.1：确认产物与镜像**
+- [x] **B.1：确认产物与镜像**
 
 ```bash
 # 前端产物时间戳是本次发布
@@ -1985,7 +1985,7 @@ curl -fsS http://127.0.0.1:8086/api/health && echo
 
 ### B.2 页面与静态资源
 
-- [ ] **B.2：入口页、SPA 回退、资源可访问**
+- [x] **B.2：入口页、SPA 回退、资源可访问**
 
 ```bash
 curl -fsS -H 'Host: raspi' http://127.0.0.1/forum/ | grep -o '/forum/assets/[^"]*\.js' | head -3
@@ -2000,7 +2000,7 @@ curl -s -o /dev/null -D - -H 'Host: raspi' -H 'Accept-Encoding: gzip' "http://12
 
 ### B.3 缓存头（本轮核心验收）
 
-- [ ] **B.3：assets 一条 immutable、index.html no-cache、没有双头**
+- [x] **B.3：assets 一条 immutable、index.html no-cache、没有双头**
 
 ```bash
 ASSET=$(curl -fsS -H 'Host: raspi' http://127.0.0.1/forum/ | grep -o '/forum/assets/[^"]*\.js' | head -1)
@@ -2015,7 +2015,7 @@ echo "--- uploads（本轮不动）---"; curl -sI -H 'Host: raspi' http://127.0.
 
 ### B.4 体积（回填用）
 
-- [ ] **B.4：记录线上产物体积（bytes）**
+- [x] **B.4：记录线上产物体积（bytes）**
 
 ```bash
 cd /pd/Program/forum/frontend/assets
@@ -2027,7 +2027,7 @@ node -e "const fs=require('fs');const f=fs.readdirSync('.').filter(n=>n.endsWith
 
 ### B.5 既有功能回归（后端 + SSE + uploads）
 
-- [ ] **B.5：API、SSE、uploads 三条既有冒烟**
+- [x] **B.5：API、SSE、uploads 三条既有冒烟**
 
 ```bash
 # API
@@ -2044,7 +2044,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' http://127.0.0.1/forum
 
 ### B.6 人工回归（浏览器，5 分钟）
 
-- [ ] **B.6：逐条确认**
+- [x] **B.6：逐条确认**
 
 1. 打开 `http://raspi/forum/`：首页列表渲染、`v-loading` 遮罩正常、无控制台 `Failed to resolve component`。
 2. 任意帖子详情：评论列表、`el-tag` 样式、Markdown 高亮正常。
@@ -2055,7 +2055,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' http://127.0.0.1/forum
 
 ### B.7 回填数据清单
 
-- [ ] **B.7：把下面每个值抄进 `docs/DEVELOPMENT.md` §4.14**
+- [x] **B.7：把下面每个值抄进 `docs/DEVELOPMENT.md` §4.14**
 
 | 字段 | 来源 |
 | --- | --- |
@@ -2083,8 +2083,8 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' http://127.0.0.1/forum
 | 7 | 既有 spec 改动 | 仅 `tokens.spec.js` 1 个（改断言，不新增用例） | 仅 `tokens.spec.js` 1 个；新增 `plugins/elementAutoImport.spec.js` 1 个（2 例） | 无 |
 | 8 | 后端用例 | 177 / 21 类 | `Tests run: 177, Failures: 0, Errors: 0, Skipped: 1`，21 类 | 无 |
 | 9 | 缓存头 | assets 1 条 immutable；index 1 条 no-cache | 部署前静态审查 + `deploy.sh` 断言已就位 | 线上实测见第 10、11 行 |
-| 10 | Jenkins | #20，全 stage SUCCESS（含 check:bundle） | （待回填） | |
-| 11 | 人工回归 | B.6 六条全过 | （待回填） | |
+| 10 | Jenkins | #20，全 stage SUCCESS（含 check:bundle） | Build #20 SUCCESS（`db16214..3abfa85`，镜像 `forum-backend:20`，容器 healthy，日志含 check:bundle，预算全绿） | 无 |
+| 11 | 人工回归 | B.6 六条全过 | Playwright+Edge 真实部署环境：首屏样式、分页 aria「上一页/下一页」、删除确认框「取消/确定」、`v-loading` mask+spinner、暗色切换、控制台无异常（仅点取消时 ElMessageBox 的 cancel 噪音） | 截图与数字见 `docs/DEVELOPMENT.md` §4.14 上线验收 |
 | 12 | 提交数 | 7 条（第 0 次 Lead + 6 次执行），信息与附录 A 逐字一致 | 8 条：`07736d8`、`8446d3a`、`a83806c`、`0ff12fe`、`371c2cc`、`d474b18`（计划外 follow-up）、本次文档提交、后续回填提交 | Task 3 质量审查发现 `deploy.sh` 的 gzip/计数断言在失败路径上不可达，按「测试与部署断言也要能失败」的原则补 test-only 提交；计划附录 B.2 原用 HEAD 验 gzip 也一并改为 GET |
 
 **执行中做出的、计划没写的决定**（有就写，没有写「无」）：

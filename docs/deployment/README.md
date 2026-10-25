@@ -263,6 +263,8 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
 ```
 
 > 必须带 `-H 'Host: raspi'`：raspi 上 nginx 的 server 块写了 `server_name raspi`，不带 Host 时请求落到默认 server，测不到 `/forum/` 的配置。
+
+> **2026-10-25 验收实测（Build #20，镜像 `forum-backend:20`）**：`/forum/assets/index-Dm2pwhnr.js` 返回 `HTTP/1.1 200`、1 条 `Cache-Control: public, max-age=31536000, immutable`、`Content-Encoding: gzip`；`/forum/` 与 `/forum/posts/1` 均为 `Cache-Control: no-cache`；首页入口 JS 84,431 B、入口 CSS 39,019 B（与本地构建一致）；`deploy.sh` 的缓存头断言全部通过。上线后请复核一次 `sudo nginx -T | grep -n add_header`，确认两个 location 没有丢 server 级安全头。
 >
 > 发布后如果用户反馈「还是旧界面」，让用户强制刷新一次即可：旧 `index.html` 里引用的旧 hash 资源已被 `rsync --delete` 删除，`no-cache` 保证下一次不会再用旧 html。
 

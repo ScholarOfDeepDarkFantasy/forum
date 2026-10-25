@@ -727,7 +727,21 @@ cd frontend && pnpm test --run
 
 **上线验收（2026-10-25）**
 
-⟨待回填：Jenkins 构建号 / 镜像 tag / 提交范围 / 健康检查 / 缓存头实测 / 体积实测 / 人工回归结论⟩
+- 构建：Jenkins **Build #20** SUCCESS（提交范围 `db16214..3abfa85`，镜像 `localhost/forum-backend:20`，容器 `Up (healthy)`）；构建日志含 `pnpm check:bundle` 且预算是全绿（`>500 kB` 告警为 0）。部署由 `deploy.sh` 自动完成，新增的缓存头断言与首页/资源探针全部通过。
+- 线上产物（`/pd/Program/forum/frontend/assets/`）：入口 JS `index-Dm2pwhnr.js` **84,431 B**、入口 CSS `index-DZY9d3G8.css` **39,019 B**、JS chunk 24 个、assets 目录合计 **1,021,535 B**；与本地构建字节数一致（hash 不同因构建时间戳）。
+- 缓存头实测（`curl -H 'Host: raspi'`）：
+  - `/forum/assets/index-Dm2pwhnr.js`：`HTTP/1.1 200`、**1 条** `Cache-Control: public, max-age=31536000, immutable`、`Content-Encoding: gzip`。
+  - `/forum/` 与 `/forum/posts/1`：`Cache-Control: no-cache`（SPA 回退与首页都命中精确 location）。
+  - `/forum/uploads/nope.png`：404（无 Cache-Control，属正常）。
+- 会话回归：登录 200 → `me` 200 → `logout` 200 → 旧 token `me` 401（V4 版本号机制未受影响）；`/forum/api/health` 经 nginx 200。
+- 人工回归（Playwright + Edge，1440×1000，真实部署环境，截图见执行记录）：
+  1. 首屏样式：帖子列表 10 条正常渲染，`.el-button` 圆角 4px、`.el-tag` 4 个、`.el-input__wrapper` 高 32px，均为 Element Plus 默认外观。
+  2. 分页中文：管理页表格 11 行、分页两页；分页按钮 `aria-label` 为「上一页」「下一页」，`el-table` 单元格颜色正常。
+  3. 删除确认框：标题「提示」、正文「确定删除该帖子吗？（软删除，不可恢复显示）」、按钮「取消」「确定」，样式完整（MessageBox 的 `style/css` 手工账生效）。
+  4. `v-loading`：延迟帖子列表请求 3 s，首页出现 `.el-loading-mask`（`rgba(255,255,255,0.9)`）与 spinner，加载结束消失。
+  5. 暗色模式：下拉项「跟随系统/浅色/深色」中文；切深色后 `html.dark` 生效、页面底色 `rgb(245,246,248) → rgb(10,10,10)`、卡片 `rgb(29,30,31)`、详情页暗色正常。
+  6. 控制台：除「点取消」时 ElMessageBox 自身 `cancel` 拒绝被记为一条 error 外，无其它 error/warning；无「组件已解析/样式缺失」类告警。
+- 结论：第九轮上线验收通过；唯一遗留是 `deploy.sh` 首页探针的诊断可达性与 `ElMessageBox` 取消时的控制台噪音（均记入已知限制）。
 
 ---
 
@@ -835,7 +849,8 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-25 | docs | 记录第九轮前端性能优化（按需引入、产物预算与传输层） | 本次提交 |
+| 2026-10-25 | docs | 回填第九轮构建与冒烟验收（Build #20、缓存头实测、人工回归） | 本次提交 |
+| 2026-10-25 | docs | 记录第九轮前端性能优化（按需引入、产物预算与传输层） | `3abfa85` |
 | 2026-10-25 | fix | 修正部署缓存头冒烟的失败路径与计数断言 | `d474b18` |
 | 2026-10-25 | fix | 标签搜索转义 LIKE 通配符（T17） | `371c2cc` |
 | 2026-10-25 | perf | 静态资源长缓存与入口页禁用缓存 | `0ff12fe` |
