@@ -14,7 +14,7 @@
 
 - 仓库：`E:\JavaSpace\forum`，Git Bash 路径 `/e/JavaSpace/forum`。**直接在 `master` 上提交**，不开分支、不提 PR、不 amend、不 rebase、不 squash、不 force push。
 - 基线提交 `db16214`（`docs: 回填第八轮提交哈希与上线验收`）。开工前 `git status --short` 必须为空。
-- **本轮共 7 次提交**，顺序与信息如下（附录 A 是汇总）。第 0 次是 **Lead 在开工前单独提交的 spec + 计划**（两份文档先入库，执行者不要重复提交它们），之后才是执行者的 6 次：
+- **本轮实际共 8 次提交**（计划为 7 次，追加 1 次计划外 follow-up `d474b18`：修正部署冒烟脚本的失败路径与计数断言，见 §12 第 12 行）。顺序与信息如下（附录 A 是 7 条计划的汇总）。第 0 次是 **Lead 在开工前单独提交的 spec + 计划**（两份文档先入库，执行者不要重复提交它们），之后才是执行者的 6 次：
 
   | # | 提交信息 | 归属 |
   | --- | --- | --- |
@@ -2095,4 +2095,3 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' http://127.0.0.1/forum
 | 2026-10-25 | `main.js` 显式 `app.directive('loading', ElLoading.directive)` | 4 个视图用 `v-loading`，模板指令不会被组件 resolver 自动注册 | `main.js` +5 行；`el-loading-mask` 样式随 `loading/style/css` 引入 |
 | 2026-10-25 | 追加 `d474b18` 修复部署冒烟脚本 | 质量审查实测：`set -euo pipefail` 下 grep 无匹配会让赋值语句直接退出，`|| die` 是死代码；assets 缺 Cache-Control 计数断言；README 用 HEAD 验 gzip 必假红 | `deploy/deploy.sh`、`docs/deployment/README.md`；不影响应用代码与测试计数 |
 | 2026-10-25 | 计划附录 B.2 的 gzip 命令由 `curl -sI` 改为 GET `-D -` | nginx gzip filter 对 `r->header_only` 跳过，HEAD 响应永远没有 `content-encoding` | 仅文档；B.3 的 HEAD 数 `cache-control` 仍然正确，未改 |
-

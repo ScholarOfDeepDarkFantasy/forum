@@ -62,6 +62,9 @@ function mountApp() {
         },
         'el-dropdown-menu': { template: '<div><slot /></div>' },
         'el-dropdown-item': { template: '<div><slot /></div>' },
+        // App.vue 用 `<el-config-provider :locale="zhCn">` 包裹布局；不 stub 会触发
+        // “Failed to resolve component” 的 Vue warn（不影响断言，但污染测试输出）。
+        'el-config-provider': { template: '<div><slot /></div>' },
         ThemeToggle: true,
         HeaderSearch: true,
         UserAvatar: true

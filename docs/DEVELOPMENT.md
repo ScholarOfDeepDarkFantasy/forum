@@ -710,7 +710,7 @@ cd frontend && pnpm test --run
 - 后端：176 → **177** 用例、21 个测试类不变（`TagFlowIntegrationTest` 8 → 9）。
 - 前端：321 → **323** 用例、31 → **32** 个 spec（新增 `src/plugins/elementAutoImport.spec.js` 2 例，源码/配置断言，不做 mount）。
 - 端点 39 不变、Flyway 仍 4 个版本、无新增运行时依赖（devDependencies 5 → 6，只加 `unplugin-vue-components`）。
-- 构建：`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` ⟨待回填：耗时⟩ 成功，无 >500 kB 告警；`pnpm check:bundle` 全绿。
+- 构建：`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 约 0.8 s（788 ms）成功，无 >500 kB 告警；`pnpm check:bundle` 全绿。
 - 传输层：`/forum/assets/*.js` 返回 `Cache-Control: public, max-age=31536000, immutable` 且只有一条；`/forum/` 与 `/forum/posts/1` 的 `index.html` 返回 `Cache-Control: no-cache`；gzip 仍生效。
 
 **已知限制**
@@ -723,11 +723,12 @@ cd frontend && pnpm test --run
 6. **测试期不挂载按需插件**：`vite.config.js` 在 `mode === 'test'` 时只保留 `vue()`，因为既有的 31 个组件/页面 spec 用 `global.stubs` 拦截 `el-*`（第 32 个 spec 是源码/配置断言，不挂载组件）；若测试期注入真实组件，实测 63 例 / 7 个 spec 会红。代价是单测不覆盖构建期解析链，由 `elementAutoImport.spec.js`（源码/配置断言）+ `pnpm check:bundle`（体积 + 9 个 CSS 选择器覆盖）+ 部署冒烟共同守护。
 7. `check-bundle.mjs` 只接受 `--dist <dir>` 形式；写成 `--dist=<dir>` 或未知参数会被忽略并检查当前目录的 `dist`（CI 不传参，不受影响）。
 8. 预算脚本只拦「构建体积回归」，不拦「视觉回归」；按需引入后浏览器端组件的真实渲染仍需部署后人工回归（见下方验收）。
-9. `deploy/deploy.sh` 的首页探针仍分两处（`:111` 的 `curl -fsS … | grep -q` 与 `:124` 带状态码的抓取）：前者对 5xx/连接失败会先以「VITE_BASE_PATH 没生效？」退出，导致新增的 HTTP 状态诊断只对「200 但无 js」可达。属既有诊断文案问题，不影响「坏环境必红」，待后续清理；`asset_hits` 统计的是匹配行数（单行压缩产物里多个引用仍为 1），`index_headers` 探针也还没补 `--max-time`/`|| true`。
+9. `deploy/deploy.sh` 的首页探针仍分两处（`:111` 的 `curl -fsS … | grep -q` 与 `:124` 带状态码的抓取）：前者对 5xx/连接失败会先以「VITE_BASE_PATH 没生效？」退出，导致新增的 HTTP 状态诊断只对「200 但无 js」可达；且 `curl | grep -q` 在 `pipefail` 下可能因 grep 提前退出让 curl 收到 SIGPIPE(23) 而偶发误退（本轮未引入，概率低）。`asset_hits` 统计的是匹配行数（单行压缩产物里多个引用仍为 1）；`index_headers`、`uploads_code`、`stream_code` 三处命令替换尚未补 `|| true`——失败仍是红，只是丢失对应 `die` 文案。属既有诊断文案问题，不影响「坏环境必红」，待后续清理。
 
 **上线验收（2026-10-25）**
 
-- 构建：Jenkins **Build #20** SUCCESS（提交范围 `db16214..3abfa85`，镜像 `localhost/forum-backend:20`，容器 `Up (healthy)`）；构建日志含 `pnpm check:bundle` 且预算是全绿（`>500 kB` 告警为 0）。部署由 `deploy.sh` 自动完成，新增的缓存头断言与首页/资源探针全部通过。
+- 构建：Jenkins **Build #20** SUCCESS（提交范围 `db16214..3abfa85`，镜像 `localhost/forum-backend:20`，容器 `Up (healthy)`）；构建日志含 `pnpm check:bundle` 且预算是全绿（`>500 kB` 告警为 0）。部署由 `deploy.sh` 自动完成，新增的缓存头断言与首页/资源探针全部通过。回填提交 `8e6d71b` 触发的 **Build #21** 亦 SUCCESS（docs-only 重建，镜像 `:21` healthy，产物字节数与本记录一致），此后不再单独记录构建号。
+- 体积口径：下表「入口 JS/CSS」只统计 `dist/index.html` 直接引用的 `index-*` 文件（check-bundle 同口径）；首屏实际下载还包括 `index.html` 的 `modulepreload`（`_plugin-vue_export-helper` 233,744 B、`css-*.js` 51,751 B）与首屏 CSS links，合计首屏 JS **369,926 B（−57.9%）**、首屏 CSS **81,766 B（−77.9%）**。入口单文件 −90.4% 是 `index-*` 自身的降幅，不要读成首屏下载量降幅。
 - 线上产物（`/pd/Program/forum/frontend/assets/`）：入口 JS `index-Dm2pwhnr.js` **84,431 B**、入口 CSS `index-DZY9d3G8.css` **39,019 B**、JS chunk 24 个、assets 目录合计 **1,021,535 B**；与本地构建字节数一致（hash 不同因构建时间戳）。
 - 缓存头实测（`curl -H 'Host: raspi'`）：
   - `/forum/assets/index-Dm2pwhnr.js`：`HTTP/1.1 200`、**1 条** `Cache-Control: public, max-age=31536000, immutable`、`Content-Encoding: gzip`。
