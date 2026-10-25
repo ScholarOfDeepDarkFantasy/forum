@@ -310,6 +310,9 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
 - **限流键是单个 IP 字面量，双栈下存在绕过面**：若 nginx 同时监听 IPv6，公网 IPv6 客户端可在一个 /64 内轮换源地址，使每次失败落到不同计数桶从而绕过锁定；只监听 IPv4 的现有部署不受影响，双栈部署建议按 /64 归并限流键或只监听 IPv4。
 - **成功登录会清空该 IP 的整个失败窗口**：`POST /api/auth/register` 公开，攻击者可「4 次错密码 + 1 次自己账号成功登录」循环让窗口永不锁定；单 IP 触发全站锁定已在 Build #15 修复，但此绕过面仍在，见 `docs/DEVELOPMENT.md` §4.12 已知取舍第 5 条。
 - **第八轮（2026-10-24 质量加固）没有新增部署要求**：无数据库迁移、无新配置项、无 nginx/location 改动；发布即镜像替换（Jenkins 自动构建 + `deploy.sh`）。回滚只需把镜像 tag 切到上一版并重跑 `deploy.sh`。
+- **静态资源缓存一年 + 入口页 no-cache（第九轮起）**：`/forum/assets/*` 带内容 hash，发布后文件名变化、旧文件被 `rsync --delete` 删除，因此长缓存安全；`index.html` 必须每次回源，否则用户会一直加载旧入口、请求已删除的旧 hash 资源（表现为白屏）。若出现白屏，让用户强制刷新一次即可，不要改成给 `index.html` 加长缓存。
+- **首次发布第九轮后可能白屏一次**：改动前 `index.html` 没有任何 `Cache-Control`，浏览器按启发式规则缓存；上线瞬间可能仍用旧 html 去请求已被删除的旧 hash 资源，强刷一次即可恢复。`no-cache` 只对「已经拿到新 html」之后的加载生效。
+- **nginx `add_header` 不再从 server 级继承**：`/forum/assets/` 与 `location = /forum/index.html` 各自定义 `add_header`，若宿主机 `conf.d/app.conf` 在 server 级设置过安全头（`X-Frame-Options`、`Referrer-Policy`、CSP 等），这两个 location 会丢掉它们。第九轮新增断言只覆盖 Cache-Control；上线后请 `sudo nginx -T | grep -n add_header` 复核一次。
 
 ## 附录 A：Jenkins job `config.xml`
 

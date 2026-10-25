@@ -240,7 +240,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 21 个测试类、176 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 21 个测试类、177 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 
@@ -250,7 +250,7 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 31 个 spec、321 个用例，覆盖：
+当前为 32 个 spec、323 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
@@ -270,6 +270,17 @@ pnpm build       # 生产构建
 - 实时通知连接（`src/composables/useNotificationStream.spec.js`）：取票后建立 SSE 连接、事件回调合并到 store、断线按 1s→30s 指数退避重连、重连成功回调、401 取票失败进入 `disabled` 且不再重连、坏 JSON 忽略不中断、页面隐藏时暂停与恢复、网络离线时 120s 轮询兜底且重连后停止、旧票晚到失败不破坏新会话、`stop` 清理定时器与连接
 - SSE 生命周期与开关（`src/App.spec.js`）：登录后取票并建立连接、未登录不取票、登出后 `stop` 且角标清零、SSE 关闭时退回 120s 轮询、账号切换时断开旧连接并以新 token 重新建立
 
+### 产物体积预算
+
+```bash
+cd frontend
+pnpm build                     # 部署到子路径时：MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build
+pnpm check:bundle              # 入口 JS/CSS、单 chunk、CSS 总量、JS 总量与 9 个关键 CSS 选择器是否在预算内（CI 同一条命令）
+node scripts/check-bundle.mjs --dist /tmp/some-dist   # 也可以检查任意一份历史产物
+```
+
+预算常量在 `frontend/scripts/check-bundle.mjs` 顶部；阈值调整规则与历史实测见 `docs/DEVELOPMENT.md` §4.14。
+
 ## 优化记录（第二轮）
 
 | 主题 | 改动 |
@@ -286,7 +297,9 @@ pnpm build       # 生产构建
 
 `frontend/src/styles/tokens.css` 是设计令牌的唯一来源，包含颜色、间距阶梯、圆角、字号阶梯，以及 `--el-color-primary` 对 Element Plus 主色的覆盖。页面应引用令牌（如 `var(--jf-space-4)`）而不是写死数值。令牌只保留有消费方的条目：无消费方的 `--jf-color-text-2`、`--jf-radius-lg`、`--jf-shadow-card`、`--jf-shadow-hover` 已移除，新增令牌时应连同首个消费方一起加。
 
-第四轮起颜色令牌分成两套：`:root` 为亮色、`html.dark` 为暗色，两套的 `--jf-color-*` 名称必须完全一致。样式导入顺序固定为 Element Plus 基础样式 → 官方暗色变量 → `tokens.css` → `common.css` → `markdown.css` → `github.css` → `highlight-dark.css` → `style.css`（共 8 条，`tokens.spec.js` 逐条校验）。`styles/tokens.spec.js` 还守住：两套令牌集合相等、11 个颜色令牌与设计一致、每个颜色都是 6 位小写十六进制、每个颜色令牌在 `src` 下至少有一处 `var()` 消费、页面底与卡片底在两套中取值不同（否则切换主题看不出变化）。暗色语法高亮在 `styles/highlight-dark.css` 里以 `html.dark .hljs-*` 逐条叠加（手工同步 highlight.js 11.12.0 的 github-dark.css），代码块底色统一走 `--jf-color-code-bg`。`html.dark` 类由 `composables/useTheme.js` 与 `index.html` 的首屏内联脚本共同维护，存储键与类名以 `useTheme.js` 为唯一来源。
+第四轮起颜色令牌分成两套：`:root` 为亮色、`html.dark` 为暗色，两套的 `--jf-color-*` 名称必须完全一致。样式导入顺序固定为 `element-plus/theme-chalk/base.css` → 官方暗色变量 → `message` → `message-box` → `notification` → `loading` 四条编程式 API 样式 → `tokens.css` → `common.css` → `markdown.css` → `github.css` → `highlight-dark.css` → `style.css`（共 12 条，`tokens.spec.js` 逐条校验；第九轮起 Element Plus 按需引入，组件样式随组件进各自 chunk，入口只留这 6 条 EP 样式）。
+
+`base.css` 必须先于 `tokens.css`：`tokens.css` 覆盖 `--el-color-primary` 依赖基础变量先加载。模板里的 `<el-*>` 与 `v-loading` 由 `unplugin-vue-components` 在编译期解析（见 `frontend/vite.config.js`）；`loading` 的样式服务 `v-loading` 指令（`ElLoading.directive` 在 `main.js` 全局注册）。新增编程式 API（如后续的 `ElTooltip` 单例）时，除了从 `element-plus` 具名导入，还要在 `frontend/src/main.js` 补一条 `element-plus/es/components/<name>/style/css`——这是按需引入唯一的「手工账」。`styles/tokens.spec.js` 还守住：两套令牌集合相等、11 个颜色令牌与设计一致、每个颜色都是 6 位小写十六进制、每个颜色令牌在 `src` 下至少有一处 `var()` 消费、页面底与卡片底在两套中取值不同（否则切换主题看不出变化）。暗色语法高亮在 `styles/highlight-dark.css` 里以 `html.dark .hljs-*` 逐条叠加（手工同步 highlight.js 11.12.0 的 github-dark.css），代码块底色统一走 `--jf-color-code-bg`。`html.dark` 类由 `composables/useTheme.js` 与 `index.html` 的首屏内联脚本共同维护，存储键与类名以 `useTheme.js` 为唯一来源。
 
 注意 768px 断点目前在多处重复出现：`frontend/src/composables/useResponsive.js` 的 `MOBILE_BREAKPOINT = 768`、`tokens.css` 的 `--jf-breakpoint-mobile`（仅作说明，`@media` 无法使用 `var()`），以及 `HomeView` / `PostDetailView` / `LoginView` / `RegisterView` / `NotificationsView` 五个视图与 `components/PostListItem`（公共帖子行）中的六处 `@media (max-width: 768px)`。改断点必须在同一次提交内同步以上所有位置，`breakpoint.spec.js` 会扫描 `src/**/*.{vue,css}` 的媒体查询，并在断点数量不为 6、字面量不是逐字的 `768px`、数值与 `MOBILE_BREAKPOINT` 不一致或出现 `min-width` 查询时报错。
 

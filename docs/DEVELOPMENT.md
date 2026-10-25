@@ -123,20 +123,20 @@ cd frontend && pnpm test --run
 | 第六轮 | 实时通知：SSE 推送 + 一次性 ticket + 断线重连与 120s 兜底轮询 | 5 | ✅ 已完成 | 2026-10-22 |
 | 第七轮 | 安全加固：JWT 主动失效（`token_version`）+ 登录失败按 IP 限流（429 + `Retry-After`） | 6 | ✅ 已完成 | 2026-10-23 |
 
-**当前进度：MVP 100% ｜ 已完成 7 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 9 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
-## 3. 当前状态快照（2026-10-24）
+## 3. 当前状态快照（2026-10-25）
 
 ### 3.1 代码规模
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 82 | 5062 |
-| 后端测试（`src/test/java`） | 22 | 5064 |
-| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4742 |
-| 前端测试（`*.spec.js`） | 31 | 5701 |
+| 后端主代码（`src/main/java`） | 82 | 5083 |
+| 后端测试（`src/test/java`） | 22 | 5105 |
+| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4780 |
+| 前端测试（`*.spec.js`） | 32 | 5746 |
 
 后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 9、`service/` 11、`security/` 7（+`ClientIpResolver`、`LoginRateLimiter`，`exception/` 另加 `TooManyLoginAttemptsException`）、`config/` 7（+`ClockConfig`）、`util/` 4、`exception/` 4。
 
@@ -146,13 +146,13 @@ cd frontend && pnpm test --run
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **176** 个用例 / 21 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
-| 前端 | **321** 个用例 / 31 个 spec | 全绿 |
+| 后端 | **177** 个用例 / 21 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 前端 | **323** 个用例 / 32 个 spec | 全绿 |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布（合计 176）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 8、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
+后端测试类分布（合计 177）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
 
-前端 spec 分布（合计 321）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）17、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3。
+前端 spec 分布（合计 323）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）17、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3、`elementAutoImport` 2。
 
 > 分布行在此前的记录里与实际总数对不上（2026-10-24 复核时后端、前端两行均已按 `target/surefire-reports` 与 `pnpm test` 输出重新点数并对齐）；此后以本行标注的合计与 `mvn` / `vitest` 的实际输出为准。
 
@@ -661,6 +661,74 @@ cd frontend && pnpm test --run
 - 全量测试：后端 21 个测试类 / 176 个用例（1 例 POSIX 权限用例在 Windows 上跳过）；前端 31 个 spec / 321 个用例；`VITE_BASE_PATH=/forum/ pnpm build` 通过（既有 `index-*.js` 约 878 kB 警告为本轮预期）。
 - 主题跨标签同步无法用 curl 验证（由 `useTheme.spec.js` 的 3 例 + 变异测试锁定）；人工验收：两个 `/forum/` 标签页在 A 页切换主题，B 页应立即跟随、无需刷新。
 
+### 4.14 第九轮：前端性能优化（2026-10-25）
+
+设计：[2026-10-25-round9-frontend-performance-design.md](superpowers/specs/2026-10-25-round9-frontend-performance-design.md) ｜ 计划：[2026-10-25-round9-frontend-performance.md](superpowers/plans/2026-10-25-round9-frontend-performance.md)
+
+**目标**：压掉 878 kB 的入口 chunk 与 Vite 的 `chunks larger than 500 kB` 警告，建立可回归的体积预算，补静态资源缓存头，顺带收掉 T17。不改任何用户可见功能与交互。
+
+**改动清单**
+
+| # | 改动 | 落点 | 提交 |
+| --- | --- | --- | --- |
+| 1 | Element Plus 改按需引入（插件解析 + 4 条编程式样式） | `frontend/vite.config.js`、`frontend/src/main.js` | `perf: 按需引入 Element Plus 并配置本地化提供者` |
+| 2 | 语言包从 `app.use()` 迁到 `<el-config-provider :locale="zhCn">`，`ElMessageBox` 三处显式中文按钮文案 | `frontend/src/App.vue`、`AdminView.vue`、`PostDetailView.vue` | 同上 |
+| 3 | 新增守护测试 2 例（源码/配置断言：`main.js` 不再全量注册、构建期挂载按需插件、测试期不挂载） | `frontend/src/plugins/elementAutoImport.spec.js` | 同上 |
+| 4 | 体积预算脚本 + Jenkins 步骤 | `frontend/scripts/check-bundle.mjs`、`Jenkinsfile` | `perf: 增加产物预算检查并接入构建流程` |
+| 5 | `assets` 一年 immutable、`index.html` no-cache + 部署时断言 | `deploy/nginx/forum.conf`、`deploy/deploy.sh` | `perf: 静态资源长缓存与入口页禁用缓存` |
+| 6 | 标签搜索转义 LIKE 通配符（T17） | `TagRepository.java`、`TagService.java` | `fix: 标签搜索转义 LIKE 通配符` |
+| 7 | 部署冒烟断言加固（grep 无匹配不再静默退出、assets Cache-Control 单条计数、README gzip 改 GET） | `deploy/deploy.sh`、`docs/deployment/README.md` | `fix: 修正部署缓存头冒烟的失败路径与计数断言` |
+
+**体积对比（构建号 ⟨#20⟩，bytes/1000 口径）**
+
+| 产物 | 第八轮基线 | 第九轮 | 变化 |
+| --- | --- | --- | --- |
+| 入口 JS `index-*.js` | 878,120 B（878.12 kB） | 84,431 B（84.43 kB） | -793,689 B（-90.4%） |
+| 入口 JS gzip | 279,660 B（279.66 kB） | 31,680 B（31.68 kB） | -247,980 B（-88.7%） |
+| 入口 CSS `index-*.css` | 369,967 B（369.97 kB） | 39,019 B（39.02 kB） | -330,948 B（-89.5%） |
+| 入口 CSS gzip | 50,520 B（50.52 kB） | 7,150 B（7.15 kB） | -43,370 B（-85.8%） |
+| 最大 JS chunk | 878,120 B | 233,744 B（233.74 kB） | -644,376 B（-73.4%） |
+| JS 总量（24 chunk） | 1,344,673 B（1344.67 kB） | 835,869 B（835.87 kB） | -508,804 B（-37.8%） |
+| CSS 总量（20 文件） | 381,751 B（381.75 kB） | 181,570 B（181.57 kB） | -200,181 B（-52.4%） |
+| Vite `>500 kB` 告警 | 有 | 无 | — |
+
+> 上表第九轮数字来自 Task 1 的实测构建（`VITE_BASE_PATH=/forum/`，本机 1.29 s）。Task 5 回填时用 Jenkins 构建日志复核一遍；文件名 hash 会变，但字节数应一致（略有出入以实测为准）。
+
+**预算阈值（`frontend/scripts/check-bundle.mjs`）**
+
+| 项 | 阈值 | 定稿依据 |
+| --- | --- | --- |
+| 入口 JS | 150 kB | 实测 84.43 kB，留约 78% 余量；硬上限 |
+| 入口 CSS | 70 kB | 实测 39.02 kB；硬上限 |
+| 任一 JS chunk | 300 kB | 实测最大 233.74 kB；远低于 Vite 的 500 kB 告警线 |
+| CSS 总量 | 260 kB | 实测 181.57 kB；硬上限 |
+| JS 总量 | 950 kB | 实测 835.87 kB；必须低于基线 1344.67 kB |
+| 9 个 CSS 选择器 | 全部存在 | `.el-button`、`.el-dialog`、`.el-table`、`.el-message-box`、`.el-notification`、`.el-pagination`、`.el-loading-mask`、`.el-form`、`.el-select` |
+
+**测试与验证**
+
+- 后端：176 → **177** 用例、21 个测试类不变（`TagFlowIntegrationTest` 8 → 9）。
+- 前端：321 → **323** 用例、31 → **32** 个 spec（新增 `src/plugins/elementAutoImport.spec.js` 2 例，源码/配置断言，不做 mount）。
+- 端点 39 不变、Flyway 仍 4 个版本、无新增运行时依赖（devDependencies 5 → 6，只加 `unplugin-vue-components`）。
+- 构建：`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` ⟨待回填：耗时⟩ 成功，无 >500 kB 告警；`pnpm check:bundle` 全绿。
+- 传输层：`/forum/assets/*.js` 返回 `Cache-Control: public, max-age=31536000, immutable` 且只有一条；`/forum/` 与 `/forum/posts/1` 的 `index.html` 返回 `Cache-Control: no-cache`；gzip 仍生效。
+
+**已知限制**
+
+1. 去掉全量注册后，`ElMessageBox`/`ElMessage`/`ElNotification` 的样式依赖 `main.js` 的手工清单；新增编程式 API 时必须同步补 `style/css`，否则弹窗会「无样式但能用」（已写进 `main.js` 注释与 README）。
+2. 按需引入后每个视图 chunk 会带上自己用到的组件与样式（体积分散），因此「JS 总量」降幅远小于入口降幅；本轮不以总量为目标，只设回归上限。
+3. 实测 `<el-config-provider :locale="zhCn">` 的 locale 会被 `ElMessageBox` 取到（ConfigProvider 写模块级全局 fallback，`ElMessageBox` 以 `inject(configProviderContextKey, globalConfig)` 兜底），按钮文案本就是「取消/确定」；三处 `confirm` 仍显式传中文文案，作为「provider 挂载前先弹框」这一极端时序的防御。
+4. 入口页 `no-cache` 依赖 `location = /forum/index.html` 的精确匹配；若将来把 SPA 目录改成 nginx 的 `root` 而非 `alias`，需要重新核对这个 location（`alias` 与 `try_files` 组合对路径敏感）。这两个 location 各自定义了 `add_header`，按 nginx 语义不再继承 server 级 `add_header`；上线后需 `sudo nginx -T | grep -n add_header` 确认没有丢掉安全头。
+5. `<el-config-provider>` 没有引入 `size`/`zIndex` 等其它全局配置，保持与第八轮一致的视觉。
+6. **测试期不挂载按需插件**：`vite.config.js` 在 `mode === 'test'` 时只保留 `vue()`，因为既有的 31 个组件/页面 spec 用 `global.stubs` 拦截 `el-*`（第 32 个 spec 是源码/配置断言，不挂载组件）；若测试期注入真实组件，实测 63 例 / 7 个 spec 会红。代价是单测不覆盖构建期解析链，由 `elementAutoImport.spec.js`（源码/配置断言）+ `pnpm check:bundle`（体积 + 9 个 CSS 选择器覆盖）+ 部署冒烟共同守护。
+7. `check-bundle.mjs` 只接受 `--dist <dir>` 形式；写成 `--dist=<dir>` 或未知参数会被忽略并检查当前目录的 `dist`（CI 不传参，不受影响）。
+8. 预算脚本只拦「构建体积回归」，不拦「视觉回归」；按需引入后浏览器端组件的真实渲染仍需部署后人工回归（见下方验收）。
+9. `deploy/deploy.sh` 的首页探针仍分两处（`:111` 的 `curl -fsS … | grep -q` 与 `:124` 带状态码的抓取）：前者对 5xx/连接失败会先以「VITE_BASE_PATH 没生效？」退出，导致新增的 HTTP 状态诊断只对「200 但无 js」可达。属既有诊断文案问题，不影响「坏环境必红」，待后续清理；`asset_hits` 统计的是匹配行数（单行压缩产物里多个引用仍为 1），`index_headers` 探针也还没补 `--max-time`/`|| true`。
+
+**上线验收（2026-10-25）**
+
+⟨待回填：Jenkins 构建号 / 镜像 tag / 提交范围 / 健康检查 / 缓存头实测 / 体积实测 / 人工回归结论⟩
+
 ---
 
 ## 5. 待办与后续计划
@@ -684,7 +752,7 @@ cd frontend && pnpm test --run
 | T13 | ~~**首页关键词过滤不转义 LIKE 通配符**~~ | 已关闭 | 2026-10-24 第八轮：`PostService.list` 先 `escapeLike`，`searchIds` 两处 LIKE 加 `ESCAPE '!'`，与 `/api/posts/search` 同一约定（见 §4.13）。原记录：首页 GET /api/posts?keyword= 走 searchIds 的 LOWER(...) LIKE LOWER(CONCAT('%', :keyword, '%'))，未转义 %/_，搜「100%」会命中「1000」。本轮只给新搜索接口做了转义；修首页需同步改 JPQL 与前端提示，属独立小改动 |
 | T14 | **搜索无分词、无相关度排序** | 中 | 采用 pg_trgm 子串匹配：中文不分词，1–2 个字的关键词的 trigram 覆盖不足，规划器会放弃索引改走顺序扫描；排序只有「标题命中优先 + 时间倒序」，没有 `ts_rank`/`similarity` 之类相关度。数据量增长后的升级路径是 `tsvector`（需分词扩展）或两阶段检索 |
 | T15 | **`posts.content` 无长度上限** | 低 | 正文列是 `TEXT` 且无应用层长度校验；超长正文会放大 `snippet` 截取与索引维护成本，也让 `pg_trgm` 的 GIN 索引更大。可加与标题一致的长度提示或截断策略 |
-| T17 | **标签检索的 LIKE 通配符未转义** | 低 | 第八轮 T13 只覆盖首页 `GET /api/posts?keyword=` 与既有的 `/api/posts/search`；`TagRepository.findWithPostCounts` 的标签关键词 LIKE 仍把 `%`/`_` 当通配符（`GET /api/tags?keyword=`），搜「a_b」会命中「axb」。修法同 T13：service 先 `escapeLike`，JPQL 加 `ESCAPE '!'` |
+| T17 | ~~**标签检索的 LIKE 通配符未转义**~~ | 已关闭 | 2026-10-25 第九轮：`TagService` 先 `escapeLike`（转义 `!`/`%`/`_`），`TagRepository.findWithPostCounts` 的 JPQL 加 `ESCAPE '!'`；`TagFlowIntegrationTest` 新增 `@Order(9)` 覆盖 `100%`、`a_b`、`!` 三个关键词（见 §4.14）。原记录：第八轮 T13 只覆盖首页 `GET /api/posts?keyword=` 与既有的 `/api/posts/search`；`TagRepository.findWithPostCounts` 的标签关键词 LIKE 仍把 `%`/`_` 当通配符（`GET /api/tags?keyword=`），搜「a_b」会命中「axb」。修法同 T13：service 先 `escapeLike`，JPQL 加 `ESCAPE '!'` |
 
 ### 5.2 候选功能（第七轮新增「限流共享存储」一项）
 
@@ -704,6 +772,8 @@ cd frontend && pnpm test --run
 
 > 第八轮同样不加业务功能，只做质量加固（见 §4.13）；「限流改共享存储」仍是多实例部署的前置条件。
 
+> 第九轮同样不加业务功能，只做前端性能优化与 T17（见 §4.14）；双审顺带记录了两条候选：两处 `escapeLike`（`PostService`/`TagService`）重复 11 行，将来若改转义字符需双改；`check-bundle.mjs` 的参数解析只认 `--dist <dir>` 形式。
+
 ---
 
 ## 6. 已知问题与限制
@@ -715,7 +785,6 @@ cd frontend && pnpm test --run
 | 浏览量在每次详情页请求时 +1 | 刷新即累加，非去重 UV | MVP 简化，未做去重 |
 | 无国际化 | 界面文案硬编码中文 | 第一轮非目标 |
 | `AdminView` 桌面表格与窄屏卡片仍需各维护一份 | 加字段要改 2 处（原为 4 处，第二轮已收敛一半） | 进一步收敛需抽列定义，属结构性改动 |
-| 构建产物有 chunk > 500kB 警告 | 首屏加载体积偏大 | Element Plus 全量引入所致，可按需引入或分包 |
 | Markdown 会解释历史纯文本帖子 | 正文里恰好像 Markdown 的写法（`# 标题`、`*斜体*`、`[文字](链接)`）被渲染成格式而非原样显示 | 单换行已转 `<br>` 以保留换行观感；需要原样展示可转义或用代码块；未做「按帖子版本区分渲染」 |
 | 无独立 404 标签页，标签聚合在应用层 | 未知标签与「标签下无帖子」共用空态；标签数量级大时聚合排序分页在应用层完成 | 已接受：标签数据量小；接口语义为「未知标签返回空页」（见 §4.8） |
 | 实时通知是单实例的 | SSE 连接注册表在应用内存中；多实例部署时事件只从产生通知的那个实例推给连在它上面的客户端 | 当前单容器部署不构成问题；发版/重启时在线连接断开，客户端自动换票重连并校准未读数 |
@@ -766,7 +835,14 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-24 | docs | 回填第八轮上线验收（Build #18、冒烟结果与提交哈希） | 本次提交 |
+| 2026-10-25 | docs | 记录第九轮前端性能优化（按需引入、产物预算与传输层） | 本次提交 |
+| 2026-10-25 | fix | 修正部署缓存头冒烟的失败路径与计数断言 | `d474b18` |
+| 2026-10-25 | fix | 标签搜索转义 LIKE 通配符（T17） | `371c2cc` |
+| 2026-10-25 | perf | 静态资源长缓存与入口页禁用缓存 | `0ff12fe` |
+| 2026-10-25 | perf | 增加产物预算检查并接入构建流程 | `a83806c` |
+| 2026-10-25 | perf | 按需引入 Element Plus 并配置本地化提供者 | `8446d3a` |
+| 2026-10-25 | docs | 新增第九轮前端性能优化设计与计划 | `07736d8` |
+| 2026-10-24 | docs | 回填第八轮上线验收（Build #18、冒烟结果与提交哈希） | `db16214` |
 | 2026-10-24 | docs | 记录第八轮质量加固（测试基线、已知限制与变更日志） | `0e691b9` |
 | 2026-10-24 | test | 加固登出时序与主题跨标签的回归守护 | `94b1970` |
 | 2026-10-24 | test | 补齐首页搜索正文分支的通配符转义守护 | `ef791fb` |

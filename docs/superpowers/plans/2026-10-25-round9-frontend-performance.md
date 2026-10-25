@@ -173,7 +173,7 @@ Task 2（预算脚本）与 Task 3（nginx）没有单元测试：它们的 RED/
 
 不改任何代码，先把「优化前」的产物留一份在仓库外。Task 2 要用它对预算脚本自证 RED。
 
-- [ ] **Step 1-1：复制基线 dist 到 `E:/tmp/forum-dist-baseline`**
+- [x] **Step 1-1：复制基线 dist 到 `E:/tmp/forum-dist-baseline`**
 
 ```bash
 cd /e/JavaSpace/forum/frontend
@@ -193,7 +193,7 @@ ls -l /e/tmp/forum-dist-baseline/assets | head -3
 -rw-r--r-- … 369967 … index-7FnP3hU_.css
 ```
 
-- [ ] **Step 1-2：记下基线数字**（写进你的执行日志，Task 5 回填要用）
+- [x] **Step 1-2：记下基线数字**（写进你的执行日志，Task 5 回填要用）
 
 ```bash
 cd /e/tmp/forum-dist-baseline/assets
@@ -204,7 +204,7 @@ node -e "const fs=require('fs');const f=fs.readdirSync('.').filter(n=>n.endsWith
 
 ### Step 1-2：写守护测试（RED）
 
-- [ ] **Step 1-2a：创建 `frontend/src/plugins/elementAutoImport.spec.js`**
+- [x] **Step 1-2a：创建 `frontend/src/plugins/elementAutoImport.spec.js`**
 
 `src/plugins/` 目录当前不存在，先建：
 
@@ -249,7 +249,7 @@ describe('Element Plus 按需引入（构建期）', () => {
 })
 ```
 
-- [ ] **Step 1-2b：跑 RED**
+- [x] **Step 1-2b：跑 RED**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && pnpm vitest run src/plugins/elementAutoImport.spec.js
@@ -274,7 +274,7 @@ cd /e/JavaSpace/forum/frontend && pnpm vitest run src/plugins/elementAutoImport.
 
 ### Step 1-3：安装 `unplugin-vue-components`（devDependency）
 
-- [ ] **Step 1-3：安装并确认 lockfile 一起变了**
+- [x] **Step 1-3：安装并确认 lockfile 一起变了**
 
 ```bash
 cd /e/JavaSpace/forum/frontend
@@ -304,7 +304,7 @@ node -p "require('./node_modules/unplugin-vue-components/package.json').engines"
 
 > **这是本轮最关键的一步。** 插件若在 vitest 也生效，模板里的 `el-*` 会在测试期被解析成真实组件，既有用例里的 `global.stubs` 不再命中，实测 **63 个用例失败 / 7 个 spec 文件**（真实 EP 组件渲染 + props 校验报错）。所以 `vite.config.js` 必须导出工厂函数，按 `mode` 决定挂不挂插件。
 
-- [ ] **Step 1-4a：在 import 区追加两行**
+- [x] **Step 1-4a：在 import 区追加两行**
 
 `frontend/vite.config.js` 顶部（`import { fileURLToPath, URL } from 'node:url'` 之后）插入：
 
@@ -313,7 +313,7 @@ import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 ```
 
-- [ ] **Step 1-4b：把对象导出改成工厂函数，并替换 `plugins`**
+- [x] **Step 1-4b：把对象导出改成工厂函数，并替换 `plugins`**
 
 把 `export default defineConfig({` 改成 `export default defineConfig(({ mode }) => ({`；把文件末尾的 `})` 改成 `}))`。`base` / `resolve` / `server` / `test` 四段原样保留——`test` 段是 vitest 的配置（`environment: 'jsdom'`、`globals: true`、`include: ['src/**/*.spec.js']`），工厂函数不影响它。
 
@@ -336,7 +336,7 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
   ],
 ```
 
-- [ ] **Step 1-4c：确认两种 mode 的插件数**
+- [x] **Step 1-4c：确认两种 mode 的插件数**
 
 ```bash
 cd /e/JavaSpace/forum/frontend
@@ -347,7 +347,7 @@ node -e "import('./vite.config.js').then(async (m) => { const c = m.default; con
 
 > 若 `node -e` 报 `c is not a function`：工厂函数没改完（默认导出还是对象）。若 `test` 也出现 2 个插件：`mode === 'test'` 判断写错（vitest 传入的 mode 就是 `test`，不要改写成 `process.env.NODE_ENV`）。
 
-- [ ] **Step 1-4d：跑守护测试看 GREEN**
+- [x] **Step 1-4d：跑守护测试看 GREEN**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && pnpm vitest run src/plugins/elementAutoImport.spec.js
@@ -364,7 +364,7 @@ cd /e/JavaSpace/forum/frontend && pnpm vitest run src/plugins/elementAutoImport.
 
 ### Step 1-5：重写 `frontend/src/main.js`（删全量引入）
 
-- [ ] **Step 1-5：全文件替换为**
+- [x] **Step 1-5：全文件替换为**
 
 ```js
 import { createApp } from 'vue'
@@ -410,7 +410,7 @@ app.directive('loading', ElLoading.directive)
 app.mount('#app')
 ```
 
-- [ ] **Step 1-6：确认没有残留的全量引用**
+- [x] **Step 1-6：确认没有残留的全量引用**
 
 ```bash
 cd /e/JavaSpace/forum/frontend
@@ -422,7 +422,7 @@ grep -c "^import 'element-plus/" src/main.js
 
 ### Step 1-7：`App.vue` 换用 `<el-config-provider>`
 
-- [ ] **Step 1-7a：在 `<script setup>` 的 import 区加语言包**
+- [x] **Step 1-7a：在 `<script setup>` 的 import 区加语言包**
 
 `frontend/src/App.vue` 第 4 行（`import { ElMessage } from 'element-plus'`）之后插入：
 
@@ -431,7 +431,7 @@ grep -c "^import 'element-plus/" src/main.js
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 ```
 
-- [ ] **Step 1-7b：模板根部包一层 provider**
+- [x] **Step 1-7b：模板根部包一层 provider**
 
 `frontend/src/App.vue` 的 `<template>` 里，把根节点 `<el-container class="layout">` 整段包起来（开标签在 :47、闭标签在 :99，内部缩进整体 +2 空格），形状变成：
 
@@ -447,7 +447,7 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 要求：`</el-config-provider>` 必须在 `</el-container>` 之后、`</template>` 之前；内部所有标签只改缩进，不改内容（`<router-view :key="$route.fullPath" />` 的位置与 key 不动）。
 
-- [ ] **Step 1-7c：确认包裹正确**
+- [x] **Step 1-7c：确认包裹正确**
 
 ```bash
 cd /e/JavaSpace/forum/frontend
@@ -461,7 +461,7 @@ grep -c "el-container" src/App.vue
 
 > 为什么必须做：`ElMessageBox.confirm()` 会创建独立 app 实例渲染（`render(vnode, container)`），**不继承** `<el-config-provider>` 的 provide；它读 locale 走的是模块级 globalConfig，而那份配置原本由 `app.use(ElementPlus)` 写入。去掉全量注册后不显式给文案，按钮会从「确定/取消」退回英文 `OK`/`Cancel` —— 这是用户可见变更。
 
-- [ ] **Step 1-8a：`frontend/src/views/AdminView.vue:59`**
+- [x] **Step 1-8a：`frontend/src/views/AdminView.vue:59`**
 
 把：
 
@@ -481,7 +481,7 @@ grep -c "el-container" src/App.vue
   })
 ```
 
-- [ ] **Step 1-8b：`frontend/src/views/PostDetailView.vue:138`**
+- [x] **Step 1-8b：`frontend/src/views/PostDetailView.vue:138`**
 
 把：
 
@@ -501,7 +501,7 @@ grep -c "el-container" src/App.vue
   })
 ```
 
-- [ ] **Step 1-8c：`frontend/src/views/PostDetailView.vue:167`**
+- [x] **Step 1-8c：`frontend/src/views/PostDetailView.vue:167`**
 
 把：
 
@@ -521,7 +521,7 @@ grep -c "el-container" src/App.vue
   })
 ```
 
-- [ ] **Step 1-8d：确认三处都改到了**
+- [x] **Step 1-8d：确认三处都改到了**
 
 ```bash
 cd /e/JavaSpace/forum/frontend
@@ -533,7 +533,7 @@ grep -rn "ElMessageBox.confirm" src/views | wc -l
 
 ### Step 1-9：同步 `tokens.spec.js` 的样式顺序清单
 
-- [ ] **Step 1-9：把 `frontend/src/styles/tokens.spec.js` 里的 `describe('main.js 样式导入顺序', …)` 整块替换为**
+- [x] **Step 1-9：把 `frontend/src/styles/tokens.spec.js` 里的 `describe('main.js 样式导入顺序', …)` 整块替换为**
 
 ```js
 describe('main.js 样式导入顺序', () => {
@@ -567,7 +567,7 @@ describe('main.js 样式导入顺序', () => {
 })
 ```
 
-- [ ] **Step 1-10：单独跑这个 spec**
+- [x] **Step 1-10：单独跑这个 spec**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && pnpm vitest run src/styles/tokens.spec.js
@@ -579,7 +579,7 @@ cd /e/JavaSpace/forum/frontend && pnpm vitest run src/styles/tokens.spec.js
 
 ### Step 1-11：全量前端测试与兼容性排查
 
-- [ ] **Step 1-11a：跑全量**
+- [x] **Step 1-11a：跑全量**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && pnpm test
@@ -592,7 +592,7 @@ cd /e/JavaSpace/forum/frontend && pnpm test
       Tests  323 passed (323)
 ```
 
-- [ ] **Step 1-11b：若有用例失败，按下面的顺序排查（不要改既有断言、不要加真组件 stub）**
+- [x] **Step 1-11b：若有用例失败，按下面的顺序排查（不要改既有断言、不要加真组件 stub）**
 
 > 测试期插件是关的（`mode === 'test'`），`el-*` 仍由各 spec 的 `global.stubs` 拦截，所以**不会**出现「真实组件渲染」类失败。实测 `mode: 'test'` 下基线 321 例全绿。
 
@@ -605,7 +605,7 @@ cd /e/JavaSpace/forum/frontend && pnpm test
 
 **停下条件**：需要改动任一既有 spec（`tokens.spec.js` 除外），或前端用例总数不再是 323 → 停下来把失败清单报告 Lead，不要继续。
 
-- [ ] **Step 1-11c：确认 spec 文件数**
+- [x] **Step 1-11c：确认 spec 文件数**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && find src -name '*.spec.js' | wc -l
@@ -615,7 +615,7 @@ cd /e/JavaSpace/forum/frontend && find src -name '*.spec.js' | wc -l
 
 ### Step 1-12：构建并记录体积（决定 Task 2 的阈值）
 
-- [ ] **Step 1-12a：构建**
+- [x] **Step 1-12a：构建**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build
@@ -623,7 +623,7 @@ cd /e/JavaSpace/forum/frontend && MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_P
 
 预期：命令成功；日志里**不再出现** `(!) Some chunks are larger than 500 kB after minification` 这一行（若仍出现，说明还有 1 个 >500 kB 的 chunk，把它记下来，Task 2 的 RED 会告诉你它是谁）。
 
-- [ ] **Step 1-12b：量体积**
+- [x] **Step 1-12b：量体积**
 
 ```bash
 cd /e/JavaSpace/forum/frontend/dist/assets
@@ -645,14 +645,14 @@ node -e "const fs=require('fs');const f=fs.readdirSync('.').filter(n=>n.endsWith
 
 > 与基线对照：入口 JS 878,120 → 84,431 B（-90.4%）；入口 CSS 369,967 → 39,019 B；JS 总量 1,344,673 → 835,623 B；CSS 总量 381,751 → 181,570 B。日志里**没有** `(!) Some chunks are larger than 500 kB after minification`。
 
-- [ ] **Step 1-12c：把上面五个体积数字记到执行日志**（Task 2 定阈值 + Task 5 回填都要用）
+- [x] **Step 1-12c：把上面五个体积数字记到执行日志**（Task 2 定阈值 + Task 5 回填都要用）
 
 ```bash
 cd /e/JavaSpace/forum/frontend/dist/assets
 for f in index-*.js index-*.css; do echo "$f $(stat -c%s "$f")"; done
 ```
 
-- [ ] **Step 1-12d：人工回归（5 分钟，浏览器）**
+- [x] **Step 1-12d：人工回归（5 分钟，浏览器）**
 
 `pnpm dev` 后逐项确认（**这是本轮唯一的人工验证，不能跳过**）：
 
@@ -664,7 +664,7 @@ for f in index-*.js index-*.css; do echo "$f $(stat -c%s "$f")"; done
 
 ### Step 1-13：提交
 
-- [ ] **Step 1-13a：确认改动面**
+- [x] **Step 1-13a：确认改动面**
 
 ```bash
 cd /e/JavaSpace/forum && git status --short
@@ -684,7 +684,7 @@ cd /e/JavaSpace/forum && git status --short
 ?? frontend/src/plugins/
 ```
 
-- [ ] **Step 1-13b：提交**
+- [x] **Step 1-13b：提交**
 
 ```bash
 cd /e/JavaSpace/forum
@@ -696,7 +696,7 @@ git add frontend/package.json frontend/pnpm-lock.yaml frontend/vite.config.js \
 git commit -m "perf: 按需引入 Element Plus 并配置本地化提供者"
 ```
 
-- [ ] **Step 1-13c：确认提交只含预期文件**
+- [x] **Step 1-13c：确认提交只含预期文件**
 
 ```bash
 cd /e/JavaSpace/forum && git show --stat --oneline HEAD
@@ -717,7 +717,7 @@ cd /e/JavaSpace/forum && git show --stat --oneline HEAD
 
 ### Step 2-1：写预算脚本
 
-- [ ] **Step 2-1：创建 `frontend/scripts/check-bundle.mjs`（全文件）**
+- [x] **Step 2-1：创建 `frontend/scripts/check-bundle.mjs`（全文件）**
 
 `scripts/` 目录当前不存在，先建：
 
@@ -912,7 +912,7 @@ if (failed > 0) {
 console.log('✓ 全部在预算内（退出码 0）')
 ```
 
-- [ ] **Step 2-2：语法自检（不构建也能跑，找不到目录会按设计失败）**
+- [x] **Step 2-2：语法自检（不构建也能跑，找不到目录会按设计失败）**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && node --check scripts/check-bundle.mjs && echo 'syntax OK'
@@ -922,7 +922,7 @@ cd /e/JavaSpace/forum/frontend && node --check scripts/check-bundle.mjs && echo 
 
 ### Step 2-2：对基线产物跑 RED（自证脚本真的会拦）
 
-- [ ] **Step 2-3：用**优化前**的产物跑脚本，必须失败**
+- [x] **Step 2-3：用**优化前**的产物跑脚本，必须失败**
 
 ```bash
 cd /e/JavaSpace/forum/frontend
@@ -948,7 +948,7 @@ exit=1
 
 ### Step 2-3：对 Task 1 的产物跑 GREEN
 
-- [ ] **Step 2-4：在当前 `dist`（Task 1 的构建结果）上跑**
+- [x] **Step 2-4：在当前 `dist`（Task 1 的构建结果）上跑**
 
 ```bash
 cd /e/JavaSpace/forum/frontend
@@ -970,7 +970,7 @@ JS 总量       24 个 chunk                               835.62 kB    950.00 k
 exit=0
 ```
 
-- [ ] **Step 2-5：如果某一条红，按 §0.5 裁决点 8 处理**
+- [x] **Step 2-5：如果某一条红，按 §0.5 裁决点 8 处理**
 
 预算已按 Task 1 实测值定稿，**只允许收紧、不允许放宽**。若实测与 Step 1-12 记录的差异超过 20%，先停下核对：是不是构建没带 `VITE_BASE_PATH=/forum/`、或 `dist` 里混进了旧产物（`rm -rf dist` 后重新构建）。
 
@@ -987,14 +987,14 @@ exit=0
 
 ### Step 2-4：把脚本挂到 `package.json`
 
-- [ ] **Step 2-6：在 `frontend/package.json` 的 `scripts` 里加一行（放在 `"build"` 之后）**
+- [x] **Step 2-6：在 `frontend/package.json` 的 `scripts` 里加一行（放在 `"build"` 之后）**
 
 ```json
     "build": "vite build",
     "check:bundle": "node scripts/check-bundle.mjs",
 ```
 
-- [ ] **Step 2-7：用 pnpm 跑一遍，确认入口可用**
+- [x] **Step 2-7：用 pnpm 跑一遍，确认入口可用**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && pnpm check:bundle; echo "exit=$?"
@@ -1002,7 +1002,7 @@ cd /e/JavaSpace/forum/frontend && pnpm check:bundle; echo "exit=$?"
 
 预期：与 Step 2-4 相同输出，`exit=0`。
 
-- [ ] **Step 2-8：确认脚本对「没有 dist」也会按设计失败**
+- [x] **Step 2-8：确认脚本对「没有 dist」也会按设计失败**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && node scripts/check-bundle.mjs --dist E:/tmp/no-such-dist; echo "exit=$?"
@@ -1017,7 +1017,7 @@ exit=1
 
 ### Step 2-5：接入 Jenkins
 
-- [ ] **Step 2-9：`Jenkinsfile` 的 Build Frontend 阶段，在 build 之后追加一行**
+- [x] **Step 2-9：`Jenkinsfile` 的 Build Frontend 阶段，在 build 之后追加一行**
 
 把：
 
@@ -1044,7 +1044,7 @@ exit=1
                 }
 ```
 
-- [ ] **Step 2-10：确认 Jenkinsfile 结构没坏（Groovy 花括号配对）**
+- [x] **Step 2-10：确认 Jenkinsfile 结构没坏（Groovy 花括号配对）**
 
 ```bash
 cd /e/JavaSpace/forum && node -e "const s=require('fs').readFileSync('Jenkinsfile','utf8');const o=(s.match(/\{/g)||[]).length,c=(s.match(/\}/g)||[]).length;console.log('braces',o,c,o===c?'OK':'MISMATCH')"
@@ -1055,7 +1055,7 @@ grep -n "check:bundle" Jenkinsfile
 
 ### Step 2-6：提交
 
-- [ ] **Step 2-11：确认改动面并提交**
+- [x] **Step 2-11：确认改动面并提交**
 
 ```bash
 cd /e/JavaSpace/forum && git status --short
@@ -1079,7 +1079,7 @@ git show --stat --oneline HEAD
 
 ### Step 3-1：`/forum/assets/` 改长缓存
 
-- [ ] **Step 3-1：替换 `deploy/nginx/forum.conf` 里 assets 的 location**
+- [x] **Step 3-1：替换 `deploy/nginx/forum.conf` 里 assets 的 location**
 
 把：
 
@@ -1109,7 +1109,7 @@ git show --stat --oneline HEAD
 
 ### Step 3-2：新增 `index.html` 的精确 location
 
-- [ ] **Step 3-2：在 SPA 的 `location /forum/ { … }` 块**之后**插入**
+- [x] **Step 3-2：在 SPA 的 `location /forum/ { … }` 块**之后**插入**
 
 ```nginx
     # 入口页：必须每次回源校验。`index index.html` 与 `try_files … /forum/index.html`
@@ -1122,7 +1122,7 @@ git show --stat --oneline HEAD
     }
 ```
 
-- [ ] **Step 3-3：确认两个 location 都存在，且没有残留的 `expires 7d` 在 assets 块里**
+- [x] **Step 3-3：确认两个 location 都存在，且没有残留的 `expires 7d` 在 assets 块里**
 
 ```bash
 cd /e/JavaSpace/forum
@@ -1138,7 +1138,7 @@ grep -n "location\|Cache-Control\|expires" deploy/nginx/forum.conf
 
 ### Step 3-3：`deploy.sh` 冒烟加缓存头断言
 
-- [ ] **Step 3-4：在「冒烟测试」段里、`/forum/api/posts` 检查之后插入**
+- [x] **Step 3-4：在「冒烟测试」段里、`/forum/api/posts` 检查之后插入**
 
 锚点（原文件里这两行）：
 
@@ -1167,7 +1167,7 @@ echo "$index_headers" | grep -qi '^cache-control: no-cache' \
     || die "/forum/index.html 返回了多条 Cache-Control 头（是否同时写了 expires 与 add_header？）"
 ```
 
-- [ ] **Step 3-5：语法检查**
+- [x] **Step 3-5：语法检查**
 
 ```bash
 cd /e/JavaSpace/forum && bash -n deploy/deploy.sh && echo 'deploy.sh syntax OK'
@@ -1175,7 +1175,7 @@ cd /e/JavaSpace/forum && bash -n deploy/deploy.sh && echo 'deploy.sh syntax OK'
 
 预期：`deploy.sh syntax OK`。
 
-- [ ] **Step 3-6：本地无法验证 nginx，确认「验证责任」已经落到部署上**
+- [x] **Step 3-6：本地无法验证 nginx，确认「验证责任」已经落到部署上**
 
 本机是 Windows，没有 nginx；`nginx -t` 只能在 raspi 上跑。`deploy.sh` 的顺序是：
 
@@ -1189,7 +1189,7 @@ cd /e/JavaSpace/forum && bash -n deploy/deploy.sh && echo 'deploy.sh syntax OK'
 
 ### Step 3-4：部署手册补冒烟命令
 
-- [ ] **Step 3-7：在 `docs/deployment/README.md` 的 §5 冒烟检查末尾（`### 登录限流与真实客户端 IP（V4）` 小节之后、`## 6. 排障` 之前）插入**
+- [x] **Step 3-7：在 `docs/deployment/README.md` 的 §5 冒烟检查末尾（`### 登录限流与真实客户端 IP（V4）` 小节之后、`## 6. 排障` 之前）插入**
 
 ````markdown
 ### 静态资源缓存头（第九轮）验证
@@ -1222,7 +1222,7 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
 > 发布后如果用户反馈「还是旧界面」，让用户强制刷新一次即可：旧 `index.html` 里引用的旧 hash 资源已被 `rsync --delete` 删除，`no-cache` 保证下一次不会再用旧 html。
 ````
 
-- [ ] **Step 3-8：确认小节位置正确**
+- [x] **Step 3-8：确认小节位置正确**
 
 ```bash
 cd /e/JavaSpace/forum
@@ -1233,7 +1233,7 @@ grep -n "静态资源缓存头（第九轮）验证\|^## 6. 排障" docs/deploym
 
 ### Step 3-5：提交
 
-- [ ] **Step 3-9：提交**
+- [x] **Step 3-9：提交**
 
 ```bash
 cd /e/JavaSpace/forum && git status --short
@@ -1259,7 +1259,7 @@ git show --stat --oneline HEAD
 
 ### Step 4-1：写 RED 测试
 
-- [ ] **Step 4-1a：在 `TagFlowIntegrationTest.java` 的 import 区追加三个 import**
+- [x] **Step 4-1a：在 `TagFlowIntegrationTest.java` 的 import 区追加三个 import**
 
 在 `import java.util.List;` 之前插入（保持 `java.*` 分组内字母序）：
 
@@ -1269,7 +1269,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 ```
 
-- [ ] **Step 4-1b：在类末尾（最后一个 `@Test` 方法之后、类的 `}` 之前）追加测试与 helper**
+- [x] **Step 4-1b：在类末尾（最后一个 `@Test` 方法之后、类的 `}` 之前）追加测试与 helper**
 
 ```java
     /**
@@ -1311,7 +1311,7 @@ import java.nio.charset.StandardCharsets;
     }
 ```
 
-- [ ] **Step 4-1c：跑 RED**
+- [x] **Step 4-1c：跑 RED**
 
 ```bash
 cd /e/JavaSpace/forum && mvn -B test -Dtest=TagFlowIntegrationTest
@@ -1334,7 +1334,7 @@ to contain exactly (and in same order):
 
 ### Step 4-2：给 JPQL 加 `ESCAPE '!'`
 
-- [ ] **Step 4-2：替换 `TagRepository.java` 的查询**
+- [x] **Step 4-2：替换 `TagRepository.java` 的查询**
 
 把：
 
@@ -1362,7 +1362,7 @@ to contain exactly (and in same order):
 
 ### Step 4-3：`TagService` 转义关键词
 
-- [ ] **Step 4-3a：改一行查询调用**
+- [x] **Step 4-3a：改一行查询调用**
 
 把：
 
@@ -1377,7 +1377,7 @@ to contain exactly (and in same order):
         List<TagResponse> all = tagRepository.findWithPostCounts(escapeLike(kw)).stream()
 ```
 
-- [ ] **Step 4-3b：在类的最后一个方法之后、类的 `}` 之前追加 `escapeLike`**
+- [x] **Step 4-3b：在类的最后一个方法之后、类的 `}` 之前追加 `escapeLike`**
 
 锚点（`TagService.java` 末尾两段）：
 
@@ -1417,7 +1417,7 @@ to contain exactly (and in same order):
 
 ### Step 4-4：自检改动落位，然后跑 GREEN
 
-- [ ] **Step 4-4：grep 自检（`mvn -B test-compile` 之前先确认 import 没漏、`ESCAPE` 只加了一处）**
+- [x] **Step 4-4：grep 自检（`mvn -B test-compile` 之前先确认 import 没漏、`ESCAPE` 只加了一处）**
 
 ```bash
 cd /e/JavaSpace/forum && grep -n "escapeLike\|ESCAPE '!'" src/main/java/org/song/forum/service/TagService.java src/main/java/org/song/forum/repository/TagRepository.java
@@ -1425,7 +1425,7 @@ cd /e/JavaSpace/forum && grep -n "escapeLike\|ESCAPE '!'" src/main/java/org/song
 
 预期：`TagService.java` 里 2 处（调用 1 + 方法定义 1，方法体内的 `'!'` 判断不算），`TagRepository.java` 里 1 处。
 
-- [ ] **Step 4-5：单类绿**
+- [x] **Step 4-5：单类绿**
 
 ```bash
 cd /e/JavaSpace/forum && mvn -B test -Dtest=TagFlowIntegrationTest
@@ -1438,7 +1438,7 @@ cd /e/JavaSpace/forum && mvn -B test -Dtest=TagFlowIntegrationTest
 [INFO] BUILD SUCCESS
 ```
 
-- [ ] **Step 4-6：全量绿（后端 177 / 21 类）**
+- [x] **Step 4-6：全量绿（后端 177 / 21 类）**
 
 ```bash
 cd /e/JavaSpace/forum && mvn -B clean test
@@ -1453,7 +1453,7 @@ cd /e/JavaSpace/forum && mvn -B clean test
 
 `Skipped: 1` 是那个 POSIX 权限用例（Windows 跳过），不是失败。若 `Tests run` 不是 177，先看是否有用例被 `-Dtest` 残留影响，再核对是否漏跑测试类。
 
-- [ ] **Step 4-7：确认前端没被牵连（后端改动不影响前端，但提交前跑一次更稳）**
+- [x] **Step 4-7：确认前端没被牵连（后端改动不影响前端，但提交前跑一次更稳）**
 
 ```bash
 cd /e/JavaSpace/forum/frontend && pnpm test
@@ -1463,7 +1463,7 @@ cd /e/JavaSpace/forum/frontend && pnpm test
 
 ### Step 4-5：提交
 
-- [ ] **Step 4-8：提交**
+- [x] **Step 4-8：提交**
 
 ```bash
 cd /e/JavaSpace/forum && git status --short
@@ -1933,10 +1933,10 @@ Task 1 → Task 2 有硬依赖（预算阈值要用 Task 1 的实测值；基线
 
 ## 11. Execution Handoff
 
-- [ ] **Task 1**：按需引入 Element Plus 并配置本地化提供者（Steps 1-1…1-13，提交 `perf: 按需引入 Element Plus 并配置本地化提供者`）
-- [ ] **Task 2**：增加产物预算检查并接入构建流程（Steps 2-1…2-11，提交 `perf: 增加产物预算检查并接入构建流程`）
-- [ ] **Task 3**：静态资源长缓存与入口页禁用缓存（Steps 3-1…3-9，提交 `perf: 静态资源长缓存与入口页禁用缓存`）
-- [ ] **Task 4**：标签搜索转义 LIKE 通配符（Steps 4-1…4-8，提交 `fix: 标签搜索转义 LIKE 通配符`）
+- [x] **Task 1**：按需引入 Element Plus 并配置本地化提供者（Steps 1-1…1-13，提交 `perf: 按需引入 Element Plus 并配置本地化提供者`）
+- [x] **Task 2**：增加产物预算检查并接入构建流程（Steps 2-1…2-11，提交 `perf: 增加产物预算检查并接入构建流程`）
+- [x] **Task 3**：静态资源长缓存与入口页禁用缓存（Steps 3-1…3-9，提交 `perf: 静态资源长缓存与入口页禁用缓存`）
+- [x] **Task 4**：标签搜索转义 LIKE 通配符（Steps 4-1…4-8，提交 `fix: 标签搜索转义 LIKE 通配符`）
 - [ ] **Task 5**：文档、上线与回填（Steps 5-1…5-9，提交 `docs: 记录第九轮前端性能优化（按需引入、产物预算与传输层）` 与 `docs: 回填第九轮构建与冒烟验收`）
 
 **最容易写错的 7 个点**
@@ -1992,7 +1992,8 @@ curl -fsS -H 'Host: raspi' http://127.0.0.1/forum/ | grep -o '/forum/assets/[^"]
 curl -fsS -H 'Host: raspi' http://127.0.0.1/forum/posts/1 | grep -c 'id="app"'
 # 取第一个 asset 验证 200 + gzip（-H 'Accept-Encoding: gzip' 才会有 content-encoding 行）
 ASSET=$(curl -fsS -H 'Host: raspi' http://127.0.0.1/forum/ | grep -o '/forum/assets/[^"]*\.js' | head -1)
-curl -sI -H 'Host: raspi' -H 'Accept-Encoding: gzip' "http://127.0.0.1$ASSET" | grep -iE '^(HTTP/|content-encoding:|cache-control:)'
+# 必须用 GET：nginx 的 gzip filter 对 header_only（HEAD）会跳过，HEAD 永远取不到 content-encoding
+curl -s -o /dev/null -D - -H 'Host: raspi' -H 'Accept-Encoding: gzip' "http://127.0.0.1$ASSET" | grep -iE '^(HTTP/|content-encoding:|cache-control:)'
 ```
 
 预期：第一条输出 1–3 条 `/forum/assets/index-*.js`；第二条 `1`；第三条 `HTTP/1.1 200`、`content-encoding: gzip`、`cache-control: public, max-age=31536000, immutable`。
@@ -2073,22 +2074,25 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' http://127.0.0.1/forum
 
 | # | 项 | 计划预期 | 实际 | 偏差原因 / 处理 |
 | --- | --- | --- | --- | --- |
-| 1 | 依赖安装 | `unplugin-vue-components@32.1.0`，lockfile 同提交 | （待填） | |
-| 2 | 入口 JS | ≤ 150,000 B（实测 84,431 B） | （待填） | |
-| 3 | 入口 CSS | ≤ 70,000 B（实测 39,019 B） | （待填） | |
-| 4 | 最大 chunk | ≤ 300,000 B（实测 233,744 B），Vite 无告警 | （待填） | |
-| 5 | JS 总量 | ≤ 950,000 B（实测 835,623 B）；CSS 总量 ≤ 260,000 B（实测 181,570 B） | （待填） | |
-| 6 | 前端用例 | 323 / 32 spec | （待填） | |
-| 7 | 既有 spec 改动 | 仅 `tokens.spec.js` 1 个（改断言，不新增用例） | （待填） | 若 > 12 个需记录原因 |
-| 8 | 后端用例 | 177 / 21 类 | （待填） | |
-| 9 | 缓存头 | assets 1 条 immutable；index 1 条 no-cache | （待填） | |
-| 10 | Jenkins | #20，全 stage SUCCESS（含 check:bundle） | （待填） | |
-| 11 | 人工回归 | B.6 六条全过 | （待填） | |
-| 12 | 提交数 | 7 条（第 0 次 Lead + 6 次执行），信息与附录 A 逐字一致 | （待填） | |
+| 1 | 依赖安装 | `unplugin-vue-components@32.1.0`，lockfile 同提交 | `unplugin-vue-components@32.1.0`，`pnpm-lock.yaml` 同提交（+215 行，纯新增 18 个传递依赖） | 无 |
+| 2 | 入口 JS | ≤ 150,000 B（实测 84,431 B） | 84,431 B | 无 |
+| 3 | 入口 CSS | ≤ 70,000 B（实测 39,019 B） | 39,019 B | 无 |
+| 4 | 最大 chunk | ≤ 300,000 B（实测 233,744 B），Vite 无告警 | 233,744 B（`_plugin-vue_export-helper`），无 >500 kB 告警 | 无 |
+| 5 | JS 总量 | ≤ 950,000 B（实测 835,623 B）；CSS 总量 ≤ 260,000 B（实测 181,570 B） | JS 835,869 B；CSS 181,570 B | 计划里的 835,623 是实验 worktree 的数字，主工作区为 835,869 B（+246 B），预算余量 12.0% |
+| 6 | 前端用例 | 323 / 32 spec | `Test Files 32 passed (32)` / `Tests 323 passed (323)` | 无 |
+| 7 | 既有 spec 改动 | 仅 `tokens.spec.js` 1 个（改断言，不新增用例） | 仅 `tokens.spec.js` 1 个；新增 `plugins/elementAutoImport.spec.js` 1 个（2 例） | 无 |
+| 8 | 后端用例 | 177 / 21 类 | `Tests run: 177, Failures: 0, Errors: 0, Skipped: 1`，21 类 | 无 |
+| 9 | 缓存头 | assets 1 条 immutable；index 1 条 no-cache | 部署前静态审查 + `deploy.sh` 断言已就位 | 线上实测见第 10、11 行 |
+| 10 | Jenkins | #20，全 stage SUCCESS（含 check:bundle） | （待回填） | |
+| 11 | 人工回归 | B.6 六条全过 | （待回填） | |
+| 12 | 提交数 | 7 条（第 0 次 Lead + 6 次执行），信息与附录 A 逐字一致 | 8 条：`07736d8`、`8446d3a`、`a83806c`、`0ff12fe`、`371c2cc`、`d474b18`（计划外 follow-up）、本次文档提交、后续回填提交 | Task 3 质量审查发现 `deploy.sh` 的 gzip/计数断言在失败路径上不可达，按「测试与部署断言也要能失败」的原则补 test-only 提交；计划附录 B.2 原用 HEAD 验 gzip 也一并改为 GET |
 
 **执行中做出的、计划没写的决定**（有就写，没有写「无」）：
 
 | 日期 | 决定 | 原因 | 影响面 |
 | --- | --- | --- | --- |
-| （待填） | | | |
+| 2026-10-25 | 测试模式不挂 `unplugin-vue-components`（`mode === 'test'` 时插件列表只有 `vite:vue`） | 实测无条件挂载会让模板 `el-*` 不再命中 `global.stubs`，63 个用例失败；测试期保持纯 stub 语义，生产构建才按需解析 | `vite.config.js` 改用 `defineConfig(({ mode }) => …)` 工厂；`elementAutoImport.spec.js` 同时断言两种 mode |
+| 2026-10-25 | `main.js` 显式 `app.directive('loading', ElLoading.directive)` | 4 个视图用 `v-loading`，模板指令不会被组件 resolver 自动注册 | `main.js` +5 行；`el-loading-mask` 样式随 `loading/style/css` 引入 |
+| 2026-10-25 | 追加 `d474b18` 修复部署冒烟脚本 | 质量审查实测：`set -euo pipefail` 下 grep 无匹配会让赋值语句直接退出，`|| die` 是死代码；assets 缺 Cache-Control 计数断言；README 用 HEAD 验 gzip 必假红 | `deploy/deploy.sh`、`docs/deployment/README.md`；不影响应用代码与测试计数 |
+| 2026-10-25 | 计划附录 B.2 的 gzip 命令由 `curl -sI` 改为 GET `-D -` | nginx gzip filter 对 `r->header_only` 跳过，HEAD 响应永远没有 `content-encoding` | 仅文档；B.3 的 HEAD 数 `cache-control` 仍然正确，未改 |
 
