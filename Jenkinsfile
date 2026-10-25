@@ -76,6 +76,9 @@ pipeline {
                     sh "${PNPM} install --frozen-lockfile --registry=${NPM_REGISTRY} --store-dir /pd/pnpm-store"
                     // 部署在子路径 /forum/：资源、路由、axios baseURL 三处联动（见 README「部署到子路径」）
                     sh "VITE_BASE_PATH=/forum/ ${PNPM} build"
+                    // 产物预算（第九轮）：入口 JS/CSS、单 chunk、CSS 总量、JS 总量 + CSS 覆盖断言，超阈值让流水线红。
+                    // 阈值与规则见 frontend/scripts/check-bundle.mjs 与 docs/DEVELOPMENT.md §4.14
+                    sh "${PNPM} check:bundle"
                 }
             }
         }
