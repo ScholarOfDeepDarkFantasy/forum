@@ -116,16 +116,36 @@ curl -fsS -H 'Host: raspi' "http://127.0.0.1/forum/api/posts?page=0&size=1" >/de
     || die "经 nginx 访问 /forum/api/posts 失败（检查反代与数据库连通性）"
 
 # 静态资源必须带 immutable 长缓存、入口页必须 no-cache（第九轮）：
-# 抓真实 asset 路径而不是硬编码文件名——每次构建的 hash 都会变
-asset_path="$(curl -fsS -H 'Host: raspi' "http://127.0.0.1/forum/" | grep -o '/forum/assets/[^"]*\.js' | head -1)"
-[ -n "$asset_path" ] || die "/forum/ 首页没有引用任何 /forum/assets/*.js"
-asset_cache="$(curl -sSI -H 'Host: raspi' "http://127.0.0.1$asset_path" | tr -d '\r' | grep -i '^cache-control:' || true)"
+# 抓真实 asset 路径而不是硬编码文件名——每次构建的 hash 都会变。
+#
+# 命令替换内部末尾的 `|| true` 是必需的：`set -o pipefail` 下 grep 无匹配会让
+# 整条管道返回 1，赋值语句本身就会触发 errexit —— 下面带诊断信息的 die 永远不可达。
+# 这里不用 curl -f：要把 HTTP 状态码带进 die 文案。
+home_raw="$(curl -sS --max-time 5 -H 'Host: raspi' -w '\n%{http_code}' "http://127.0.0.1/forum/" || true)"
+home_status="${home_raw##*$'\n'}"
+home_html="${home_raw%$'\n'*}"
+asset_hits="$(printf '%s\n' "$home_html" | grep -c '/forum/assets/[^"]*\.js' || true)"
+asset_path="$(printf '%s\n' "$home_html" | grep -o '/forum/assets/[^"]*\.js' | head -1 || true)"
+[ -n "$asset_path" ] \
+    || die "/forum/ 首页没有引用任何 /forum/assets/*.js（首页 HTTP ${home_status:-000}，命中 ${asset_hits:-0} 条）"
+
+# HEAD 探针同样带超时；先断言 200，否则「资源 404」会被误报成「Cache-Control 不含 immutable」
+asset_raw="$(curl -sS --max-time 5 -I -H 'Host: raspi' -w '\n%{http_code}' "http://127.0.0.1$asset_path" || true)"
+asset_status="${asset_raw##*$'\n'}"
+asset_cache="$(printf '%s\n' "$asset_raw" | tr -d '\r' | grep -i '^cache-control:' || true)"
+asset_cache_n="$(printf '%s\n' "$asset_raw" | tr -d '\r' | grep -ci '^cache-control:' || true)"
+[ "$asset_status" = "200" ] \
+    || die "$asset_path 的请求返回 HTTP ${asset_status:-000}（应为 200；资源不存在或 nginx alias 未指向 frontend/assets）"
+# 条数必须为 1：expires 与 add_header 同写会各生成一条 Cache-Control，两条头能分别
+# 满足下面的 immutable / max-age 断言，只查内容会漏检（计划风险 R6）
+[ "$asset_cache_n" = "1" ] \
+    || die "$asset_path 返回了 $asset_cache_n 条 Cache-Control（应为 1；assets 块里是否同时写了 expires 与 add_header？实际：$(echo "$asset_cache" | tr '\n' ';')）"
 echo "$asset_cache" | grep -q 'immutable' \
     || die "$asset_path 的 Cache-Control 不含 immutable（实际：${asset_cache:-无}；检查 nginx snippet 是否已 reload）"
 echo "$asset_cache" | grep -q 'max-age=31536000' \
     || die "$asset_path 的 Cache-Control 不是一年（实际：${asset_cache:-无}）"
 
-index_headers="$(curl -sSI -H 'Host: raspi' "http://127.0.0.1/forum/index.html" | tr -d '\r')"
+index_headers="$(curl -sS --max-time 5 -I -H 'Host: raspi' "http://127.0.0.1/forum/index.html" | tr -d '\r')"
 echo "$index_headers" | grep -qi '^cache-control: no-cache' \
     || die "/forum/index.html 的 Cache-Control 不含 no-cache（实际：$(echo "$index_headers" | grep -i '^cache-control:' || echo 无)）"
 [ "$(echo "$index_headers" | grep -ci '^cache-control:')" = "1" ] \

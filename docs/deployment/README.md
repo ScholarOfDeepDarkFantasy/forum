@@ -235,17 +235,21 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' -H 'Content-Type: appl
 
 ### 静态资源缓存头（第九轮）验证
 
-第九轮把 `/forum/assets/` 改成一年 + `immutable`（只写一条 `Cache-Control`），并给入口页加了 `no-cache`。`deploy.sh` 会自动断言这两点，这里给手工复核命令：
+第九轮把 `/forum/assets/` 改成一年 + `immutable`（只写一条 `Cache-Control`），并给入口页加了 `no-cache`。`deploy.sh` 会自动断言这些点（HTTP 200、只有一条 `Cache-Control`、`immutable`、一年、入口页 `no-cache`），这里给手工复核命令：
 
 ```bash
-# 1) 资源：必须带 immutable，且只有一条 Cache-Control
+# 1) 资源：必须带 immutable（「只有一条」的计数校验在第 3 步）
 ASSET=$(curl -fsS -H 'Host: raspi' http://127.0.0.1/forum/ | grep -o '/forum/assets/[^"]*\.js' | head -1)
+[ -n "$ASSET" ] || { echo '未从首页解析到 JS 资源'; exit 1; }
 echo "asset=$ASSET"
-curl -sI -H 'Host: raspi' -H 'Accept-Encoding: gzip' "http://127.0.0.1$ASSET" | grep -iE '^(HTTP/|cache-control:|content-encoding:)'
+curl -s -o /dev/null -D - -H 'Host: raspi' -H 'Accept-Encoding: gzip' "http://127.0.0.1$ASSET" \
+  | grep -iE '^(HTTP/|cache-control:|content-encoding:)'
 # 期望：HTTP/1.1 200 OK
 #       cache-control: public, max-age=31536000, immutable
 #       content-encoding: gzip
-# 注意 content-encoding 那行只有带 Accept-Encoding: gzip 才会出现（curl -I 默认不发）
+# 注意：必须用 GET 取响应头，不能用 curl -I（HEAD）——nginx 的 gzip filter 对
+# header_only 请求直接跳过，HEAD 无论带不带 Accept-Encoding 都不会有 content-encoding。
+# 若 .js 没出现 content-encoding，还取决于宿主机 nginx 的 gzip_types（不在本仓库），以 raspi 实测为准。
 
 # 2) 入口页与 SPA 回退：必须 no-cache
 curl -sI -H 'Host: raspi' http://127.0.0.1/forum/ | grep -i '^cache-control:'
