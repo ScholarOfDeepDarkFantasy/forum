@@ -115,6 +115,22 @@ curl -fsS -H 'Host: raspi' "http://127.0.0.1/forum/posts/1" | grep -q 'id="app"'
 curl -fsS -H 'Host: raspi' "http://127.0.0.1/forum/api/posts?page=0&size=1" >/dev/null \
     || die "经 nginx 访问 /forum/api/posts 失败（检查反代与数据库连通性）"
 
+# 静态资源必须带 immutable 长缓存、入口页必须 no-cache（第九轮）：
+# 抓真实 asset 路径而不是硬编码文件名——每次构建的 hash 都会变
+asset_path="$(curl -fsS -H 'Host: raspi' "http://127.0.0.1/forum/" | grep -o '/forum/assets/[^"]*\.js' | head -1)"
+[ -n "$asset_path" ] || die "/forum/ 首页没有引用任何 /forum/assets/*.js"
+asset_cache="$(curl -sSI -H 'Host: raspi' "http://127.0.0.1$asset_path" | tr -d '\r' | grep -i '^cache-control:' || true)"
+echo "$asset_cache" | grep -q 'immutable' \
+    || die "$asset_path 的 Cache-Control 不含 immutable（实际：${asset_cache:-无}；检查 nginx snippet 是否已 reload）"
+echo "$asset_cache" | grep -q 'max-age=31536000' \
+    || die "$asset_path 的 Cache-Control 不是一年（实际：${asset_cache:-无}）"
+
+index_headers="$(curl -sSI -H 'Host: raspi' "http://127.0.0.1/forum/index.html" | tr -d '\r')"
+echo "$index_headers" | grep -qi '^cache-control: no-cache' \
+    || die "/forum/index.html 的 Cache-Control 不含 no-cache（实际：$(echo "$index_headers" | grep -i '^cache-control:' || echo 无)）"
+[ "$(echo "$index_headers" | grep -ci '^cache-control:')" = "1" ] \
+    || die "/forum/index.html 返回了多条 Cache-Control 头（是否同时写了 expires 与 add_header？）"
+
 # 上传目录必须由 nginx 的 ^~ /forum/uploads/ 直出：
 # 命中 alias 时，不存在的文件是 404；若配置没生效，请求会落到 SPA 的
 # try_files 而返回 200 + index.html —— 这正是要抓的静默错误

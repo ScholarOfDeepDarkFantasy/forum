@@ -233,6 +233,35 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' -H 'Content-Type: appl
 
 > 后端只在 `remoteAddr` 是**环回或 RFC1918 私网地址**时才读 `X-Real-IP`。本机用 rootless podman 发布 `127.0.0.1:${HOST_PORT:-8086}:8080`，端口映射会让后端看到的 `remoteAddr` 变成容器网关地址（2026-10-23 实测 `10.89.3.15`，不是 `127.0.0.1`）；该地址属于私网，因此上面的 `-H 'X-Real-IP: ...'` 在本机直连 8086 时**会被采信**，第 4 步（其它 IP 不受影响）应返回 **200**。安全前提：8086 只发布在宿主机回环、且由本机 nginx 覆盖写该头，所以本机以外的客户端无法伪造；将来若把端口发布到其它网卡或公网，这个信任模型必须重新评估（本机任意进程即可伪造该头）。经 nginx 时该头会被覆盖为真实 `$remote_addr`。若要把锁定影响降到最低，冒烟可改用一次性用户（见计划 Task 6）。
 
+### 静态资源缓存头（第九轮）验证
+
+第九轮把 `/forum/assets/` 改成一年 + `immutable`（只写一条 `Cache-Control`），并给入口页加了 `no-cache`。`deploy.sh` 会自动断言这两点，这里给手工复核命令：
+
+```bash
+# 1) 资源：必须带 immutable，且只有一条 Cache-Control
+ASSET=$(curl -fsS -H 'Host: raspi' http://127.0.0.1/forum/ | grep -o '/forum/assets/[^"]*\.js' | head -1)
+echo "asset=$ASSET"
+curl -sI -H 'Host: raspi' -H 'Accept-Encoding: gzip' "http://127.0.0.1$ASSET" | grep -iE '^(HTTP/|cache-control:|content-encoding:)'
+# 期望：HTTP/1.1 200 OK
+#       cache-control: public, max-age=31536000, immutable
+#       content-encoding: gzip
+# 注意 content-encoding 那行只有带 Accept-Encoding: gzip 才会出现（curl -I 默认不发）
+
+# 2) 入口页与 SPA 回退：必须 no-cache
+curl -sI -H 'Host: raspi' http://127.0.0.1/forum/ | grep -i '^cache-control:'
+# 期望：cache-control: no-cache
+curl -sI -H 'Host: raspi' http://127.0.0.1/forum/posts/1 | grep -i '^cache-control:'
+# 期望：cache-control: no-cache
+
+# 3) 不能出现两条 Cache-Control（同时写了 expires 与 add_header 就会）
+curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
+# 期望：1
+```
+
+> 必须带 `-H 'Host: raspi'`：raspi 上 nginx 的 server 块写了 `server_name raspi`，不带 Host 时请求落到默认 server，测不到 `/forum/` 的配置。
+>
+> 发布后如果用户反馈「还是旧界面」，让用户强制刷新一次即可：旧 `index.html` 里引用的旧 hash 资源已被 `rsync --delete` 删除，`no-cache` 保证下一次不会再用旧 html。
+
 ## 6. 排障
 
 | 现象 | 排查 |
