@@ -26,6 +26,9 @@ import org.song.forum.dto.tag.TagResponse;
 import org.song.forum.util.PageResponse;
 import org.song.forum.util.Result;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -235,5 +238,43 @@ class TagFlowIntegrationTest {
         assertThat(malformed.getStatusCode().value()).isEqualTo(400);
         assertThat(malformed.getBody().isSuccess()).isFalse();
         assertThat(malformed.getBody().getMessage()).contains("size");
+    }
+
+    /**
+     * T17（第九轮）：标签关键词里的 '%' 与 '_' 必须按字面量匹配。
+     *
+     * 必须放在最后（@Order(9)）：本用例会新建标签，而 @Order(2) 断言总览恰好
+     * containsExactly("java","spring","spring-boot")、@Order(7) 断言 totalElements()==3，
+     * 提前建标签会把它们弄红。
+     *
+     * 关键词必须自己编码（URLEncoder + URI），不能让 RestTemplate 二次编码：
+     * 它是 URI 模板展开器，'%' 会被当成非法字符或再次转义。
+     */
+    @Test
+    @Order(9)
+    void tagKeywordTreatsLikeWildcardsAsLiterals() {
+        String tagger = registerAndLogin("wildcard-tagger");
+        // 两对「一个含通配符、一个能被通配符误命中」的标签
+        createPost(tagger, "百分比标签", List.of("100%", "1000"));
+        createPost(tagger, "下划线标签", List.of("a_b", "axb"));
+
+        // '%' 不转义时 LIKE '%100%%' 会连 "1000" 一起命中
+        assertThat(searchTagNames("100%")).containsExactly("100%");
+        // '_' 不转义时 LIKE '%a_b%' 会连 "axb" 一起命中
+        assertThat(searchTagNames("a_b")).containsExactly("a_b");
+        // ESCAPE 符本身也必须能被转义：搜 '!' 不应把整张标签表都匹配出来
+        assertThat(searchTagNames("!")).isEmpty();
+    }
+
+    private List<String> searchTagNames(String keyword) {
+        String encoded = URLEncoder.encode(keyword, StandardCharsets.UTF_8);
+        ResponseEntity<Result<PageResponse<TagResponse>>> resp = rest.exchange(
+                URI.create(url("/api/tags?keyword=" + encoded)),
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<>() {
+                });
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
+        return resp.getBody().getData().content().stream().map(TagResponse::name).toList();
     }
 }

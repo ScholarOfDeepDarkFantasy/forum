@@ -20,7 +20,8 @@ public class TagService {
     @Transactional(readOnly = true)
     public PageResponse<TagResponse> list(String keyword, int page, int size) {
         String kw = (keyword == null || keyword.isBlank()) ? "" : keyword.trim();
-        List<TagResponse> all = tagRepository.findWithPostCounts(kw).stream()
+        // 关键词进 LIKE 前必须转义（T17）：'%'、'_' 是通配符，'!' 是 JPQL 里 ESCAPE 指定的转义符
+        List<TagResponse> all = tagRepository.findWithPostCounts(escapeLike(kw)).stream()
                 .map(row -> new TagResponse(
                         ((Number) row[0]).longValue(),
                         (String) row[1],
@@ -44,5 +45,23 @@ public class TagService {
         int totalPages = (int) ((all.size() + (long) safeSize - 1) / safeSize);
         return new PageResponse<>(all.subList(from, to), safePage, safeSize, all.size(), totalPages,
                 to >= all.size());
+    }
+
+    /**
+     * 转义 LIKE 通配符：'!' 是 JPQL 里 ESCAPE 指定的转义符，所以它自己也要先转义。
+     * 与 PostService.escapeLike 同款（那边搜索/列表都靠它）；标签名允许 '%'、'_'
+     * （PostService.resolveTags 只做 trim + 小写），所以标签搜索侧也必须转义（T17）。
+     * 抽公共工具类不划算：只有这两个 Service 用，且两边注释各自解释了「为什么」。
+     */
+    private static String escapeLike(String keyword) {
+        StringBuilder sb = new StringBuilder(keyword.length() + 8);
+        for (int i = 0; i < keyword.length(); i++) {
+            char c = keyword.charAt(i);
+            if (c == '!' || c == '%' || c == '_') {
+                sb.append('!');
+            }
+            sb.append(c);
+        }
+        return sb.toString();
     }
 }
