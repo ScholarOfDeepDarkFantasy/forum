@@ -6,7 +6,10 @@
 ## 1. 部署形态
 
 ```
-浏览器 ── http://raspi/forum/
+浏览器 ── http://raspi/forum/            （内网）
+浏览器 ── https://treenewbee.men/forum/  （公网，Cloudflare Tunnel）
+  cloudflared（系统服务，远程托管 tunnel；ingress: hostname=treenewbee.men → http://localhost:80）
+    └─ 保留原始 Host 头 → nginx
   nginx :80（系统服务）
     ├─ /forum/       → /pd/Program/forum/frontend/      Vue dist（nginx 直出，不进容器）
     ├─ /forum/uploads/ → /pd/Program/forum/uploads/     头像文件（bind mount 进后端容器，nginx 直出）
@@ -18,6 +21,20 @@ Jenkins :8080 → job `javaforum`（Jenkinsfile from SCM，master，轮询 H/5�
 ```
 
 要点：后端只绑 `127.0.0.1:8086`；数据库不新增容器；镜像/工作区/前端都在 `/pd`（根盘只剩 5G）。SSE 端点 `/forum/api/notifications/stream` 由 snippet 单独配置（`proxy_buffering off` + `proxy_read_timeout 3600s`），漏配的表现与排障见第 6 节。
+
+**两个 server 块，两个入口**（2026-10-26 起）：
+
+| 入口 | nginx 配置文件 | `server_name` | 暴露范围 |
+|---|---|---|---|
+| 内网 `http://raspi/forum/` | `/etc/nginx/conf.d/app.conf`（include snippet） | `raspi` | app.conf 里所有 location（`/imageweb/`、`/manager/`、`/files/`、`/api/` 等）+ `/forum/` |
+| 公网 `https://treenewbee.men/forum/` | `/etc/nginx/conf.d/forum-public.conf`（只 include snippet） | `treenewbee.men` | 仅 `/forum/`；其它路径一律 404 |
+
+公网块刻意不复用 `app.conf` 的 `server_name`：tunnel 会把原始 Host（`treenewbee.men`）带到 nginx，
+若把该域名加进 `app.conf`，`/imageweb/`、`/manager/`、`/api/`（mini-mall 网关）等内网应用会一并被带到公网。
+该文件由 `deploy.sh` 每次部署幂等覆盖（`deploy/nginx/public.conf`），并带 `real_ip_header CF-Connecting-IP`
+（`set_real_ip_from` 限定回环），否则后端看到的客户端 IP 恒为 `::1`，登录限流会把全站当成同一个 IP。
+它还写了 `absolute_redirect off`：cloudflared 用明文 http 连源站，不加这一行时 `return 302 /forum/`
+会被补成 `http://treenewbee.men/forum/`，公网 https 用户会被降级到 http。
 
 ## 2. 一次性引导（换机器时照做；当前主机已完成）
 
@@ -126,6 +143,8 @@ curl -fsSI -H 'Host: raspi' "http://127.0.0.1/forum$AVATAR" | grep -Ei '^(HTTP/|
 ```
 
 > 必须带 `Host: raspi`：`app.conf` 是 `server_name raspi`，用 IP 访问会落到 `sites-enabled/default`。
+> 公网入口同理，用 `-H 'Host: treenewbee.men'` 验证 `forum-public.conf` 那条路由（`deploy.sh` 已内置该断言）：
+> `curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: treenewbee.men' http://127.0.0.1/forum/` 期望 200。
 
 ### 全文搜索（V3 pg_trgm）验证
 
@@ -282,6 +301,8 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
 | 容器 `Created` 但起不来，日志有 `crun: opening file 'memory.max' ...` | compose 里写了 `mem_limit`，而本机 `/proc/cmdline` 带 `cgroup_disable=memory`（没有内存 cgroup 控制器）；删掉 `mem_limit`，用 `JAVA_OPTS` 的 `-Xmx` 限制堆 |
 | 数据库密码错 | `sudo -u pi podman exec postgresql psql -U postgres -c "ALTER ROLE forum WITH PASSWORD '<.env 里的值>';"` |
 | `/forum/` 404 | `app.conf` 是否 include snippet；`/pd/Program/forum/frontend/index.html` 是否存在 |
+| **公网域名**访问 `/forum/` 404，内网 `http://raspi/forum/` 正常 | 典型的 `server_name` 不匹配：cloudflared 保留原始 Host（`treenewbee.men`）到 nginx，而 `app.conf` 是 `server_name raspi`，请求落到 `sites-enabled/default`（`server_name _`，root=`/var/www/html`）→ 404。确认 `/etc/nginx/conf.d/forum-public.conf` 存在且 `nginx -t` + reload 过；本机验证：`curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: treenewbee.men' http://127.0.0.1/forum/` 应为 **200** |
+| 公网访问时所有用户被当成同一个 IP（一人打满限流，全站 429） | `forum-public.conf` 的 realip 没生效：cloudflared 从回环连入，缺 `real_ip_header CF-Connecting-IP` 时 `$remote_addr` 恒为 `::1`，后端 `ClientIpResolver` 只能拿到环回地址。确认该文件含 `set_real_ip_from 127.0.0.1; set_real_ip_from ::1; real_ip_header CF-Connecting-IP;` 并已 reload；`sudo tail /var/log/nginx/access.log` 里公网请求的第一列应是真实公网 IP 而非 `::1` |
 | `/forum/api/` 502 | `forum-backend` 未起或未监听 8086：`sudo -u pi curl -v http://127.0.0.1:8086/api/health` |
 | `/forum/uploads/xxx` 返回 200 HTML | nginx 的 `^~ /forum/uploads/` 必须排在 `location /forum/`（SPA 回退）之前，否则 `try_files` 把请求兜到 `index.html`；确认 snippet 顺序后 `sudo nginx -t && sudo systemctl reload nginx` |
 | 上传返回 `413` 或 `400 图片不能超过 2MB` | 413 来自 nginx：snippet 的 `/forum/api/` 已设 `client_max_body_size 3m`，若仍出现说明服务器上是旧版 snippet（重新发布或手工 `cp` 后 reload）；400 来自后端（超过 2MB 或 multipart 上限），响应体里带 `图片不能超过 2MB` |

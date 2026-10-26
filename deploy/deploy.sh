@@ -8,6 +8,10 @@
 #   2. /etc/nginx/conf.d/app.conf 已 include /etc/nginx/snippets/forum.conf
 #   3. 镜像 localhost/forum-backend:<IMAGE_TAG> 已由流水线构建
 #
+# 本脚本还会写 /etc/nginx/conf.d/forum-public.conf（公网 Cloudflare Tunnel 入口的
+# server 块，源文件 deploy/nginx/public.conf）。首次执行前该文件可以不存在——
+# cp 会创建它，随后的 nginx -t 与 reload 让它生效。
+#
 # 脚本可重复执行：先 down 再 up，保证换镜像后容器一定重建。
 
 set -euo pipefail
@@ -102,6 +106,10 @@ chmod -R a+rX "$FRONTEND_DIR"
 
 log "同步 nginx snippet 并 reload"
 sudo -n cp "$WORKSPACE/deploy/nginx/forum.conf" /etc/nginx/snippets/forum.conf
+# 公网入口（Cloudflare Tunnel）的独立 server 块：app.conf 是 `server_name raspi`，
+# 匹配不上 tunnel 带来的 Host: treenewbee.men，请求会落到 sites-enabled/default 的 404。
+# 该文件只 include forum snippet，因此公网仅暴露 /forum/。
+sudo -n cp "$WORKSPACE/deploy/nginx/public.conf" /etc/nginx/conf.d/forum-public.conf
 sudo -n /usr/sbin/nginx -t
 sudo -n /usr/bin/systemctl reload nginx
 
@@ -158,6 +166,20 @@ uploads_code="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Host: ra
     "http://127.0.0.1/forum/uploads/__probe__/missing.jpg")"
 [ "$uploads_code" = "404" ] \
     || die "/forum/uploads/ 未直出（返回 $uploads_code，应为 404；检查 nginx snippet 是否已 reload 且 /pd/Program/forum/uploads 可读）"
+
+# 公网入口（Cloudflare Tunnel）必须命中 conf.d/forum-public.conf 的 server 块。
+# cloudflared 把原始 Host 原样带给 nginx；匹配不上 app.conf 的 `server_name raspi`
+# 就会落到 default_server 的 404 —— 那正是「tunnel 通了但页面 404」的成因。
+# 本机带 Host 头即可覆盖同一条 nginx 路由，不需要真的走公网。
+public_code="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Host: treenewbee.men' \
+    "http://127.0.0.1/forum/")"
+[ "$public_code" = "200" ] \
+    || die "Host: treenewbee.men 的 /forum/ 返回 $public_code（应为 200；检查 /etc/nginx/conf.d/forum-public.conf 是否存在并已 reload）"
+# 公网 server 块只 include forum snippet：其它内网应用（/imageweb/、/manager/ 等）不能被带出去
+public_leak="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Host: treenewbee.men' \
+    "http://127.0.0.1/imageweb/")"
+[ "$public_leak" = "404" ] \
+    || die "Host: treenewbee.men 访问 /imageweb/ 返回 $public_leak（应为 404；公网 server 块不应暴露内网应用）"
 
 # SSE 订阅端点必须由后端回答 401（ticket 缺失），而不是落到 SPA 的 index.html（200）：
 # 若 nginx 精确匹配缺失，请求会被 try_files 兜到 /forum/index.html，这里会拿到 200；
