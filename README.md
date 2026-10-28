@@ -151,6 +151,11 @@ http://raspi/forum/            nginx :80
                                  └─ host.containers.internal:5432 → 主机已有 postgresql 容器（库 javaforum）
 ```
 
+两个对外入口：
+
+- 内网：`http://raspi/forum/`（`server_name raspi`，`deploy/nginx/forum.conf` 片段）
+- 公网：`https://treenewbee.men/forum/`（Cloudflare Tunnel → cloudflared → 本机 nginx 的 `deploy/nginx/public.conf`）；该 server 块只 `include` 论坛片段、只暴露 `/forum/`，源站对明文请求返回 308 到 https 并下发 HSTS 等 4 个安全响应头。第十轮验收记录见 [`docs/DEVELOPMENT.md` §4.15](docs/DEVELOPMENT.md)。
+
 相关文件：
 
 | 文件 | 作用 |

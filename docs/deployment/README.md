@@ -33,8 +33,10 @@ Jenkins :8080 → job `javaforum`（Jenkinsfile from SCM，master，轮询 H/5�
 若把该域名加进 `app.conf`，`/imageweb/`、`/manager/`、`/api/`（mini-mall 网关）等内网应用会一并被带到公网。
 该文件由 `deploy.sh` 每次部署幂等覆盖（`deploy/nginx/public.conf`），并带 `real_ip_header CF-Connecting-IP`
 （`set_real_ip_from` 限定回环），否则后端看到的客户端 IP 恒为 `::1`，登录限流会把全站当成同一个 IP。
-它还写了 `absolute_redirect off`：cloudflared 用明文 http 连源站，不加这一行时 `return 302 /forum/`
-会被补成 `http://treenewbee.men/forum/`，公网 https 用户会被降级到 http。
+它还用 `X-Forwarded-Proto` 在源站强制 HTTPS（明文请求 308 到 `https://treenewbee.men/...`），并下发
+`HSTS`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy` 四个安全响应头；
+`absolute_redirect off` 仍然保留，让 `/forum` → `/forum/` 这类内部跳转保持相对路径。
+HTML 与静态资源的安全头实际写在 snippet 的两个 location 里（nginx 1.22 的 `add_header` 不继承，见第 7 节）。
 
 ## 2. 一次性引导（换机器时照做；当前主机已完成）
 
@@ -143,8 +145,23 @@ curl -fsSI -H 'Host: raspi' "http://127.0.0.1/forum$AVATAR" | grep -Ei '^(HTTP/|
 ```
 
 > 必须带 `Host: raspi`：`app.conf` 是 `server_name raspi`，用 IP 访问会落到 `sites-enabled/default`。
-> 公网入口同理，用 `-H 'Host: treenewbee.men'` 验证 `forum-public.conf` 那条路由（`deploy.sh` 已内置该断言）：
-> `curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: treenewbee.men' http://127.0.0.1/forum/` 期望 200。
+> 公网入口同理，用 `-H 'Host: treenewbee.men'` 验证 `forum-public.conf` 那条路由（`deploy.sh` 已内置这些断言）：
+>
+> ```bash
+> # 明文必须 308 到 https（cloudflared 会把客户端 scheme 放进 X-Forwarded-Proto）
+> curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' \
+>   -H 'Host: treenewbee.men' -H 'X-Forwarded-Proto: http' http://127.0.0.1/forum/
+> # 期望：308 https://treenewbee.men/forum/
+>
+> # HTML 必须带 4 个安全响应头
+> curl -sI -H 'Host: treenewbee.men' http://127.0.0.1/forum/ | grep -iE \
+>   '^(strict-transport-security|x-content-type-options|x-frame-options|referrer-policy):'
+>
+> # 公网静态资源同样单条 immutable；公网 SSE 与内网一样 401
+> curl -sI -H 'Host: treenewbee.men' http://127.0.0.1/forum/assets/<hash>.js | grep -ci '^cache-control:'
+> curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: treenewbee.men' \
+>   http://127.0.0.1/forum/api/notifications/stream   # 期望 401
+> ```
 
 ### 全文搜索（V3 pg_trgm）验证
 
@@ -287,6 +304,12 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
 >
 > 发布后如果用户反馈「还是旧界面」，让用户强制刷新一次即可：旧 `index.html` 里引用的旧 hash 资源已被 `rsync --delete` 删除，`no-cache` 保证下一次不会再用旧 html。
 
+> **2026-10-28 第十轮公网验收（Build #24，镜像 `forum-backend:24`）**：`https://treenewbee.men/forum/` 200
+> 且带 `Cache-Control: no-cache` + 4 个安全响应头；`http://` 308 到 https；公网 asset 200 + 单条 immutable + gzip；
+> 公网 `/imageweb/`、`/manager/` 404；公网 SSE 401；公网登录 → me → logout → 旧 token 401；
+> nginx access log 首列为真实公网 IP（realip 生效）；连续 5 次错密码后第 6 次 429 + `Retry-After: 899`，
+> 后端日志 `WARN ... IP <真实公网 IP> 登录失败 5 次，锁定 900000 ms`。`deploy.sh` 新增的 4 组公网断言在本次构建日志中通过。
+
 ## 6. 排障
 
 | 现象 | 排查 |
@@ -335,7 +358,9 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
 - **第八轮（2026-10-24 质量加固）没有新增部署要求**：无数据库迁移、无新配置项、无 nginx/location 改动；发布即镜像替换（Jenkins 自动构建 + `deploy.sh`）。回滚只需把镜像 tag 切到上一版并重跑 `deploy.sh`。
 - **静态资源缓存一年 + 入口页 no-cache（第九轮起）**：`/forum/assets/*` 带内容 hash，发布后文件名变化、旧文件被 `rsync --delete` 删除，因此长缓存安全；`index.html` 必须每次回源，否则用户会一直加载旧入口、请求已删除的旧 hash 资源（表现为白屏）。若出现白屏，让用户强制刷新一次即可，不要改成给 `index.html` 加长缓存。
 - **首次发布第九轮后可能白屏一次**：改动前 `index.html` 没有任何 `Cache-Control`，浏览器按启发式规则缓存；上线瞬间可能仍用旧 html 去请求已被删除的旧 hash 资源，强刷一次即可恢复。`no-cache` 只对「已经拿到新 html」之后的加载生效。
-- **nginx `add_header` 不再从 server 级继承**：`/forum/assets/` 与 `location = /forum/index.html` 各自定义 `add_header`，若宿主机 `conf.d/app.conf` 在 server 级设置过安全头（`X-Frame-Options`、`Referrer-Policy`、CSP 等），这两个 location 会丢掉它们。第九轮新增断言只覆盖 Cache-Control；上线后请 `sudo nginx -T | grep -n add_header` 复核一次。
+- **nginx `add_header` 不再从 server 级继承**：`/forum/assets/` 与 `location = /forum/index.html` 各自定义 `add_header`，若宿主机 `conf.d/app.conf` 在 server 级设置过安全头（`X-Frame-Options`、`Referrer-Policy`、CSP 等），这两个 location 会丢掉它们。第十轮起把 4 个安全头直接写进这两个 location（`deploy/nginx/forum.conf`），公网 API 响应由 `forum-public.conf` 的 server 级负责；将来 nginx 升到 1.29+ 可用 `add_header_inherit merge` 合并。
+- **Cloudflare 免费版会给 404 加边缘缓存头**：请求不存在的 `/forum/assets/*.js` 会返回 404 + `Cache-Control: max-age=14400` + `cf-cache-status: MISS`，这是 Cloudflare 的边缘行为，不是源站配置错误；源站的 404 本身不带 Cache-Control。
+- **公网强制 HTTPS 在源站兜底**：`forum-public.conf` 用 `X-Forwarded-Proto` 把明文请求 308 到 https；Cloudflare 面板的 Always Use HTTPS 未纳入仓库，属手工设置，开启后是多一层保险。HSTS 不带 `includeSubDomains`，避免误伤该域名下的其它内网子域。
 
 ## 附录 A：Jenkins job `config.xml`
 

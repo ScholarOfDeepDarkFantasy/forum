@@ -744,6 +744,58 @@ cd frontend && pnpm test --run
   6. 控制台：除「点取消」时 ElMessageBox 自身 `cancel` 拒绝被记为一条 error 外，无其它 error/warning；无「组件已解析/样式缺失」类告警。
 - 结论：第九轮上线验收通过；唯一遗留是 `deploy.sh` 首页探针的诊断可达性与 `ElMessageBox` 取消时的控制台噪音（均记入已知限制）。
 
+### 4.15 第十轮：公网入口验证与加固（2026-10-28）
+
+**背景**：第七轮之后在仓库外追加了 `600a8aa`（`deploy/nginx/public.conf` + `deploy.sh` 公网断言），但一直未推送、未跑过 Jenkins，公网现场也没有端到端验收。实测发现公网 HTTPS 可用，但 `http://` 不跳转、响应缺少 HSTS / nosniff / X-Frame-Options / Referrer-Policy。本轮只做验证与加固，不改业务代码。
+
+**公网入口架构**：
+
+```
+浏览器 → Cloudflare 边缘（treenewbee.men）→ cloudflared（raspi，本机回环）→ nginx :80
+        → forum-public.conf（server_name treenewbee.men，308 + 安全头）
+        → include snippets/forum.conf（/forum/ 静态 + /forum/api/ 反代）
+        → 127.0.0.1:8086 forum-backend
+```
+
+**CF 侧建议**（未纳入仓库，手工保持）：面板开 Always Use HTTPS（源站 308 已兜底，属双保险）；如需 HSTS 预加载再评估 `includeSubDomains`；不要给 `app.conf` 加该域名（会把 `/imageweb/`、`/manager/`、`/files/`、`/api/` 等内网应用一起暴露）。
+
+**改动**
+
+| 文件 | 改动 |
+| --- | --- |
+| `deploy/nginx/public.conf` | 用 `X-Forwarded-Proto = http` 判定公网明文请求并 `return 308 https://treenewbee.men$request_uri`；server 级补 4 个安全响应头；更新注释（Cloudflare 面板的 Always Use HTTPS 只作双保险） |
+| `deploy/nginx/forum.conf` | 在 `location ^~ /forum/assets/` 与 `location = /forum/index.html` 各补 4 个安全响应头 —— nginx 1.22 没有 `add_header_inherit`，这两个 location 自带 `add_header`，不继承 server 级配置，HTML/静态的实际下发点在这里 |
+| `deploy/deploy.sh` | 新增 4 组公网断言：明文请求 308 + Location、HTML 四个安全头、公网 Host 的 asset 单条 immutable、公网 Host 的 SSE 401 |
+
+**验证矩阵（2026-10-28，Build #24，镜像 `localhost/forum-backend:24`）**
+
+| # | 项 | 结果 |
+| --- | --- | --- |
+| V1 | `https://treenewbee.men/forum/` | 200，`Cache-Control: no-cache` |
+| V2 | `http://treenewbee.men/forum/` | **308 → `https://treenewbee.men/forum/`** |
+| V3 | 公网 `/imageweb/`、`/manager/` | 404（内网应用未暴露） |
+| V4 | 公网 asset `index-Dm2pwhnr.js` | 200、**1 条** `Cache-Control: public, max-age=31536000, immutable`、`Content-Encoding: gzip`、`cf-cache-status: HIT` |
+| V5 | 公网 `/forum/api/health` | 200 |
+| V6 | 公网 SSE（无 ticket） | 401 |
+| V7 | 公网 `/forum/uploads/__probe__/missing.jpg` | 404（未落到 SPA） |
+| V8 | 公网登录 → me → logout → 旧 token me | 200 / 200 / 200 / 401 |
+| V9 | realip | nginx access log 首列为真实公网 IP `27.17.82.164`（非 `::1`） |
+| V10 | 公网连续 5 次错密码 | 5×401，第 6 次 **429** + `Retry-After: 899`；后端日志 `WARN ... IP 27.17.82.164 登录失败 5 次，锁定 900000 ms` |
+| V11 | 限流隔离 | 内网入口伪造 `X-Real-IP: 203.0.113.99` 正确密码 200（未与环回地址共桶） |
+
+构建记录：`600a8aa` + 设计/计划提交 → **Build #23** SUCCESS（镜像 23）；`a1cd36b`（加固）→ **Build #24** SUCCESS，部署日志里 4 组新公网断言全部通过。锁定验收后 `podman restart forum-backend` 清空内存计数，公网登录恢复 200（`health=200`、`login=200`）。
+
+**已知限制**
+
+- nginx 1.22 无 `add_header_inherit`：安全头的下发点必须写进带 `add_header` 的 location（assets、index.html）；API 响应走 server 级。将来升级到 1.29+ 可合并。
+- 未设 CSP：论坛有内联主题脚本与 Markdown 内联样式，需要单独设计。
+- HSTS 不带 `includeSubDomains`（该域名下可能有其它内网子域），max-age 一年。
+- Cloudflare 免费版对 404 会加 `Cache-Control: max-age=14400`、`cf-cache-status: MISS`，属边缘行为，不是源站配置错误。
+- Cloudflare 面板的 Always Use HTTPS、WAF 等未纳入仓库；源站 308 已兜底 https，面板设置仅作双保险。
+- 限流验收会锁定验收机 IP 15 分钟；重启后端即清（内存计数，见 §4.12）。
+
+**上线验收**：V1–V11 全部通过；`deploy.sh` 4 组公网断言在 Build #24 日志中通过；公网 HTTP 明文已 308 到 https；安全响应头在 HTML 与 SPA 路由上均存在。
+
 ---
 
 ## 5. 待办与后续计划
@@ -788,6 +840,8 @@ cd frontend && pnpm test --run
 > 第八轮同样不加业务功能，只做质量加固（见 §4.13）；「限流改共享存储」仍是多实例部署的前置条件。
 
 > 第九轮同样不加业务功能，只做前端性能优化与 T17（见 §4.14）；双审顺带记录了两条候选：两处 `escapeLike`（`PostService`/`TagService`）重复 11 行，将来若改转义字符需双改；`check-bundle.mjs` 的参数解析只认 `--dist <dir>` 形式。
+
+> 第十轮继续不加业务功能，只做公网入口验证与运维加固（见 §4.15）；新增两条候选：①CSP（需要处理内联主题脚本与 Markdown 内联样式，属独立一轮）；②把 Cloudflare 侧设置（Always Use HTTPS、HSTS）纳入仓库化配置（目前只有源站 nginx 兜底，面板设置靠手工保持）。
 
 ---
 
@@ -850,7 +904,12 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-25 | docs | 回填第九轮构建与冒烟验收（Build #20、缓存头实测、人工回归） | 本次提交 |
+| 2026-10-28 | docs | 记录第十轮公网入口验证与加固（HTTPS 强制、安全响应头、部署断言） | 本次提交 |
+| 2026-10-28 | fix | 公网入口强制 HTTPS 并补安全响应头 | `a1cd36b` |
+| 2026-10-28 | docs | 新增第十轮公网入口设计与计划 | `7fa08f9` |
+| 2026-10-26 | fix | 公网 Cloudflare Tunnel 入口的 nginx server 块 | `600a8aa` |
+| 2026-10-25 | docs | 回填第九轮构建与冒烟验收（Build #20、缓存头实测、人工回归） | `8e6d71b` |
+| 2026-10-25 | chore | 收尾第九轮审查遗留的文档与测试噪音（App.spec stub、体积口径说明） | `9199d91` |
 | 2026-10-25 | docs | 记录第九轮前端性能优化（按需引入、产物预算与传输层） | `3abfa85` |
 | 2026-10-25 | fix | 修正部署缓存头冒烟的失败路径与计数断言 | `d474b18` |
 | 2026-10-25 | fix | 标签搜索转义 LIKE 通配符（T17） | `371c2cc` |

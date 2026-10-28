@@ -388,3 +388,42 @@ git push git@github.com:ScholarOfDeepDarkFantasy/forum.git master:master
 - [ ] B.8 公网 5 次错密码后 429 + `Retry-After`，日志 IP 为真实 IP；内网伪造 IP 200（隔离）
 - [ ] B.9 重启后端清空限流窗口后公网登录恢复 200
 - [ ] B.10 部署日志包含 4 组新公网断言且通过
+
+## 12. 实施记录与偏差（2026-10-28）
+
+### 12.1 构建记录
+
+| 提交 | 内容 | Jenkins | 镜像 |
+| --- | --- | --- | --- |
+| `600a8aa` | 公网 server 块（本轮前置，本地未推送 → 本次补推） | Build #23 SUCCESS | `forum-backend:23`（healthy） |
+| `a1cd36b` | 公网强制 HTTPS + 安全响应头 + deploy.sh 断言 | Build #24 SUCCESS | `forum-backend:24`（healthy） |
+| ⟨待回填⟩ | 文档（§4.15、部署手册、README、本计划） | ⟨待回填⟩ | ⟨待回填⟩ |
+| ⟨待回填⟩ | 回填验收与哈希 | ⟨待回填⟩ | ⟨待回填⟩ |
+
+### 12.2 RED 证据（加固前，raspi 本机模拟公网 Host）
+
+```
+xfp_redirect=200                                  # 期望 308，实际 200 → 断言红
+strict-transport-security 计数=0                  # 期望 ≥1 → 断言红
+```
+
+加固后同一组命令：`A_redirect=[308 https://treenewbee.men/forum/]`、四个安全头 grep 全过、
+`public_asset=200 cache_control_n=1`、`public_sse=401`；`deploy.sh` 实跑 13/13 组断言通过。
+
+### 12.3 执行中的偏差与决定
+
+1. **下发 nginx 配置的方式**：计划写普通拷贝，实际本机没有 scp，改用
+   `base64 -w0` + `forum-ssh.py` + `sudo tee`（public.conf → `/etc/nginx/conf.d/forum-public.conf`，
+   forum.conf → `/etc/nginx/snippets/forum.conf`）+ `nginx -t` + `systemctl reload nginx`；改完立即公网/内网双回归。
+2. **临时探针实验**：为确认 cloudflared 是否传 `X-Forwarded-Proto`，在公网 server 块临时加
+   `location = /forum/__probe` 返回 `$http_x_forwarded_proto` / `$http_cf_visitor` / `$remote_addr` /
+   `$realip_remote_addr`。实测 https→`https`、http→`http`，`$realip_remote_addr=::1`（只有回环可信），
+   公网真实 IP 已由 `CF-Connecting-IP` 还原。探针已删除并 reload。
+3. **设计判断修正**：spec 原把「assets 与 index.html 拿不到安全头」列为已知限制；实现时发现只需把 4 个头
+   写进 snippet 的两个 location（它们自带 `add_header`，不继承 server 级），因此该限制已消除，
+   已知限制改为「nginx 1.22 无 add_header_inherit，下发点分散」。
+4. **断言数量**：`deploy.sh` 现有 13 组断言（原 9 组 + 本轮 4 组），新 4 组插在 `/imageweb/` 泄露断言之后。
+5. **V10 的清理**：限流验收会锁验收机公网 IP 15 分钟；按约定放到最后，结束后
+   `podman restart forum-backend` 清空内存计数，实测重启 60 s 后 `healthy`、公网登录恢复 200。
+6. **验收机 IP**：V10 首次验收机公网 IP 为 `27.17.82.164`（`Retry-After: 899`）；
+   Task 5 复核时用 `203.0.113.x` 段再验一次（429 + `Retry-After: 900`），两次都在 §4.15 留证。
