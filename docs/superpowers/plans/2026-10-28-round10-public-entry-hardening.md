@@ -319,7 +319,7 @@ python /c/Temp/forum-ssh.py 'sudo podman restart forum-backend && sleep 20 && cu
 - 验证矩阵 V1–V11 实测结果表（构建号、镜像 tag、实际值）。
 - 已知限制：nginx 1.22 无 add_header 继承（assets/index.html 无安全头）；CF 404 边缘缓存头；CF 免费版无 WAF；未设 CSP；HSTS 不含子域。
 - 「CF 侧建议」：Always Use HTTPS、按需开 HSTS、不要把域名加到 app.conf。
-- 上线验收占位（`⟨待回填⟩`）。
+- 上线验收（Task 5 回填，结果见 §4.15「上线验收」）。
 
 **Step 4-2** `docs/deployment/README.md`：
 
@@ -378,16 +378,16 @@ git push git@github.com:ScholarOfDeepDarkFantasy/forum.git master:master
 
 ## 附录 B 上线冒烟清单
 
-- [ ] B.1 公网 HTTPS 首页 200、`Cache-Control: no-cache`
-- [ ] B.2 公网 HTTP 308 到 https
-- [ ] B.3 公网 `/imageweb/`、`/manager/` 404
-- [ ] B.4 公网 asset 200 + 单条 immutable + gzip
-- [ ] B.5 公网 `/forum/api/health` 200；SSE 401；uploads 404
-- [ ] B.6 公网登录 200 → me 200 → logout 200 → 旧 token 401
-- [ ] B.7 realip：access log 首列是真实公网 IP
-- [ ] B.8 公网 5 次错密码后 429 + `Retry-After`，日志 IP 为真实 IP；内网伪造 IP 200（隔离）
-- [ ] B.9 重启后端清空限流窗口后公网登录恢复 200
-- [ ] B.10 部署日志包含 4 组新公网断言且通过
+- [x] B.1 公网 HTTPS 首页 200、`Cache-Control: no-cache`
+- [x] B.2 公网 HTTP 308 到 https
+- [x] B.3 公网 `/imageweb/`、`/manager/` 404
+- [x] B.4 公网 asset 200 + 单条 immutable + gzip
+- [x] B.5 公网 `/forum/api/health` 200；SSE 401；uploads 404
+- [x] B.6 公网登录 200 → me 200 → logout 200 → 旧 token 401
+- [x] B.7 realip：access log 首列是真实公网 IP
+- [x] B.8 公网 5 次错密码后 429 + `Retry-After`，日志 IP 为真实 IP；内网伪造 IP 200（隔离）
+- [x] B.9 重启后端清空限流窗口后公网登录恢复 200
+- [x] B.10 部署日志包含 4 组新公网断言且通过
 
 ## 12. 实施记录与偏差（2026-10-28）
 
@@ -397,8 +397,8 @@ git push git@github.com:ScholarOfDeepDarkFantasy/forum.git master:master
 | --- | --- | --- | --- |
 | `600a8aa` | 公网 server 块（本轮前置，本地未推送 → 本次补推） | Build #23 SUCCESS | `forum-backend:23`（healthy） |
 | `a1cd36b` | 公网强制 HTTPS + 安全响应头 + deploy.sh 断言 | Build #24 SUCCESS | `forum-backend:24`（healthy） |
-| ⟨待回填⟩ | 文档（§4.15、部署手册、README、本计划） | ⟨待回填⟩ | ⟨待回填⟩ |
-| ⟨待回填⟩ | 回填验收与哈希 | ⟨待回填⟩ | ⟨待回填⟩ |
+| `4569d2e` | 文档（§4.15、部署手册、README、本计划） | Build #25 SUCCESS | `forum-backend:25`（healthy） |
+| 本次回填提交 | 回填验收与哈希（Build #25 复核 177/323、`check:bundle`、V1/V2/V4/V5/V6/V8、13/13 断言） | Build #26 SUCCESS | `forum-backend:26`（healthy） |
 
 ### 12.2 RED 证据（加固前，raspi 本机模拟公网 Host）
 

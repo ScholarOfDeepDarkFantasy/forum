@@ -780,10 +780,10 @@ cd frontend && pnpm test --run
 | V7 | 公网 `/forum/uploads/__probe__/missing.jpg` | 404（未落到 SPA） |
 | V8 | 公网登录 → me → logout → 旧 token me | 200 / 200 / 200 / 401 |
 | V9 | realip | nginx access log 首列为真实公网 IP `27.17.82.164`（非 `::1`） |
-| V10 | 公网连续 5 次错密码 | 5×401，第 6 次 **429** + `Retry-After: 899`；后端日志 `WARN ... IP 27.17.82.164 登录失败 5 次，锁定 900000 ms` |
+| V10 | 公网连续 5 次错密码 | 5×401，第 6 次 **429** + `Retry-After: 899`；后端日志 `WARN ... IP 27.17.82.164 登录失败 5 次，锁定 900000 ms`（Task 5 用另一 IP 段复测：同样 5×401 → 429 + `Retry-After: 900`） |
 | V11 | 限流隔离 | 内网入口伪造 `X-Real-IP: 203.0.113.99` 正确密码 200（未与环回地址共桶） |
 
-构建记录：`600a8aa` + 设计/计划提交 → **Build #23** SUCCESS（镜像 23）；`a1cd36b`（加固）→ **Build #24** SUCCESS，部署日志里 4 组新公网断言全部通过。锁定验收后 `podman restart forum-backend` 清空内存计数，公网登录恢复 200（`health=200`、`login=200`）。
+构建记录：`600a8aa` + 设计/计划提交 → **Build #23** SUCCESS（镜像 23）；`a1cd36b`（加固）→ **Build #24** SUCCESS，部署日志里 4 组新公网断言全部通过；`4569d2e`（文档）→ **Build #25** SUCCESS（镜像 25）。锁定验收后 `podman restart forum-backend` 清空内存计数，公网登录恢复 200（`health=200`、`login=200`）。
 
 **已知限制**
 
@@ -792,9 +792,10 @@ cd frontend && pnpm test --run
 - HSTS 不带 `includeSubDomains`（该域名下可能有其它内网子域），max-age 一年。
 - Cloudflare 免费版对 404 会加 `Cache-Control: max-age=14400`、`cf-cache-status: MISS`，属边缘行为，不是源站配置错误。
 - Cloudflare 面板的 Always Use HTTPS、WAF 等未纳入仓库；源站 308 已兜底 https，面板设置仅作双保险。
+- API 的 401（例如 `/forum/api/` 下的未认证响应）由 snippet 内层 location 返回，不带那 4 个安全响应头（JSON 响应，浏览器不渲染，影响低）；HTML 与静态资源均带。
 - 限流验收会锁定验收机 IP 15 分钟；重启后端即清（内存计数，见 §4.12）。
 
-**上线验收**：V1–V11 全部通过；`deploy.sh` 4 组公网断言在 Build #24 日志中通过；公网 HTTP 明文已 308 到 https；安全响应头在 HTML 与 SPA 路由上均存在。
+**上线验收（Build #25，镜像 `forum-backend:25`）**：本地全量回归后端 `177 / 0 / 0 / 1`（21 类）、前端 `32 files / 323 tests`、`pnpm check:bundle` exit 0（84.43/150、39.02/70、233.74/300、835.87/950、181.57/260）；公网 V1/V2/V4/V5/V6/V8 全部复测通过（V1 200 + `no-cache` + 4 个安全头；V2 308；V4 200 + 单条 immutable + gzip；V5 200；V6 401；V8 200/200/401）；`deploy.sh` 13/13 组断言在 Build #25 部署日志中通过；远端 master == 本地 HEAD。
 
 ---
 
@@ -904,7 +905,8 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-28 | docs | 记录第十轮公网入口验证与加固（HTTPS 强制、安全响应头、部署断言） | 本次提交 |
+| 2026-10-28 | docs | 回填第十轮构建与上线验收（Build #25、镜像 25、V1–V11 与 13/13 断言） | 本次提交 |
+| 2026-10-28 | docs | 记录第十轮公网入口验证与加固（HTTPS 强制、安全响应头、部署断言） | `4569d2e` |
 | 2026-10-28 | fix | 公网入口强制 HTTPS 并补安全响应头 | `a1cd36b` |
 | 2026-10-28 | docs | 新增第十轮公网入口设计与计划 | `7fa08f9` |
 | 2026-10-26 | fix | 公网 Cloudflare Tunnel 入口的 nginx server 块 | `600a8aa` |

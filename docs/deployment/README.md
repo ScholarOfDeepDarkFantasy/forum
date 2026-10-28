@@ -304,7 +304,7 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
 >
 > 发布后如果用户反馈「还是旧界面」，让用户强制刷新一次即可：旧 `index.html` 里引用的旧 hash 资源已被 `rsync --delete` 删除，`no-cache` 保证下一次不会再用旧 html。
 
-> **2026-10-28 第十轮公网验收（Build #24，镜像 `forum-backend:24`）**：`https://treenewbee.men/forum/` 200
+> **2026-10-28 第十轮公网验收（Build #24，镜像 `forum-backend:24`；Build #25 复核）**：`https://treenewbee.men/forum/` 200
 > 且带 `Cache-Control: no-cache` + 4 个安全响应头；`http://` 308 到 https；公网 asset 200 + 单条 immutable + gzip；
 > 公网 `/imageweb/`、`/manager/` 404；公网 SSE 401；公网登录 → me → logout → 旧 token 401；
 > nginx access log 首列为真实公网 IP（realip 生效）；连续 5 次错密码后第 6 次 429 + `Retry-After: 899`，
