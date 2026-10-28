@@ -181,6 +181,47 @@ public_leak="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Host: tre
 [ "$public_leak" = "404" ] \
     || die "Host: treenewbee.men 访问 /imageweb/ 返回 $public_leak（应为 404；公网 server 块不应暴露内网应用）"
 
+# 公网必须强制 HTTPS：cloudflared 会把客户端 scheme 放进 X-Forwarded-Proto（实测
+# http/https 均有），本机带上它即可复现公网明文请求，不需要真的走外网。
+public_redirect="$(curl --max-time 5 -s -o /dev/null -w '%{http_code} %{redirect_url}' \
+    -H 'Host: treenewbee.men' -H 'X-Forwarded-Proto: http' "http://127.0.0.1/forum/")"
+public_redirect_code="${public_redirect%% *}"
+public_redirect_url="${public_redirect#* }"
+[ "$public_redirect_code" = "308" ] \
+    || die "公网明文 /forum/ 未返回 308（返回 ${public_redirect_code:-000}；检查 forum-public.conf 的 X-Forwarded-Proto 跳转）"
+case "$public_redirect_url" in
+    https://treenewbee.men/forum/*) ;;
+    *) die "公网 308 的 Location 不是 https://treenewbee.men/forum/（实际：${public_redirect_url:-空}）" ;;
+esac
+
+# 公网 HTML 必须带基础安全响应头。assets/index.html 因自带 add_header 不继承
+# server 级 add_header（nginx 1.22 无 add_header_inherit），属已知限制，不在此断言。
+public_headers="$(curl -sS --max-time 5 -I -H 'Host: treenewbee.men' "http://127.0.0.1/forum/" | tr -d '\r' || true)"
+for expected_header in \
+    '^x-content-type-options: nosniff' \
+    '^x-frame-options: SAMEORIGIN' \
+    '^referrer-policy: strict-origin-when-cross-origin' \
+    '^strict-transport-security: max-age=31536000'
+do
+    echo "$public_headers" | grep -qi "$expected_header" \
+        || die "公网 /forum/ 缺少安全响应头 $expected_header（实际头：$(printf '%s\n' "$public_headers" | grep -i '^\(x-\|referrer\|strict\)' | tr '\n' ';')）"
+done
+
+# 公网静态资源也必须走 immutable 长缓存（复用上面解析出的 asset_path）
+public_asset_raw="$(curl -sS --max-time 5 -I -H 'Host: treenewbee.men' -w '\n%{http_code}' "http://127.0.0.1$asset_path" || true)"
+public_asset_status="${public_asset_raw##*$'\n'}"
+public_asset_cache_n="$(printf '%s\n' "$public_asset_raw" | tr -d '\r' | grep -ci '^cache-control:' || true)"
+[ "$public_asset_status" = "200" ] \
+    || die "经公网 Host 请求 $asset_path 返回 HTTP ${public_asset_status:-000}（应为 200）"
+[ "$public_asset_cache_n" = "1" ] \
+    || die "经公网 Host 请求 $asset_path 返回了 $public_asset_cache_n 条 Cache-Control（应为 1）"
+
+# 公网 SSE 端点也必须由后端 401（不能被 SPA 兜成 200）
+public_stream_code="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Host: treenewbee.men' \
+    "http://127.0.0.1/forum/api/notifications/stream")"
+[ "$public_stream_code" = "401" ] \
+    || die "经公网 Host 访问 SSE 返回 $public_stream_code（应为 401）"
+
 # SSE 订阅端点必须由后端回答 401（ticket 缺失），而不是落到 SPA 的 index.html（200）：
 # 若 nginx 精确匹配缺失，请求会被 try_files 兜到 /forum/index.html，这里会拿到 200；
 # 后端未更新或未起则可能是 404/502 —— 三者都说明「实时通知不可用」，部署应立刻失败
