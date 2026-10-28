@@ -184,7 +184,7 @@ public_leak="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Host: tre
 # 公网必须强制 HTTPS：cloudflared 会把客户端 scheme 放进 X-Forwarded-Proto（实测
 # http/https 均有），本机带上它即可复现公网明文请求，不需要真的走外网。
 public_redirect="$(curl --max-time 5 -s -o /dev/null -w '%{http_code} %{redirect_url}' \
-    -H 'Host: treenewbee.men' -H 'X-Forwarded-Proto: http' "http://127.0.0.1/forum/")"
+    -H 'Host: treenewbee.men' -H 'X-Forwarded-Proto: http' "http://127.0.0.1/forum/" || true)"
 public_redirect_code="${public_redirect%% *}"
 public_redirect_url="${public_redirect#* }"
 [ "$public_redirect_code" = "308" ] \
@@ -194,8 +194,8 @@ case "$public_redirect_url" in
     *) die "公网 308 的 Location 不是 https://treenewbee.men/forum/（实际：${public_redirect_url:-空}）" ;;
 esac
 
-# 公网 HTML 必须带基础安全响应头。assets/index.html 因自带 add_header 不继承
-# server 级 add_header（nginx 1.22 无 add_header_inherit），属已知限制，不在此断言。
+# 公网 HTML 必须带基础安全响应头。index.html 与 assets 两个 location 已各自补了同样
+# 4 个头（nginx 1.22 无 add_header_inherit，见 deploy/nginx/forum.conf），这里断言源站兜底。
 public_headers="$(curl -sS --max-time 5 -I -H 'Host: treenewbee.men' "http://127.0.0.1/forum/" | tr -d '\r' || true)"
 for expected_header in \
     '^x-content-type-options: nosniff' \
@@ -218,7 +218,7 @@ public_asset_cache_n="$(printf '%s\n' "$public_asset_raw" | tr -d '\r' | grep -c
 
 # 公网 SSE 端点也必须由后端 401（不能被 SPA 兜成 200）
 public_stream_code="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Host: treenewbee.men' \
-    "http://127.0.0.1/forum/api/notifications/stream")"
+    "http://127.0.0.1/forum/api/notifications/stream" || true)"
 [ "$public_stream_code" = "401" ] \
     || die "经公网 Host 访问 SSE 返回 $public_stream_code（应为 401）"
 

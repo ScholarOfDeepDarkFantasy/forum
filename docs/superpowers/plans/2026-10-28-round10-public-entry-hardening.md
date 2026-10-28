@@ -33,7 +33,7 @@
 ### 1.2 不改的文件
 
 - 所有 `src/main/java/**`、`src/test/java/**`、`frontend/**`：本轮 0 代码改动。
-- `deploy/nginx/forum.conf`：内网/公网共用的片段，本轮不动。
+- `deploy/nginx/forum.conf`：内网/公网共用的片段。原计划不动，实现时补了 `assets` 与 `index.html` 两处 location 的 4 个安全头（见 §12.3 第 7 条）。
 
 ## Task 1：推送 600a8aa 并跑通公网部署（无代码改动）
 
@@ -398,7 +398,7 @@ git push git@github.com:ScholarOfDeepDarkFantasy/forum.git master:master
 | `600a8aa` | 公网 server 块（本轮前置，本地未推送 → 本次补推） | Build #23 SUCCESS | `forum-backend:23`（healthy） |
 | `a1cd36b` | 公网强制 HTTPS + 安全响应头 + deploy.sh 断言 | Build #24 SUCCESS | `forum-backend:24`（healthy） |
 | `4569d2e` | 文档（§4.15、部署手册、README、本计划） | Build #25 SUCCESS | `forum-backend:25`（healthy） |
-| 本次回填提交 | 回填验收与哈希（Build #25 复核 177/323、`check:bundle`、V1/V2/V4/V5/V6/V8、13/13 断言） | Build #26 SUCCESS | `forum-backend:26`（healthy） |
+| `eeec230` | 回填验收与哈希（Build #25 复核 177/323、`check:bundle`、V1/V2/V4/V5/V6/V8、13/13 断言） | Build #26 SUCCESS（推后实测 2026-10-28 21:15） | `forum-backend:26`（healthy） |
 
 ### 12.2 RED 证据（加固前，raspi 本机模拟公网 Host）
 
@@ -427,3 +427,6 @@ strict-transport-security 计数=0                  # 期望 ≥1 → 断言红
    `podman restart forum-backend` 清空内存计数，实测重启 60 s 后 `healthy`、公网登录恢复 200。
 6. **验收机 IP**：V10 首次验收机公网 IP 为 `27.17.82.164`（`Retry-After: 899`）；
    Task 5 复核时用 `203.0.113.x` 段再验一次（429 + `Retry-After: 900`），两次都在 §4.15 留证。
+7. **§1.2 的「forum.conf 本轮不动」被推翻**：server 级 `add_header` 不会被自带 `add_header` 的
+   location 继承，HTTPS 上访问 HTML/静态会缺 4 个安全头；因此 a1cd36b 在 `assets` 与
+   `index.html` 两个 location 各补了 4 个头（+13 行）。§1.2 已同步注明，此处记为第 7 条偏差。

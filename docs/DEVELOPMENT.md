@@ -792,7 +792,7 @@ cd frontend && pnpm test --run
 - HSTS 不带 `includeSubDomains`（该域名下可能有其它内网子域），max-age 一年。
 - Cloudflare 免费版对 404 会加 `Cache-Control: max-age=14400`、`cf-cache-status: MISS`，属边缘行为，不是源站配置错误。
 - Cloudflare 面板的 Always Use HTTPS、WAF 等未纳入仓库；源站 308 已兜底 https，面板设置仅作双保险。
-- API 的 401（例如 `/forum/api/` 下的未认证响应）由 snippet 内层 location 返回，不带那 4 个安全响应头（JSON 响应，浏览器不渲染，影响低）；HTML 与静态资源均带。
+- `/forum/uploads/` 的静态文件只带 `X-Content-Type-Options` 与 `Cache-Control`（该 location 自带 `add_header`，不继承 server 级，因而没有 HSTS/XFO/Referrer-Policy）；图片不参与脚本执行与框架嵌入，影响低。API 的 401/SSE 401 走 server 级，实测带全部 4 个头。
 - 限流验收会锁定验收机 IP 15 分钟；重启后端即清（内存计数，见 §4.12）。
 
 **上线验收（Build #25，镜像 `forum-backend:25`）**：本地全量回归后端 `177 / 0 / 0 / 1`（21 类）、前端 `32 files / 323 tests`、`pnpm check:bundle` exit 0（84.43/150、39.02/70、233.74/300、835.87/950、181.57/260）；公网 V1/V2/V4/V5/V6/V8 全部复测通过（V1 200 + `no-cache` + 4 个安全头；V2 308；V4 200 + 单条 immutable + gzip；V5 200；V6 401；V8 200/200/401）；`deploy.sh` 13/13 组断言在 Build #25 部署日志中通过；远端 master == 本地 HEAD。
