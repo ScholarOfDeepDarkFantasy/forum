@@ -38,6 +38,15 @@ describe('CSP 与内联脚本哈希', () => {
     expect(csp).toContain(`script-src 'self' '${hash}'`)
   })
 
+  it('CSP 落在 index.html 的精确 location 内（否则会被该 location 的 add_header 屏蔽）', () => {
+    const conf = readFileSync(FORUM_CONF, 'utf8')
+    const start = conf.indexOf('location = /forum/index.html')
+    expect(start, 'forum.conf 缺少 index.html location').toBeGreaterThan(-1)
+    const rest = conf.slice(start)
+    const block = rest.slice(0, rest.indexOf('}'))
+    expect(block, 'CSP 必须写在 index.html location 里').toContain('Content-Security-Policy')
+  })
+
   it('CSP 必备指令齐全且 script-src 没有 unsafe-* / 通配符', () => {
     const [csp] = cspValues(FORUM_CONF)
     expect(csp, 'forum.conf 缺少 CSP').toBeTruthy()
@@ -86,6 +95,8 @@ describe('CSP 与内联脚本哈希', () => {
     ]) {
       expect(uploadsBlock, `uploads 缺少 ${header}`).toContain(header)
     }
+    // 图片响应不需要 CSP；写在这里只会让人误以为 HTML 也受它保护
+    expect(uploadsBlock).not.toContain('Content-Security-Policy')
   })
 
   it('deploy.sh 含 CSP 与 uploads 头断言', () => {
