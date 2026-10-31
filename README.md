@@ -275,6 +275,19 @@ pnpm build       # 生产构建
 - 实时通知连接（`src/composables/useNotificationStream.spec.js`）：取票后建立 SSE 连接、事件回调合并到 store、断线按 1s→30s 指数退避重连、重连成功回调、401 取票失败进入 `disabled` 且不再重连、坏 JSON 忽略不中断、页面隐藏时暂停与恢复、网络离线时 120s 轮询兜底且重连后停止、旧票晚到失败不破坏新会话、`stop` 清理定时器与连接
 - SSE 生命周期与开关（`src/App.spec.js`）：登录后取票并建立连接、未登录不取票、登出后 `stop` 且角标清零、SSE 关闭时退回 120s 轮询、账号切换时断开旧连接并以新 token 重新建立
 
+### 前端 E2E（Playwright）
+
+```bash
+cd frontend
+pnpm test:e2e                    # 本地：先起后端 + pnpm dev（默认 http://127.0.0.1:5173）
+E2E_CHANNEL=msedge pnpm test:e2e # 用系统 Edge，免下载 Chromium
+
+# 公网（子路径部署）：必须显式提供真实管理员凭据，缺省不会用默认密码
+E2E_BASE_URL=https://treenewbee.men/forum/ E2E_ADMIN_USERNAME=admin E2E_ADMIN_PASSWORD=****** E2E_CHANNEL=msedge pnpm test:e2e
+```
+
+当前为 5 个 spec、8 个用例，覆盖首页/板块筛选、主题切换、帖子详情 Markdown、登录登出、管理页与删除确认框（只点取消）。数据通过公开 API 在测试开始前创建、结束后清理；空库时会创建一个「E2E 板块」并按设计保留（帖子软删除 + 外键，无法删板块）。E2E 会写真实库，**不进入 Vitest 基线、也不在 Jenkins 默认流水线里**，属发版前手动验收，细节见 `docs/DEVELOPMENT.md` §4.17。
+
 ### 产物体积预算
 
 ```bash

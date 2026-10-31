@@ -126,8 +126,9 @@ cd frontend && pnpm test --run
 | 第九轮 | 前端性能：Element Plus 按需引入、产物体积预算、静态资源长缓存与入口 no-cache | 5 | ✅ 已完成 | 2026-10-25 |
 | 第十轮 | 公网入口验证与加固：Cloudflare Tunnel 下的 HTTPS 强制、安全响应头、部署断言 | 4 | ✅ 已完成 | 2026-10-28 |
 | 第十一轮 | 安全头收敛与 CSP：内联脚本哈希放行、uploads 全套头、CF 信标放行、部署断言 | 5 | ✅ 已完成 | 2026-10-31 |
+| 第十二轮 | 前端 E2E 骨架：Playwright + 确定性数据引导 + 5 条关键路径 + 双模式（本地/公网） | 5 | ✅ 已完成 | 2026-10-31 |
 
-**当前进度：MVP 100% ｜ 已完成 11 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 12 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
@@ -141,6 +142,7 @@ cd frontend && pnpm test --run
 | 后端测试（`src/test/java`） | 22 | 5105 |
 | 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4780 |
 | 前端测试（`*.spec.js`） | 33 | 5867 |
+| 前端 E2E（`frontend/e2e` + `playwright.config.js`） | 8 | 331 |
 
 后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 9、`service/` 11、`security/` 7（+`ClientIpResolver`、`LoginRateLimiter`，`exception/` 另加 `TooManyLoginAttemptsException`）、`config/` 7（+`ClockConfig`）、`util/` 4、`exception/` 4。
 
@@ -152,6 +154,7 @@ cd frontend && pnpm test --run
 | --- | --- | --- |
 | 后端 | **177** 个用例 / 21 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
 | 前端 | **330** 个用例 / 33 个 spec | 全绿 |
+| 前端 E2E | **8** 个用例 / 5 个 spec（Playwright） | 全绿（手动执行，不计入上面两行基线） |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
 后端测试类分布（合计 177）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
@@ -873,6 +876,63 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 - 浏览器复核（Build #31，配置与 #32 相同）：Playwright（Chromium/Edge）按 V6 六项全过，CSP 违规 0 条，控制台仅点「取消」的 `cancel`。
 - 远端 master == 本地 HEAD；本次回填提交触发 Build #33（docs-only 重建，镜像 33）。
 
+### 4.17 第十二轮：前端 E2E 骨架（2026-10-31）
+
+**背景**：真实浏览器验证一直靠一次性 Playwright 脚本（在 `C:\Temp`，不入库），Vitest + jsdom 又测不到真实布局、真实网络与 CSP 下的运行时行为；第十一轮的 CSP 也只有源码层断言。本轮把 5 条关键路径固化成仓库内 E2E，并让同一套用例既能跑本地 dev，也能直接跑公网部署（子路径 `/forum/`）。
+
+**改动**
+
+| 文件 | 改了什么 |
+| --- | --- |
+| `frontend/package.json` | devDependency `@playwright/test ^1.64.1`；脚本 `test:e2e`（`playwright test`）与 `test:e2e:install` |
+| `frontend/playwright.config.js` | `testDir: './e2e'`、`workers: 1`、`fullyParallel: false`；`baseURL` 归一化补尾斜杠；公网 `retries: 1` + `failOnFlakyTests: true`；`trace`/`screenshot` 仅失败时保留，`video: off`；`E2E_CHANNEL=msedge` 可改用系统 Edge |
+| `frontend/e2e/support/api.js` | 公开 API 数据引导：登录 → 复用第一个板块（空库时创建 E2E 专用板块）→ 发带 Markdown 的帖子 → 清理时删帖；远程环境缺 `E2E_ADMIN_*` 时加载即失败 |
+| `frontend/e2e/support/fixtures.js` | worker 级 `e2e` fixture（一次引导、全 worker 共享、结束清理）；auto `consoleGuard` 收集 CSP 违规与 `pageerror` |
+| `frontend/e2e/{home,theme,post-detail,auth,admin}.spec.js` | 5 个 spec / 8 个用例 |
+| `frontend/.gitignore` | 忽略 `test-results/`、`playwright-report/`、`blob-report/` |
+
+**设计要点**
+
+- **双模式**：本地默认 `E2E_BASE_URL=http://127.0.0.1:5173`（需 `pnpm dev` + 后端）；公网用 `E2E_BASE_URL=https://treenewbee.men/forum/` 并**必须**显式给 `E2E_ADMIN_USERNAME`/`E2E_ADMIN_PASSWORD`，否则 `api.js` 在加载阶段直接抛错，避免拿默认密码打生产。
+- **子路径解析**：公网入口是 `/forum/`，`page.goto('/login')` 会解析到站点根 `https://treenewbee.men/login`（源站只有 `/forum/`，404）。因此 `baseURL` 统一补尾斜杠，**所有 spec 的 `goto` 一律写相对路径**（`goto('./')`、`goto('login')`、`goto(\`posts/${id}\`)`）。
+- **确定性数据**：不依赖库里已有帖子；worker 级 fixture 通过 `POST /api/auth/login`、`GET/POST /api/boards`、`POST /api/posts` 造数据，标题带时间戳便于定位。空库时自动创建的「E2E 板块」**按设计保留**——帖子删除是软删除（行仍在）且有 `board_id` 外键，删板块必 500；之后每轮复用同一个板块，不再增长。清理只删本轮帖子，失败会让测试红（配合 `failOnFlakyTests`，不会被重试吞掉）。
+- **登出副作用**：`auth.spec` 走真实登出，服务端 `token_version +1` 会让 bootstrap 拿到的 token 立刻 401；因此清理前重新登录换一枚与当前版本匹配的 token。
+- **控制台守卫**：auto fixture 把 CSP 违规（`console.error` 含 `Content Security Policy`/`Refused to`）与 `pageerror` 记为测试失败；只放行两类预期噪音——(1) 删除确认框点「取消」时的 `cancel` reject；(2) 显式声明 `annotation: { type: 'expected-login-401' }` 的用例里那条 `Request failed with status code 401`（`LoginView.submit` 没有 `catch`，Vue dev 构建会把它重抛成 pageerror）。
+- **CI 决策**：不加入 Jenkins 默认流水线（`RUN_TESTS` 仍是可选开关），E2E 会写真实库，属于发版前手动验收，记 T20。
+- **选择器约定**：表格用 `.el-table`、确认框用 `.el-message-box`（Element Plus 未提供稳定 role），按钮尽量用 role 名（「删除」「取消」），文本断言用 `exact`。
+
+**用例矩阵**
+
+| spec | 用例 | 断言要点 |
+| --- | --- | --- |
+| `home.spec.js` | 2 | 品牌、帖子列表（含本轮 bootstrap 帖子）、板块筛选「全部」；未登录 header 有登录入口 |
+| `theme.spec.js` | 2 | 切深色 → `html.dark` + `localStorage.jf_theme=dark`，刷新保持；切浅色 → 移除 `dark` |
+| `post-detail.spec.js` | 1 | 标题、Markdown（`h1`/`strong`/`pre code`）、点赞按钮 |
+| `auth.spec.js` | 2 | 错误密码提示「用户名或密码错误」；正确密码登录 → `.header .username` 可见 → 退出登录 → `jf_token`/`jf_user` 清空 |
+| `admin.spec.js` | 1 | 板块表格可见、首行存在；点「删除」弹确认框（「提示」「确定删除板块」）→ 只点「取消」→ 框关闭且行仍在 |
+
+**验证结果**
+
+- `pnpm exec playwright test --list` → `Total: 8 tests in 5 files`。
+- 本地（`pnpm dev --host 127.0.0.1` + `E2E_CHANNEL=msedge`）：**8 passed (19.8s)**。
+- 公网（`E2E_BASE_URL=https://treenewbee.men/forum/` + 真实 admin 凭据 + `E2E_CHANNEL=msedge`，Build #35 已部署）：**8 passed (48.0s)**，`[E2E] worker 0: board=1 post=46`，清理后 `keyword=E2E 冒烟` 的 `totalElements=0`。
+- 空库路径（临时 H2 实例 + 角色种子，端口 18080）：`bootstrapData()` 自动建板块并保留，`cleanup()` 不报错、板块仍在、帖子不可见。
+- 回归：Vitest `33 spec / 330 用例` 全绿；后端 `177 / 0 / 0 / 1`（21 类）；`pnpm build` 与 `check:bundle` 不受影响。
+
+**已知限制**
+
+- 空库首轮会留下一个「E2E 板块 ...」；这是软删除 + 外键的必然结果，属设计取舍（不删除用户数据，也不引入后端硬删除接口）。
+- E2E 使用真实 admin 账号：登出会全局 `token_version +1`，并行跑多个 E2E 进程时彼此会让对方 token 失效（本套件 `workers: 1` 串行，无碰撞）。
+- 写真实库（帖子软删除留痕，不可见但计入表行数）；每轮生成 1 帖，长期跑需要偶尔清理。
+- 不做截图比对、不做跨浏览器矩阵（仅 Chromium / 系统 Edge）、不覆盖上传头像与 SSE。
+- 依赖后端可达；后端未起时错误信息会带 `BASE_URL` 与服务未启动提示。
+- `consoleGuard` 只拦 CSP 文案与 pageerror，不拦普通 `console.error`；白名单按 test 级 annotation 生效，不要上提到 describe 或复用到其他 401 用例。
+
+**上线验收（待回填）**
+
+- 本地 8 passed、公网 8 passed、Vitest 330/33、后端 177/21。
+- 明确记录公网运行所用构建号与镜像号（回填本轮 docs 提交触发的构建）。
+
 ## 5. 待办与后续计划
 
 ### 5.1 技术债与风险（建议优先处理）
@@ -881,7 +941,7 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | --- | --- | --- | --- |
 | T1 | **数据库密码仍在 git 历史中** | 高 | 自 `6eecbdc` 起 `application.yml` 含明文密码。2026-10-19 部署引导时已把 raspi 上 `forum` 角色密码重置为随机值（历史里那份仅对旧环境有效），但明文字符串仍在历史中。彻底处理需 `git filter-repo` 改写历史，属不可逆操作，需明确授权后执行 |
 | T2 | **无 PR 级 CI** | 低 | 主分支的构建/部署已由 raspi Jenkins 承担（2026-10-19，见 §4.7）。主机没有公网入口，无法做 GitHub PR 触发，PR 级校验仍需 GitHub Actions（后端 JDK 17 + H2；前端 pnpm test + build） |
-| T3 | **无前端 E2E 测试** | 中 | 真实浏览器验证目前靠一次性 Playwright 脚本（在 `C:\Temp\jf-pw`，未入库）。建议把关键路径（登录→发帖→评论→通知跳转）固化为仓库内 E2E |
+| T3 | ~~**无前端 E2E 测试**~~ | 已关闭 | 2026-10-31 第十二轮：仓库内 `frontend/e2e`（Playwright 1.64.1，5 spec / 8 用例）+ 确定性数据引导 + CSP/pageerror 守卫，本地与公网双模式（见 §4.17）。原记录：真实浏览器验证靠一次性 Playwright 脚本（在 `C:\Temp`，未入库），建议把关键路径固化为仓库内 E2E |
 | T4 | ~~**JWT 无法主动失效**~~ | 已关闭 | 2026-10-23 第七轮：`users.token_version` + 过滤器回查，登出与封禁各 +1，旧 token 立即 401（见 §4.12）。角色变更仍不即时，属遗留的小口子 |
 | T5 | ~~**登录接口无速率限制**~~ | 已关闭 | 2026-10-23 第七轮：按客户端 IP 的失败窗口 + 锁定，429 带 `Retry-After`（见 §4.12）。计数在单实例内存里，多实例需换共享存储（见 §5.2） |
 | T6 | **REPLY 通知锚点只覆盖第一页评论** | 低 | 详见 §6 |
@@ -897,6 +957,7 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | T17 | ~~**标签检索的 LIKE 通配符未转义**~~ | 已关闭 | 2026-10-25 第九轮：`TagService` 先 `escapeLike`（转义 `!`/`%`/`_`），`TagRepository.findWithPostCounts` 的 JPQL 加 `ESCAPE '!'`；`TagFlowIntegrationTest` 新增 `@Order(9)` 覆盖 `100%`、`a_b`、`!` 三个关键词（见 §4.14）。原记录：第八轮 T13 只覆盖首页 `GET /api/posts?keyword=` 与既有的 `/api/posts/search`；`TagRepository.findWithPostCounts` 的标签关键词 LIKE 仍把 `%`/`_` 当通配符（`GET /api/tags?keyword=`），搜「a_b」会命中「axb」。修法同 T13：service 先 `escapeLike`，JPQL 加 `ESCAPE '!'` |
 | T18 | **CSP 无违规上报** | 低 | 目前只有控制台人工回归 + 一次性 Playwright 脚本（不入库）；如需线上感知，可加 `report-to`/`Reporting-Endpoints`，或先用 Report-Only 观察一段时间（见 §4.16） |
 | T19 | **CSP 依赖 Cloudflare 信标放行** | 低 | 公网 CSP 放行了 `static.cloudflareinsights.com` 与 `cloudflareinsights.com`；若在 CF 面板关掉 Web Analytics，可删掉这两条并同步 `csp.spec.js`、`deploy.sh`（见 §4.16） |
+| T20 | **E2E 不在默认流水线里** | 低 | Playwright 用例会写真实库，Jenkins 默认 `RUN_TESTS=false` 且未加 E2E 阶段；发版前需手动跑本地与公网两轮（见 §4.17）。若将来要进 CI，需先提供独立测试库/账号与 `E2E_ADMIN_*` 密钥 |
 
 ### 5.2 候选功能（第七轮新增「限流共享存储」一项）
 
@@ -921,6 +982,8 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 > 第十轮继续不加业务功能，只做公网入口验证与运维加固（见 §4.15）；新增两条候选：①CSP（需要处理内联主题脚本与 Markdown 内联样式，属独立一轮）；②把 Cloudflare 侧设置（Always Use HTTPS、HSTS）纳入仓库化配置（目前只有源站 nginx 兜底，面板设置靠手工保持）。
 
 > 第十一轮完成了第十轮留下的 CSP 尾巴（见 §4.16）：内联主题脚本用 SHA-256 精确放行、`uploads` 补齐 4 个安全头、CF Web Analytics 信标显式放行、`deploy.sh` 补 5 条断言、`csp.spec.js` 补 7 条守护。HSTS 仍不加 `includeSubDomains`（该域名下还有内网应用）。新增候选：①CSP 违规上报（`report-to`/Report-Only，记 T18）；②Cloudflare 面板设置仓库化（延续第十轮候选）。
+
+> 第十二轮继续不加业务功能，只补前端 E2E 骨架（见 §4.17）：Playwright 1.64.1、5 spec / 8 用例、worker 级确定性数据、CSP 与 pageerror 守卫、本地与公网双模式；E2E 不计入 Vitest 基线（330/33 不变），也不进默认流水线（记 T20）。新增候选：①E2E 进 CI（需要独立测试库与账号）；②用 E2E 覆盖通知/SSE 与上传头像（当前明确不做，属下一轮评估）。
 
 ---
 
@@ -985,7 +1048,14 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-31 | docs | 回填第十一轮审查修复的构建记录（Build #34、镜像 34） | 本次提交 |
+| 2026-10-31 | docs | 记录第十二轮前端 E2E 骨架（§4.17、基线不变、T3 关闭 / T20 新增） | 本次提交 |
+| 2026-10-31 | fix | 修正 E2E 公网子路径解析与空库清理副作用（相对路径、板块保留、远程凭据硬失败、failOnFlakyTests） | `38913f4` |
+| 2026-10-31 | test | E2E 覆盖管理页与删除确认框 | `e3b7057` |
+| 2026-10-31 | test | E2E 覆盖主题、帖子详情与登录登出 | `14a9e97` |
+| 2026-10-31 | fix | 修正 E2E 鉴权用例对基础设施的副作用（清理前重登录、401 pageerror 白名单） | `ba0398f` |
+| 2026-10-31 | test | 引入 Playwright 与确定性数据引导 | `957ed4c` |
+| 2026-10-31 | docs | 新增第十二轮前端 E2E 骨架设计与计划 | `38519dd` |
+| 2026-10-31 | docs | 回填第十一轮审查修复的构建记录（Build #34、镜像 34） | `1eb9bd2` |
 | 2026-10-31 | fix | 加固 CSP 部署断言（哈希现算比对、脚本/连接/样式指令精确匹配、信标主机锚定）并修正文档事实 | `8207686` |
 | 2026-10-31 | docs | 回填第十一轮构建与上线验收（Build #32、镜像 32、V1–V9、全部部署断言） | `70c1ff2` |
 | 2026-10-31 | docs | 记录第十一轮安全头收敛与 CSP（§4.16、测试基线 330/33、CF 信标放行） | `ea42624` |

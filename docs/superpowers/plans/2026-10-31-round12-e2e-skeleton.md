@@ -819,30 +819,30 @@ docs: 回填第十二轮外网 E2E 冒烟与构建
 ## 附录 B：冒烟清单
 
 ### B.1 本地 E2E
-- [ ] 后端（8080）与 `pnpm dev`（5173）已启动。
-- [ ] `pnpm test:e2e:install` 成功，或使用 `E2E_CHANNEL=msedge`。
-- [ ] `pnpm exec playwright test --list` 只列 `e2e/*.spec.js`。
-- [ ] `pnpm test:e2e` 实际用例全部 passed（设计值 8）；无 CSP 守卫失败。
-- [ ] 运行后 `git status` 无 `test-results/`、`playwright-report/`。
+- [x] 后端（8080）与 `pnpm dev`（5173）已启动。
+- [x] `pnpm test:e2e:install` 成功，或使用 `E2E_CHANNEL=msedge`。
+- [x] `pnpm exec playwright test --list` 只列 `e2e/*.spec.js`。
+- [x] `pnpm test:e2e` 实际用例全部 passed（设计值 8）；无 CSP 守卫失败。
+- [x] 运行后 `git status` 无 `test-results/`、`playwright-report/`。
 
 ### B.2 公网 E2E
-- [ ] `E2E_BASE_URL=https://treenewbee.men/forum`、`E2E_CHANNEL=msedge`（或已装 Chromium）。
-- [ ] 账号密码经 `E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD` 传入，未写入仓库。
-- [ ] 实际用例全部 passed（remote 允许 1 次重试）。
-- [ ] 结束后无本轮 `E2E 冒烟 <时间戳>` 与 `E2E 板块 <时间戳>` 残留。
+- [x] `E2E_BASE_URL=https://treenewbee.men/forum`、`E2E_CHANNEL=msedge`（或已装 Chromium）。
+- [x] 账号密码经 `E2E_ADMIN_USERNAME` / `E2E_ADMIN_PASSWORD` 传入，未写入仓库。
+- [x] 实际用例全部 passed（remote 允许 1 次重试）。
+- [x] 结束后无本轮 `E2E 冒烟 <时间戳>` 与 `E2E 板块 <时间戳>` 残留。
 
 ### B.3 Vitest 基线
-- [ ] `cd frontend && pnpm test` → 330 passed / 33 spec。
-- [ ] `src/**/*.spec.js` 无新增/删除。
+- [x] `cd frontend && pnpm test` → 330 passed / 33 spec。
+- [x] `src/**/*.spec.js` 无新增/删除。
 
 ### B.4 后端基线
-- [ ] `mvn -B clean test` → 177 passed / 21 类 / 1 skip。
-- [ ] `src/main/java` 与 `src/test/java` 无 diff。
+- [x] `mvn -B clean test` → 177 passed / 21 类 / 1 skip。
+- [x] `src/main/java` 与 `src/test/java` 无 diff。
 
 ### B.5 构建产物
-- [ ] `MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 成功。
-- [ ] `pnpm check:bundle` 5 项体积在预算内、9 个选择器覆盖，退出码 0。
-- [ ] `frontend/dist` 未被提交。
+- [x] `MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 成功。
+- [x] `pnpm check:bundle` 5 项体积在预算内、9 个选择器覆盖，退出码 0。
+- [x] `frontend/dist` 未被提交。
 
 ### B.6 Jenkins 构建
 - [ ] 推送后 Jenkins 触发成功。
@@ -855,21 +855,23 @@ docs: 回填第十二轮外网 E2E 冒烟与构建
 
 ### 12.1 提交与构建链
 
-| # | 预期提交 | 实际哈希 | 完成时间 | 验证 |
-| --- | --- | --- | --- | --- |
-| 1 | `docs: 新增第十二轮前端 E2E 骨架设计与计划` | 待回填 | 待回填 | 待回填 |
-| 2 | `test(e2e): 引入 Playwright 与确定性数据引导` | 待回填 | 待回填 | 待回填 |
-| 3 | `test(e2e): 覆盖主题、帖子详情与登录登出` | 待回填 | 待回填 | 待回填 |
-| 4 | `test(e2e): 覆盖管理页与删除确认框` | 待回填 | 待回填 | 待回填 |
-| 5 | `docs: 记录第十二轮前端 E2E 骨架` | 待回填 | 待回填 | 待回填 |
-| 6 | `docs: 回填第十二轮外网 E2E 冒烟与构建` | 待回填 | 待回填 | 待回填 |
+| # | 提交 | 实际哈希 | 说明 |
+| --- | --- | --- | --- |
+| 1 | `docs: 新增第十二轮前端 E2E 骨架设计与计划` | `38519dd` | 2 文件 +1096 |
+| 2 | `test(e2e): 引入 Playwright 与确定性数据引导` | `957ed4c` | 7 文件 +201/−1 |
+| — | （计划外）`fix(e2e): 修正鉴权用例对 E2E 基础设施的副作用` | `ba0398f` | 清理前重登录 + 401 pageerror 窄白名单 |
+| 3 | `test(e2e): 覆盖主题、帖子详情与登录登出` | `14a9e97` | 3 文件 +73 |
+| 4 | `test(e2e): 覆盖管理页与删除确认框` | `e3b7057` | 1 文件 +31 |
+| — | （计划外）`fix(e2e): 修正公网子路径解析与空库清理副作用` | `38913f4` | 7 文件 +74/−25（审查 C1/C2/I1–I4） |
+| 5 | `docs: 记录第十二轮前端 E2E 骨架` | 待回填 | 本次提交 |
+| 6 | `docs: 回填第十二轮外网 E2E 冒烟与构建` | 待回填 | 构建号回填 |
 
 | 构建/运行 | 编号 | 结果 |
 | --- | --- | --- |
 | Jenkins Build | 待回填 | 待回填 |
 | 镜像 tag | 待回填 | 待回填 |
-| 本地 E2E | — | 待回填 |
-| 公网 E2E | — | 待回填 |
+| 本地 E2E | — | 8 passed / 19.8 s |
+| 公网 E2E | — | 8 passed / 48.0 s（Build #35 部署） |
 
 ### 12.2 偏差与决定
 
@@ -879,21 +881,21 @@ docs: 回填第十二轮外网 E2E 冒烟与构建
 | 2026-10-31 | 任务描述提到「板块表格 + 分页」，实际 `AdminView.vue` 板块表格无分页，分页只在用户管理 tab（191-199 行） | admin.spec 只断言表头与行数 |
 | 2026-10-31 | 登录后 header 显示 `nickname \|\| username`（admin 默认昵称「管理员」） | 断言 `.username` 非空，不写死昵称 |
 | 2026-10-31 | 任务描述称 `check:bundle` 为「60 组」，实际是 5 项体积 + 9 个 CSS 选择器 | 文档按实际脚本描述 |
-| 待回填 | Playwright 实际版本 | 待回填 |
-| 待回填 | 实际 spec / test 数量 | 待回填 |
-| 待回填 | 公网耗时与重试次数 | 待回填 |
-| 待回填 | 公网清理结果 | 待回填 |
-| 待回填 | 选择器是否需要兜底（menuitem / 表格） | 待回填 |
+| 2026-10-31 | Playwright 实际版本 | `@playwright/test ^1.64.1`（lock 已提交）；`failOnFlakyTests` 需要 1.64+ |
+| 2026-10-31 | 实际 spec / test 数量 | 5 spec / 8 test（`--list` 8 tests in 5 files） |
+| 2026-10-31 | 公网耗时与重试次数 | 48.0 s；`retries=1` 但未触发（一次全绿） |
+| 2026-10-31 | 公网清理结果 | 帖子软删除（行在、用户不可见）；空库板块 board=1 按设计保留；`keyword=E2E 冒烟` 为 0 |
+| 2026-10-31 | 选择器兜底 | 管理页用 `.el-table`、确认框用 `.el-message-box`；dropdown `menuitem` 直接可用，无其它兜底 |
 
 ### 12.3 实测数据
 
 | 项 | 设计值 | 实测 |
 | --- | --- | --- |
-| Playwright 版本 | `^1.x` | 待回填 |
-| E2E spec / test | 5 / 8 | 待回填 |
-| 本地 E2E 耗时 | — | 待回填 |
-| 公网 E2E 耗时 | — | 待回填 |
-| Vitest | 330 / 33 | 待回填 |
-| 后端 | 177 / 21 类 / 1 skip | 待回填 |
-| 构建 5 项体积 | 在预算内 | 待回填 |
-| 9 个 CSS 选择器 | 全覆盖 | 待回填 |
+| Playwright 版本 | `^1.x` | 1.64.1 |
+| E2E spec / test | 5 / 8 | 5 / 8 |
+| 本地 E2E 耗时 | — | 8 passed / 19.8 s（`E2E_CHANNEL=msedge`，maxWorkers=1） |
+| 公网 E2E 耗时 | — | 8 passed / 48.0 s（对 Build #35 部署，retries 未触发） |
+| Vitest | 330 / 33 | 330 / 33 全绿 |
+| 后端 | 177 / 21 类 / 1 skip | 177 / 21 类 / 1 skip（无 Java 改动） |
+| 构建 5 项体积 | 在预算内 | 84.43/150、39.02/70、233.74/300、835.87/950、181.57/260 kB，exit 0 |
+| 9 个 CSS 选择器 | 全覆盖 | 9/9 覆盖 |

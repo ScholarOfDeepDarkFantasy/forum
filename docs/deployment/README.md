@@ -359,6 +359,19 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|
 > CSP 违规 0 条，控制台仅点「取消」时的 `cancel`。回填提交 `ea42624` 触发 Build #32（镜像 32）与
 > 本次 docs 回填提交触发 Build #33，两者均为 docs-only 重建，产物与断言结果不变。
 
+> **第十二轮 E2E 冒烟（本机，对公网跑）**：Playwright 已随 `frontend` 的 devDependencies 安装，浏览器用系统 Edge
+> （`E2E_CHANNEL=msedge`，免下载）。公网必须显式给真实管理员凭据——`frontend/e2e/support/api.js` 在非本地
+> `BASE_URL` 且缺 `E2E_ADMIN_*` 时会直接抛错，拒绝拿默认密码打生产：
+>
+> ```bash
+> cd frontend
+> E2E_BASE_URL=https://treenewbee.men/forum/ > E2E_ADMIN_USERNAME=admin E2E_ADMIN_PASSWORD='<真实密码>' > E2E_CHANNEL=msedge pnpm test:e2e
+> # 期望 8 passed；结束时 worker 清理会删掉本轮帖子
+> ```
+>
+> E2E 会写真实库（帖子软删除留痕）、用真实 admin 账号登出（会让该账号 `token_version +1`），因此**不要与线上用户/其他 E2E 并行**。
+> 空库首次运行会自动创建并保留一个「E2E 板块」——这是软删除 + 外键的必然结果，不要手工删除。
+
 ## 6. 排障
 
 | 现象 | 排查 |
@@ -415,6 +428,10 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|
 - **CSP 没有违规上报**：目前靠控制台人工回归与一次性 Playwright 脚本；需要线上感知时可加 `report-to`/`Reporting-Endpoints`，或先上 Report-Only 观察。
 - **HSTS 未加 `includeSubDomains`**：该域名下还有内网应用（`/imageweb/` 等）；确认没有子域依赖 HTTP 后再加，并同步 `deploy/nginx/public.conf`。
 
+
+- **E2E 会写真实库**：`frontend/e2e` 通过公开 API 创建帖子和（空库时）板块；帖子是软删除，行仍在表里、对用户不可见。套件不在 Jenkins 默认流水线中，需发版前手动跑。
+- **E2E 用真实 admin 账号登出**：`token_version` 会全局 +1，正在使用该账号的其它会话（包括另一个 E2E 进程）会立刻 401。请串行执行、避开真实用户使用时段。
+- **空库首次跑 E2E 会留下「E2E 板块 ...」**：`posts.board_id` 外键 + 帖子软删除使板块无法通过 API 删除；该板块按设计保留并复用，不要手工删（删除会连带帖子外键冲突）。
 
 ## 附录 A：Jenkins job `config.xml`
 
