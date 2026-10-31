@@ -230,8 +230,14 @@ echo "$public_csp" | grep -qi '^content-security-policy:.*default-src' \
     || die "公网 /forum/ 缺少 Content-Security-Policy（实际：$(printf '%s\n' "$public_csp" | grep -i '^content-security-policy' || echo '无该头')）"
 echo "$public_csp" | grep -qi "^content-security-policy:.*script-src 'self' 'sha256-" \
     || die "公网 CSP 的 script-src 未使用内联脚本 SHA-256（检查 forum.conf 与 frontend/index.html 是否同步）"
-echo "$public_csp" | grep -qi "content-security-policy:.*script-src 'self' 'sha256-[^']*'; style-src 'self' 'unsafe-inline'" \
-    || die "公网 CSP 结构异常（应为 script-src 'self' 'sha256-…'; style-src 'self' 'unsafe-inline'）"
+echo "$public_csp" | grep -qi "content-security-policy:.*script-src 'self' 'sha256-[^']*'[^;]*; style-src 'self' 'unsafe-inline'" \
+    || die "公网 CSP 结构异常（应为 script-src 'self' 'sha256-…' [允许的额外主机]; style-src 'self' 'unsafe-inline'）"
+# CF 免费版会给 HTML 注入 Web Analytics 信标；CSP 必须放行该信标及其上报域名，
+# 否则每页控制台都会报 script 被拦截（真实访问者看到的是“报错”，不是功能故障）。
+echo "$public_csp" | grep -qi "script-src 'self' 'sha256-[^']*'[^;]*https://static\.cloudflareinsights\.com" \
+    || die "公网 CSP 未放行 Cloudflare Web Analytics 信标（static.cloudflareinsights.com），每页会报 CSP 违规"
+echo "$public_csp" | grep -qi "connect-src 'self'[^;]*https://cloudflareinsights\.com" \
+    || die "公网 CSP 未放行 Cloudflare Web Analytics 上报域名（cloudflareinsights.com）"
 
 # 上传目录（图片）也必须带全套安全头；用一个不存在的文件名，验证 add_header 的
 # always 生效（404 也下发）。这里只看头，不看状态码。
