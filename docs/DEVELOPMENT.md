@@ -122,12 +122,16 @@ cd frontend && pnpm test --run
 | 第五轮 | 全文搜索：搜索接口 + pg_trgm 索引 + 顶栏入口与搜索结果页 | 5 | ✅ 已完成 | 2026-10-21 |
 | 第六轮 | 实时通知：SSE 推送 + 一次性 ticket + 断线重连与 120s 兜底轮询 | 5 | ✅ 已完成 | 2026-10-22 |
 | 第七轮 | 安全加固：JWT 主动失效（`token_version`）+ 登录失败按 IP 限流（429 + `Retry-After`） | 6 | ✅ 已完成 | 2026-10-23 |
+| 第八轮 | 质量加固：测试守护、登录限流健壮性、首页 LIKE 转义、登出静默与主题跨标签 | 6 | ✅ 已完成 | 2026-10-24 |
+| 第九轮 | 前端性能：Element Plus 按需引入、产物体积预算、静态资源长缓存与入口 no-cache | 5 | ✅ 已完成 | 2026-10-25 |
+| 第十轮 | 公网入口验证与加固：Cloudflare Tunnel 下的 HTTPS 强制、安全响应头、部署断言 | 4 | ✅ 已完成 | 2026-10-28 |
+| 第十一轮 | 安全头收敛与 CSP：内联脚本哈希放行、uploads 全套头、CF 信标放行、部署断言 | 5 | ✅ 已完成 | 2026-10-31 |
 
-**当前进度：MVP 100% ｜ 已完成 9 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 11 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
-## 3. 当前状态快照（2026-10-25）
+## 3. 当前状态快照（2026-10-31）
 
 ### 3.1 代码规模
 
@@ -136,7 +140,7 @@ cd frontend && pnpm test --run
 | 后端主代码（`src/main/java`） | 82 | 5083 |
 | 后端测试（`src/test/java`） | 22 | 5105 |
 | 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4780 |
-| 前端测试（`*.spec.js`） | 32 | 5746 |
+| 前端测试（`*.spec.js`） | 33 | 5867 |
 
 后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 9、`service/` 11、`security/` 7（+`ClientIpResolver`、`LoginRateLimiter`，`exception/` 另加 `TooManyLoginAttemptsException`）、`config/` 7（+`ClockConfig`）、`util/` 4、`exception/` 4。
 
@@ -147,12 +151,12 @@ cd frontend && pnpm test --run
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
 | 后端 | **177** 个用例 / 21 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
-| 前端 | **323** 个用例 / 32 个 spec | 全绿 |
+| 前端 | **330** 个用例 / 33 个 spec | 全绿 |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
 后端测试类分布（合计 177）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
 
-前端 spec 分布（合计 323）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）17、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3、`elementAutoImport` 2。
+前端 spec 分布（合计 330）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）17、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3、`elementAutoImport` 2、`csp` 7。
 
 > 分布行在此前的记录里与实际总数对不上（2026-10-24 复核时后端、前端两行均已按 `target/surefire-reports` 与 `pnpm test` 输出重新点数并对齐）；此后以本行标注的合计与 `mvn` / `vitest` 的实际输出为准。
 
@@ -799,6 +803,70 @@ cd frontend && pnpm test --run
 
 ---
 
+### 4.16 第十一轮：安全头收敛与 CSP（2026-10-31）
+
+**背景**：第十轮把公网入口收敛到「强制 HTTPS + 4 个安全响应头」，但留下了三个尾巴：全站没有 CSP、`/forum/uploads/` 只带 `X-Content-Type-Options`、HSTS 是否加 `includeSubDomains` 与 Cloudflare 面板设置都没结论。第十一轮把这三件事做完，并把它们固化成仓库里的测试与部署断言。
+
+**改动**
+
+| 文件 | 改了什么 |
+| --- | --- |
+| `deploy/nginx/forum.conf` | `location = /forum/index.html` 增加 `Content-Security-Policy`；`location ^~ /forum/uploads/` 补齐 `nosniff`/`X-Frame-Options`/`Referrer-Policy`/HSTS 四个头（全部带 `always`，404 也下发） |
+| `deploy/nginx/public.conf` | 公网 server 级增加同一条 CSP（API 与 HTML 都能拿到；HTML 由 snippet 的 location 精确下发） |
+| `frontend/src/plugins/csp.spec.js` | 新增 7 条源码/配置断言：内联脚本 SHA-256 出现在 CSP、CSP 必须落在 index location 内、指令齐全且 `script-src` 无 `unsafe-*`/通配符、两份 conf 的 CSP 逐字一致、CF 信标已放行、uploads 带 4 个 always 头且不含 CSP、`deploy.sh` 断言未被删 |
+| `deploy/deploy.sh` | 公网 CSP 3 条断言（头存在 / 哈希存在 / `script-src` 结构正确）+ 2 条信标放行断言（`static.cloudflareinsights.com`、`cloudflareinsights.com`）+ uploads 4 头断言 |
+
+**CSP 取值**（两份 conf 必须逐字相同）
+
+```text
+default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha256-Sbv+SnhhPDOg1J2CVOMR4HoLBVSxnmSJ54wG/DCJq94=' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://cloudflareinsights.com; form-action 'self'; frame-ancestors 'self'
+```
+
+**设计要点**
+
+- 内联脚本不搬、不 nonce：`index.html` 首屏那段主题引导脚本改成外链会引入一次额外请求并可能闪烁，因此用 **SHA-256 哈希精确放行**；改脚本必须同步哈希，`csp.spec.js` 与 `deploy.sh` 双重守护。
+- `style-src` 必须留 `'unsafe-inline'`：Vue 的 `:style` 与 Element Plus 的弹层/表格都写行内 style，去掉会大面积破样式；`script-src` 则严格到「self + 1 个哈希 + 1 个 CF 信标主机」。
+- CSP 下发点：nginx 1.22 的 `add_header` 只要 location 自己写了就不继承 server 级，因此 HTML 的 CSP 必须写在 `location = /forum/index.html`。第十一轮第一次提交正是栽在这里（CSP 误落 uploads 块），被 `deploy.sh` 断言拦住（Build #28 FAILURE）。
+- CF 免费版会给 HTML 注入 `static.cloudflareinsights.com/beacon.min.js`。不放行时每页控制台都报 CSP 违规（真实访问者看到的是“红字报错”而不是功能故障），因此 `script-src` 放行该主机、`connect-src` 放行上报域名 `cloudflareinsights.com`；如果之后在 CF 面板关掉 Web Analytics，这两条保留也无害（多放行一个自有域）。
+- HSTS 仍**不加** `includeSubDomains`：该域名下还有内网应用（`/imageweb/` 等），若将来确认没有子域依赖 HTTP，可再把该指令加上，届时同步改 `deploy/nginx/public.conf` 与本节。
+
+**验证矩阵（2026-10-31，Build #31，镜像 `localhost/forum-backend:31`）**
+
+| # | 项 | 结果 |
+| --- | --- | --- |
+| V1 | 公网 `/forum/` | 200，`Cache-Control: no-cache` + 4 头 + **CSP 完整值** |
+| V2 | 公网 SPA 路由 `/forum/posts/1` | 200，CSP 1 条 |
+| V3 | 内网 `Host: raspi` `/forum/` | 200，CSP 1 条 |
+| V4 | `/forum/uploads/__probe_missing__.png` | 404，带 4 个安全头，`Content-Security-Policy` 计数 0（图片不需要） |
+| V5 | 公网 asset `index-Dm2pwhnr.js` | 200，单条 `Cache-Control: public, max-age=31536000, immutable`，无 CSP |
+| V6 | Playwright（Chromium/Edge，1440×1000） | 首页 10 帖、暗色 `html.dark` + `rgb(10,10,10)`、头像 200（`/forum/uploads/avatars/...`）、Markdown 渲染、搜索页、管理员登录后管理页 11 行且分页 aria「上一页/第 1 页/第 2 页/下一页」、删除确认框「提示 / 取消 / 确定」；**CSP 违规 0 条**，控制台仅点击「取消」时的 `cancel`（MessageBox 的预期 reject） |
+| V7 | 公网 SSE（无 ticket） | 401，不回归 |
+| V8 | `deploy.sh` 部署断言 | 15/15 组全过（Build #31 日志） |
+| V9 | 公网登录 → me → logout → 旧 token me | 200 / 200 / 200 / 401 |
+
+**构建记录**
+
+| 提交 | 构建 | 结果 |
+| --- | --- | --- |
+| `086c329`（起点） | Build #27 | SUCCESS（基线） |
+| `f8675ba`（首版 CSP） | Build #28 | **FAILURE**：`公网 /forum/ 缺少 Content-Security-Policy（实际：无该头）` —— CSP 被误插到 uploads 块，index location 的 add_header 屏蔽了 server 级 |
+| `0c897c9`（把 CSP 移到 index location） | Build #29 | SUCCESS，镜像 29 |
+| `db88a9f`（放行 CF 信标） | Build #30 | **FAILURE**：`公网 CSP 结构异常` —— `deploy.sh` 把 `script-src` 结构写死成「哈希后直接分号」 |
+| `bd24453`（放宽结构断言并守护信标主机） | Build #31 | SUCCESS，镜像 31 |
+
+**已知限制**
+
+- CSP 只由 nginx 注入，前端代码不感知；新增内联 `<script>` 必须同步哈希（`csp.spec.js` 与 `deploy.sh` 会红），新增内联 `<style>` 无需处理（`style-src` 已允许 inline）。
+- 未启用 `report-uri`/`report-to`/Report-Only：目前靠控制台人工回归 + Playwright 脚本（不入库）发现违规。
+- `script-src` 额外放行了 Cloudflare Web Analytics 信标主机；若关掉该面板功能，建议保留（无害）或连同 `deploy.sh` 的 2 条断言一起删。
+- API 的 401（含 SSE 401）由 `snippet` 内层 `location /forum/api/` 返回，不带 CSP（JSON 不渲染，影响低）。
+- 部署序：CSP 与静态资源 must 同步上线；先上 CSP 后上新前端会因旧 index.html 的哈希变化被拦，所以 `deploy.sh` 断言失败即视为部署失败（当前流水线即如此）。
+
+**上线验收（Build #32/#33，见回填）**
+
+- 本地全量：后端 177 / 21 类（1 skipped）、前端 33 spec / 330 用例；`pnpm build` + `check:bundle` 通过。
+- 公网 V1–V9 全部复测；`deploy.sh` 15/15；远端 master == 本地 HEAD。
+
 ## 5. 待办与后续计划
 
 ### 5.1 技术债与风险（建议优先处理）
@@ -821,6 +889,8 @@ cd frontend && pnpm test --run
 | T14 | **搜索无分词、无相关度排序** | 中 | 采用 pg_trgm 子串匹配：中文不分词，1–2 个字的关键词的 trigram 覆盖不足，规划器会放弃索引改走顺序扫描；排序只有「标题命中优先 + 时间倒序」，没有 `ts_rank`/`similarity` 之类相关度。数据量增长后的升级路径是 `tsvector`（需分词扩展）或两阶段检索 |
 | T15 | **`posts.content` 无长度上限** | 低 | 正文列是 `TEXT` 且无应用层长度校验；超长正文会放大 `snippet` 截取与索引维护成本，也让 `pg_trgm` 的 GIN 索引更大。可加与标题一致的长度提示或截断策略 |
 | T17 | ~~**标签检索的 LIKE 通配符未转义**~~ | 已关闭 | 2026-10-25 第九轮：`TagService` 先 `escapeLike`（转义 `!`/`%`/`_`），`TagRepository.findWithPostCounts` 的 JPQL 加 `ESCAPE '!'`；`TagFlowIntegrationTest` 新增 `@Order(9)` 覆盖 `100%`、`a_b`、`!` 三个关键词（见 §4.14）。原记录：第八轮 T13 只覆盖首页 `GET /api/posts?keyword=` 与既有的 `/api/posts/search`；`TagRepository.findWithPostCounts` 的标签关键词 LIKE 仍把 `%`/`_` 当通配符（`GET /api/tags?keyword=`），搜「a_b」会命中「axb」。修法同 T13：service 先 `escapeLike`，JPQL 加 `ESCAPE '!'` |
+| T18 | **CSP 无违规上报** | 低 | 目前只有控制台人工回归 + 一次性 Playwright 脚本（不入库）；如需线上感知，可加 `report-to`/`Reporting-Endpoints`，或先用 Report-Only 观察一段时间（见 §4.16） |
+| T19 | **CSP 依赖 Cloudflare 信标放行** | 低 | 公网 CSP 放行了 `static.cloudflareinsights.com` 与 `cloudflareinsights.com`；若在 CF 面板关掉 Web Analytics，可删掉这两条并同步 `csp.spec.js`、`deploy.sh`（见 §4.16） |
 
 ### 5.2 候选功能（第七轮新增「限流共享存储」一项）
 
@@ -844,6 +914,8 @@ cd frontend && pnpm test --run
 
 > 第十轮继续不加业务功能，只做公网入口验证与运维加固（见 §4.15）；新增两条候选：①CSP（需要处理内联主题脚本与 Markdown 内联样式，属独立一轮）；②把 Cloudflare 侧设置（Always Use HTTPS、HSTS）纳入仓库化配置（目前只有源站 nginx 兜底，面板设置靠手工保持）。
 
+> 第十一轮完成了第十轮留下的 CSP 尾巴（见 §4.16）：内联主题脚本用 SHA-256 精确放行、`uploads` 补齐 4 个安全头、CF Web Analytics 信标显式放行、`deploy.sh` 补 5 条断言、`csp.spec.js` 补 7 条守护。HSTS 仍不加 `includeSubDomains`（该域名下还有内网应用）。新增候选：①CSP 违规上报（`report-to`/Report-Only，记 T18）；②Cloudflare 面板设置仓库化（延续第十轮候选）。
+
 ---
 
 ## 6. 已知问题与限制
@@ -861,6 +933,8 @@ cd frontend && pnpm test --run
 | SSE 依赖反向代理正确配置 | 漏配 `proxy_buffering off` 表现为通知要等十几秒才到，漏配 `proxy_read_timeout` 表现为连接每分钟断一次 | snippet 内置精确 location + `deploy.sh` 冒烟断言 401；部署手册有「通知延迟」排障条目 |
 | SSE 断开期间的新通知不补推 | 断线期间发出的事件已丢失，重连只校准未读数，不重放列表 | 已接受：刷新或重新进入通知页即可看到；不做服务端离线队列（T16） |
 | 登录限流是单实例的 | 失败计数在应用内存（`LoginRateLimiter` 的 `ConcurrentHashMap`），多实例部署时各实例独立计数、重启清零 | 当前单容器部署不构成问题；要跨实例一致需换共享存储（§5.2） |
+| CSP 由 nginx 注入，前端不感知 | 新增内联 `<script>` 必须同步 CSP 的 SHA-256，否则线上会被浏览器拦掉（首屏主题脚本是当前唯一一条） | `csp.spec.js`（源码/配置断言）与 `deploy.sh`（公网 HTML 头断言）双重守护；新增内联样式无需处理，`style-src` 已允许 inline |
+| CSP 放行了 Cloudflare 信标 | CF 免费版会给 HTML 注入 `static.cloudflareinsights.com/beacon.min.js`；关掉 Web Analytics 后这两条放行仍在 | 关闭时删除 `script-src`/`connect-src` 里的两个主机，并同步 `csp.spec.js` 与 `deploy.sh`（T19） |
 
 ---
 
@@ -905,7 +979,15 @@ cd frontend && pnpm test --run
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-28 | docs | 回填第十轮构建与上线验收（Build #25、镜像 25、V1–V11 与 13/13 断言） | 本次提交 |
+| 2026-10-31 | docs | 记录第十一轮安全头收敛与 CSP（§4.16、测试基线 330/33、CF 信标放行） | 本次提交 |
+| 2026-10-31 | fix | 放宽 CSP 部署断言以允许放行 CF 信标 | `bd24453` |
+| 2026-10-31 | fix | CSP 放行 Cloudflare Web Analytics 信标 | `db88a9f` |
+| 2026-10-31 | fix | 把 CSP 下发点修正到 HTML location | `0c897c9` |
+| 2026-10-31 | fix | 补齐上传目录安全头并启用 CSP | `f8675ba` |
+| 2026-10-31 | test | 守护 CSP 脚本哈希与安全头一致性 | `d50341e` |
+| 2026-10-31 | docs | 新增第十一轮安全头收敛与 CSP 设计与计划 | `e3a3ffa` |
+| 2026-10-28 | chore | 修正第十轮终审发现的文档与部署断言缺口 | `086c329` |
+| 2026-10-28 | docs | 回填第十轮构建与上线验收（Build #25、镜像 25、V1–V11 与 13/13 断言） | `eeec230` |
 | 2026-10-28 | docs | 记录第十轮公网入口验证与加固（HTTPS 强制、安全响应头、部署断言） | `4569d2e` |
 | 2026-10-28 | fix | 公网入口强制 HTTPS 并补安全响应头 | `a1cd36b` |
 | 2026-10-28 | docs | 新增第十轮公网入口设计与计划 | `7fa08f9` |

@@ -255,7 +255,7 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 32 个 spec、323 个用例，覆盖：
+当前为 33 个 spec、330 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页

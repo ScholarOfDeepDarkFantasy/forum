@@ -310,6 +310,53 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
 > nginx access log 首列为真实公网 IP（realip 生效）；连续 5 次错密码后第 6 次 429 + `Retry-After: 899`，
 > 后端日志 `WARN ... IP <真实公网 IP> 登录失败 5 次，锁定 900000 ms`。`deploy.sh` 新增的 4 组公网断言在本次构建日志中通过。
 
+### 安全响应头与 CSP（第十一轮）验证
+
+第十一轮给公网 HTML 加了 `Content-Security-Policy`（内联主题脚本用 SHA-256 精确放行），并给 `/forum/uploads/` 补齐 4 个安全头。`deploy.sh` 会自动断言「公网 HTML 有 CSP」「`script-src` 带哈希」「`script-src` 结构正确」「放行 CF 信标与上报域名」「uploads 404 也带 4 个头」，手工复核命令：
+
+```bash
+# 1) 公网 HTML：必须有完整 CSP（含内联脚本哈希与 CF 信标放行）
+curl -sI -H 'Host: treenewbee.men' http://127.0.0.1/forum/ | grep -i '^content-security-policy:'
+# 期望：content-security-policy: default-src 'self'; base-uri 'self'; object-src 'none';
+#       script-src 'self' 'sha256-Sbv+SnhhPDOg1J2CVOMR4HoLBVSxnmSJ54wG/DCJq94='
+#       https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; ...
+#       connect-src 'self' https://cloudflareinsights.com; ...
+
+# 2) SPA 路由与内网入口同样要带 CSP
+curl -sI -H 'Host: treenewbee.men' http://127.0.0.1/forum/posts/1 | grep -ic '^content-security-policy:'; # 期望 1
+curl -sI -H 'Host: raspi'          http://127.0.0.1/forum/        | grep -ic '^content-security-policy:'; # 期望 1
+
+# 3) 头像/上传：404 也必须带 4 个安全头（验证 add_header 的 always 生效），且不带 CSP
+curl -sI -H 'Host: raspi' http://127.0.0.1/forum/uploads/__probe_missing__.png \
+  | grep -icE '^(x-content-type-options: nosniff|x-frame-options: SAMEORIGIN|referrer-policy: strict-origin-when-cross-origin|strict-transport-security: max-age=31536000)'
+# 期望：4
+curl -sI -H 'Host: raspi' http://127.0.0.1/forum/uploads/__probe_missing__.png | grep -ic 'content-security-policy'
+# 期望：0（图片不需要 CSP）
+
+# 4) 静态资源不带 CSP、仍然是单条长缓存
+ASSET=$(curl -fsS -H 'Host: raspi' http://127.0.0.1/forum/ | grep -o '/forum/assets/[^"]*\.js' | head -1)
+curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|content-security-policy:)'
+# 期望：只有一条 cache-control: public, max-age=31536000, immutable
+```
+
+浏览器侧复核（真实渲染，建议发布后跑一次）：打开公网首页 → 暗色模式 → 帖子详情（Markdown + 头像）→ 搜索页 → 管理员登录后的管理页（表格与中文分页）→ 删除确认框（「提示 / 取消 / 确定」），DevTools Console 不应出现 `Content Security Policy` 或 `Refused to` 字样。唯一预期噪音是点「取消」时 MessageBox reject 打印的 `cancel`。
+
+**Cloudflare 面板设置核对表**（源站兜底之外的双保险，均为手工项）
+
+| 设置 | 建议值 | 说明 |
+| --- | --- | --- |
+| SSL/TLS 模式 | Full (strict) 或 Full | 源站是 http:80，cloudflared 走隧道；至少不要 Flexible |
+| Always Use HTTPS | 开 | 源站已用 `X-Forwarded-Proto` 308 兜底，开面板是第二层保险 |
+| HSTS | 可选开启 | 若开启，与源站头保持一致（`max-age=31536000`，暂不加 `includeSubDomains`） |
+| Web Analytics | 保持现状 | 打开时 CF 会注入 `static.cloudflareinsights.com/beacon.min.js`，CSP 已放行；关闭后可与 `deploy.sh` 的两条信标断言一并删除 |
+| Rocket Loader | 关 | 会改写页面脚本、破坏 CSP 哈希且拖慢首屏 |
+| Brotli | 开（若有） | 与源站 gzip 不冲突 |
+
+> **2026-10-31 第十一轮验收（Build #31，镜像 `forum-backend:31`；待回填 Build #32/#33）**：公网 `/forum/` 200 +
+> 4 个安全头 + 完整 CSP；`/forum/posts/1` 与内网 `Host: raspi` 各 1 条 CSP；uploads 404 带 4 头、CSP 计数 0；
+> asset 200 + 单条 immutable、无 CSP；SSE 401；`deploy.sh` 15/15 组断言通过；Playwright（Chromium/Edge）六项渲染回归，
+> CSP 违规 0 条，控制台仅点「取消」时的 `cancel`。
+
 ## 6. 排障
 
 | 现象 | 排查 |
@@ -361,6 +408,11 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
 - **nginx `add_header` 不再从 server 级继承**：`/forum/assets/` 与 `location = /forum/index.html` 各自定义 `add_header`，若宿主机 `conf.d/app.conf` 在 server 级设置过安全头（`X-Frame-Options`、`Referrer-Policy`、CSP 等），这两个 location 会丢掉它们。第十轮起把 4 个安全头直接写进这两个 location（`deploy/nginx/forum.conf`），公网 API 响应由 `forum-public.conf` 的 server 级负责；将来 nginx 升到 1.29+ 可用 `add_header_inherit merge` 合并。
 - **Cloudflare 免费版会给 404 加边缘缓存头**：请求不存在的 `/forum/assets/*.js` 会返回 404 + `Cache-Control: max-age=14400` + `cf-cache-status: MISS`，这是 Cloudflare 的边缘行为，不是源站配置错误；源站的 404 本身不带 Cache-Control。
 - **公网强制 HTTPS 在源站兜底**：`forum-public.conf` 用 `X-Forwarded-Proto` 把明文请求 308 到 https；Cloudflare 面板的 Always Use HTTPS 未纳入仓库，属手工设置，开启后是多一层保险。HSTS 不带 `includeSubDomains`，避免误伤该域名下的其它内网子域。
+- **CSP 由 nginx 注入，前端代码不感知**：新增内联 `<script>` 必须同步 `script-src` 里的 SHA-256，否则线上会被浏览器拦掉（目前只有首屏主题脚本这一条内联脚本）；新增内联 `<style>` 无需处理（`style-src` 已允许 `'unsafe-inline'`）。`frontend/src/plugins/csp.spec.js` 与 `deploy.sh` 会同时报警。
+- **CSP 放行了 Cloudflare Web Analytics 信标**：CF 免费版会给 HTML 注入 `static.cloudflareinsights.com/beacon.min.js`，不放行时每页控制台都报 CSP 违规。放行主机为 `static.cloudflareinsights.com`（脚本）与 `cloudflareinsights.com`（上报）；关掉 Web Analytics 后可以删掉这两条并同步 `csp.spec.js` 与 `deploy.sh`。
+- **CSP 没有违规上报**：目前靠控制台人工回归与一次性 Playwright 脚本；需要线上感知时可加 `report-to`/`Reporting-Endpoints`，或先上 Report-Only 观察。
+- **HSTS 未加 `includeSubDomains`**：该域名下还有内网应用（`/imageweb/` 等）；确认没有子域依赖 HTTP 后再加，并同步 `deploy/nginx/public.conf`。
+
 
 ## 附录 A：Jenkins job `config.xml`
 

@@ -3,12 +3,12 @@
 - 日期：2026-10-31
 - 设计：`docs/superpowers/specs/2026-10-31-round11-security-headers-csp-design.md`
 - 仓库根：`E:\JavaSpace\forum`（Git Bash：`/e/JavaSpace/forum`）
-- 目标基线：后端 177（21 类）、前端 328（33 spec）、端点 39
+- 目标基线：后端 177（21 类）、前端 330（33 spec）、端点 39
 
 ## 0. 执行约定
 
 - 直接在 `master` 提交，不建分支、不 amend、不 rebase、不 force push。
-- 本轮共 **5 次提交**（设计计划 → 测试守护 → 实现 → 文档记录 → 回填验收）。
+- 本轮计划 5 次提交（设计计划 → 测试守护 → 实现 → 文档记录 → 回填验收）；实际 8 次：计划外的 3 个修复提交见 §12（CSP 落错位置、CF 信标放行、部署断言放宽）。
 - 提交信息逐字使用附录 A；每个 Task 提交后工作区必须干净。
 - 前端命令一律在 `frontend/` 下执行；构建必须 `MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build`。
 - 推送走 SSH：`git push git@github.com:ScholarOfDeepDarkFantasy/forum.git master:master`。
@@ -318,13 +318,39 @@ git commit -m "docs: 记录第十一轮安全头收敛与 CSP"
 
 ## 附录 B：上线冒烟清单
 
-- [ ] B.1 公网 `/forum/` 200 + CSP + 原 4 头
-- [ ] B.2 公网 SPA 路由与 B.1 同 CSP
-- [ ] B.3 内网 `Host: raspi` `/forum/` 同 CSP
-- [ ] B.4 asset 单条 immutable + gzip 不回归
-- [ ] B.5 uploads 404 带 4 头
-- [ ] B.6 详情页/管理页/搜索页 Playwright 无 CSP 违规，暗色与头像正常
-- [ ] B.7 SSE 401 不回归
-- [ ] B.8 `deploy.sh` 15/15 组断言通过
-- [ ] B.9 回滚演练：删 CSP 两行 + 重跑部署可恢复（只记录方法，不实际执行全网回滚）
-- [ ] B.10 远端 == HEAD、工作区干净
+- [x] B.1 公网 `/forum/` 200 + CSP + 原 4 头
+- [x] B.2 公网 SPA 路由与 B.1 同 CSP
+- [x] B.3 内网 `Host: raspi` `/forum/` 同 CSP
+- [x] B.4 asset 单条 immutable + gzip 不回归
+- [x] B.5 uploads 404 带 4 头
+- [x] B.6 详情页/管理页/搜索页 Playwright 无 CSP 违规，暗色与头像正常
+- [x] B.7 SSE 401 不回归
+- [x] B.8 `deploy.sh` 15/15 组断言通过
+- [x] B.9 回滚演练：删 CSP 两行 + 重跑部署可恢复（只记录方法，不实际执行全网回滚）
+- [x] B.10 远端 == HEAD、工作区干净
+
+
+## 12. 实施记录与偏差（2026-10-31）
+
+### 12.1 提交与构建链
+
+| # | 提交 | 内容 | Jenkins |
+| --- | --- | --- | --- |
+| 0 | `e3a3ffa` | 设计与计划 | Build #27 为起点 `086c329` SUCCESS |
+| 1 | `d50341e` | `csp.spec.js` 首版 5 条守护（RED：`Tests 5 failed`） | 随 `f8675ba` 一起构建 |
+| 2 | `f8675ba` | uploads 补 4 头、public.conf server 级 CSP、`deploy.sh` 两组断言 | **Build #28 FAILURE**：`公网 /forum/ 缺少 Content-Security-Policy（实际：无该头）` |
+| 3 | `0c897c9` | 把 CSP 移到 `location = /forum/index.html`；spec 扩到 6 条 | **Build #29 SUCCESS**（镜像 29） |
+| 4 | `db88a9f` | 放行 CF Web Analytics 信标（`static.cloudflareinsights.com` + 上报域） | **Build #30 FAILURE**：`公网 CSP 结构异常`（`deploy.sh` 的 `script-src` 结构断言过严） |
+| 5 | `bd24453` | 放宽结构断言 + 2 条信标放行断言 | **Build #31 SUCCESS**（镜像 31） |
+| 6 | 本次 docs 提交 | `docs: 记录第十一轮安全头收敛与 CSP` | Build #32 |
+| 7 | 回填提交 | `docs: 回填第十一轮构建与上线验收` | Build #33 |
+
+### 12.2 偏差与决定
+
+1. **CSP 落错位置**（Build #28）：首版实现对 nginx conf 用「第一次出现的 HSTS 行 + `}`」做文本替换，CSP 被插进了 uploads 块；`index.html` location 自己写 `add_header` 会屏蔽 server 级，公网 HTML 实际没有 CSP。修复：改为先定位 `location = /forum/index.html` 再替换，并新增 2 条 spec（CSP 必须在 index location、uploads 不得有 CSP）。教训记入 `docs/DEVELOPMENT.md` §4.16。
+2. **Cloudflare Web Analytics 信标**：公网实测发现 CF 免费版注入 `static.cloudflareinsights.com/beacon.min.js`，严格 CSP 下每页控制台报违规。决定显式放行该主机与上报域名 `cloudflareinsights.com`（并在 `deploy.sh` 里断言放行，防误删），而非关闭 CF 的 Web Analytics（面板项不在仓库内）。
+3. **部署断言收紧**（Build #30）：`script-src` 结构断言原本要求哈希后直接跟 `;`，放行额外主机后失效。改为允许哈希后出现白名单主机，并新增信标放行断言；`deploy.sh` 组数从 13 组升到 15 组。
+4. **前端测试数**：计划写 328/33（新增 5 条），实际 `csp.spec.js` 最终 7 条 → **330 / 33 spec**；`docs/DEVELOPMENT.md`、`README.md` 按实际回填。
+5. **HSTS `includeSubDomains`**：评估结论是不加（该域名下还有内网应用 `/imageweb/` 等），记入 §4.16 与部署手册。
+6. **验收顺序**：限流相关断言本轮不涉及；V10（锁 IP）本轮未重跑，沿用第十轮结果，避免再次锁验收机 15 分钟。
+7. **Playwright 脚本不入库**：仅作一次性公网渲染复核（截图在 `C:\Temp\r11-csp`），与 T3/T18 一致。
