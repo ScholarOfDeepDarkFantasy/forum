@@ -63,9 +63,18 @@ export async function bootstrapData() {
 
   const cleanup = async () => {
     const failures = []
+    // 登出用例会让服务端递增 tokenVersion，bootstrap 时拿到的 token 随即失效（401）。
+    // 清理前重新登录换一枚与当前版本匹配的 token；失败时仍用旧 token 尽力清理并记录。
+    let cleanupToken = token
+    try {
+      const fresh = await request('/auth/login', { method: 'POST', body: credentials })
+      if (fresh?.token) cleanupToken = fresh.token
+    } catch (err) {
+      failures.push(`[E2E] 清理前重新登录失败: ${err.message}`)
+    }
     const remove = async (path) => {
       try {
-        await request(path, { method: 'DELETE', token })
+        await request(path, { method: 'DELETE', token: cleanupToken })
       } catch (err) {
         if (!/HTTP 404/.test(err.message)) failures.push(err.message) // 已手工删除视为清理成功
       }
