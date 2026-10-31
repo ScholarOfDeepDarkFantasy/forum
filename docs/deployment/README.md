@@ -153,14 +153,15 @@ curl -fsSI -H 'Host: raspi' "http://127.0.0.1/forum$AVATAR" | grep -Ei '^(HTTP/|
 >   -H 'Host: treenewbee.men' -H 'X-Forwarded-Proto: http' http://127.0.0.1/forum/
 > # 期望：308 https://treenewbee.men/forum/
 >
-> # HTML 必须带 4 个安全响应头
-> curl -sI -H 'Host: treenewbee.men' http://127.0.0.1/forum/ | grep -iE \
->   '^(strict-transport-security|x-content-type-options|x-frame-options|referrer-policy):'
+> # HTML 必须带 4 个安全响应头 + CSP（含内联脚本的 SHA-256）
+> curl -sI --max-time 5 -H 'Host: treenewbee.men' http://127.0.0.1/forum/ | grep -iE \
+>   '^(strict-transport-security|x-content-type-options|x-frame-options|referrer-policy|content-security-policy):'
+> # 部署脚本还会现算首页内联脚本哈希与响应头比对，改 index.html 忘改哈希会直接红
 >
 > # 公网静态资源同样单条 immutable；公网 SSE 与内网一样 401
-> curl -sI -H 'Host: treenewbee.men' http://127.0.0.1/forum/assets/<hash>.js | grep -ci '^cache-control:'
+> curl -sI --max-time 5 -H 'Host: treenewbee.men' http://127.0.0.1/forum/assets/<hash>.js | grep -ci '^cache-control:'
 > curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: treenewbee.men' \
->   http://127.0.0.1/forum/api/notifications/stream   # 期望 401
+>   http://127.0.0.1/forum/api/notifications/stream   # 期望 401（带 CSP，因为继承 server 级）
 > ```
 
 ### 全文搜索（V3 pg_trgm）验证
@@ -300,7 +301,7 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -ci '^cache-control:'
 
 > 必须带 `-H 'Host: raspi'`：raspi 上 nginx 的 server 块写了 `server_name raspi`，不带 Host 时请求落到默认 server，测不到 `/forum/` 的配置。
 
-> **2026-10-25 验收实测（Build #20，镜像 `forum-backend:20`）**：`/forum/assets/index-Dm2pwhnr.js` 返回 `HTTP/1.1 200`、1 条 `Cache-Control: public, max-age=31536000, immutable`、`Content-Encoding: gzip`；`/forum/` 与 `/forum/posts/1` 均为 `Cache-Control: no-cache`；首页入口 JS 84,431 B、入口 CSS 39,019 B（与本地构建一致）；`deploy.sh` 的缓存头断言全部通过。随后的回填提交 `8e6d71b` 触发 **Build #21** 亦 SUCCESS（镜像 `:21` healthy，产物字节数相同），属 docs-only 重建。上线后请复核一次 `sudo nginx -T | grep -n add_header`，确认两个 location 没有丢 server 级安全头。
+> **2026-10-25 验收实测（Build #20，镜像 `forum-backend:20`）**：`/forum/assets/index-*.js`（文件名是内容哈希，按首页实际引用取）返回 `HTTP/1.1 200`、1 条 `Cache-Control: public, max-age=31536000, immutable`、`Content-Encoding: gzip`；`/forum/` 与 `/forum/posts/1` 均为 `Cache-Control: no-cache`；首页入口 JS 84,431 B、入口 CSS 39,019 B（与本地构建一致）；`deploy.sh` 的缓存头断言全部通过。随后的回填提交 `8e6d71b` 触发 **Build #21** 亦 SUCCESS（镜像 `:21` healthy，产物字节数相同），属 docs-only 重建。上线后请复核一次 `sudo nginx -T | grep -n add_header`，确认两个 location 没有丢 server 级安全头。
 >
 > 发布后如果用户反馈「还是旧界面」，让用户强制刷新一次即可：旧 `index.html` 里引用的旧 hash 资源已被 `rsync --delete` 删除，`no-cache` 保证下一次不会再用旧 html。
 
@@ -345,7 +346,7 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|
 
 | 设置 | 建议值 | 说明 |
 | --- | --- | --- |
-| SSL/TLS 模式 | Full (strict) 或 Full | 源站是 http:80，cloudflared 走隧道；至少不要 Flexible |
+| SSL/TLS 模式 | Full (strict) 或 Full | 源站是 http:80，cloudflared 走隧道，证书校验发生在 CF 边缘而非源站，此项对 Tunnel 基本不生效；关键只是不要选 Flexible |
 | Always Use HTTPS | 开 | 源站已用 `X-Forwarded-Proto` 308 兜底，开面板是第二层保险 |
 | HSTS | 可选开启 | 若开启，与源站头保持一致（`max-age=31536000`，暂不加 `includeSubDomains`） |
 | Web Analytics | 保持现状 | 打开时 CF 会注入 `static.cloudflareinsights.com/beacon.min.js`，CSP 已放行；关闭后可与 `deploy.sh` 的两条信标断言一并删除 |
@@ -354,7 +355,7 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|
 
 > **2026-10-31 第十一轮验收（Build #32，镜像 `forum-backend:32`）**：公网 `/forum/` 200 +
 > 4 个安全头 + 完整 CSP；`/forum/posts/1` 与内网 `Host: raspi` 各 1 条 CSP；uploads 404 带 4 头、CSP 计数 0；
-> asset 200 + 单条 immutable、无 CSP；SSE 401；`deploy.sh` 15/15 组断言通过；Playwright（Chromium/Edge）六项渲染回归，
+> asset 200 + 单条 immutable、无 CSP；SSE 401；`deploy.sh` 全部部署断言通过（含 CSP 哈希现算比对与信标放行）；Playwright（Chromium/Edge）六项渲染回归，
 > CSP 违规 0 条，控制台仅点「取消」时的 `cancel`。回填提交 `ea42624` 触发 Build #32（镜像 32）与
 > 本次 docs 回填提交触发 Build #33，两者均为 docs-only 重建，产物与断言结果不变。
 

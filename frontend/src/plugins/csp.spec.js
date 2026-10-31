@@ -23,6 +23,28 @@ function cspValues(file) {
   return [...source.matchAll(CSP_RE)].map((match) => match[1])
 }
 
+// 从 conf 文本里截出某个 location 的完整块：先定位名字，再按花括号配对到匹配的 }
+// （不能用「第一个 }」，location 里嵌套 if/limit_except 时会截错）。
+function locationBlock(source, marker) {
+  const start = source.indexOf(marker)
+  if (start < 0) {
+    return null
+  }
+  const open = source.indexOf('{', start)
+  let depth = 0
+  for (let i = open; i < source.length; i += 1) {
+    if (source[i] === '{') {
+      depth += 1
+    } else if (source[i] === '}') {
+      depth -= 1
+      if (depth === 0) {
+        return source.slice(start, i + 1)
+      }
+    }
+  }
+  return null
+}
+
 function inlineScriptHash() {
   const html = readFileSync(INDEX_HTML, 'utf8')
   const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
@@ -40,11 +62,11 @@ describe('CSP 与内联脚本哈希', () => {
 
   it('CSP 落在 index.html 的精确 location 内（否则会被该 location 的 add_header 屏蔽）', () => {
     const conf = readFileSync(FORUM_CONF, 'utf8')
-    const start = conf.indexOf('location = /forum/index.html')
-    expect(start, 'forum.conf 缺少 index.html location').toBeGreaterThan(-1)
-    const rest = conf.slice(start)
-    const block = rest.slice(0, rest.indexOf('}'))
+    const block = locationBlock(conf, 'location = /forum/index.html')
+    expect(block, 'forum.conf 缺少 index.html location').toBeTruthy()
     expect(block, 'CSP 必须写在 index.html location 里').toContain('Content-Security-Policy')
+    // 全文件只允许这一条 CSP：多写一条到 server 级/其它 location 说明下发点又漂了
+    expect(conf.match(CSP_RE) || []).toHaveLength(1)
   })
 
   it('CSP 必备指令齐全且 script-src 没有 unsafe-* / 通配符', () => {
@@ -70,7 +92,7 @@ describe('CSP 与内联脚本哈希', () => {
     expect(scriptSrc).toBeTruthy()
     expect(scriptSrc).not.toContain('unsafe-inline')
     expect(scriptSrc).not.toContain('unsafe-eval')
-    expect(scriptSrc).not.toContain(' *')
+    expect(scriptSrc).not.toMatch(/\*/)
   })
 
   it('CSP 放行 Cloudflare Web Analytics 信标（否则每页都会报 script 被拦截）', () => {
@@ -94,10 +116,8 @@ describe('CSP 与内联脚本哈希', () => {
 
   it('uploads location 带 4 个安全头且都是 always', () => {
     const conf = readFileSync(FORUM_CONF, 'utf8')
-    const start = conf.indexOf('location ^~ /forum/uploads/')
-    expect(start, 'forum.conf 缺少 uploads location').toBeGreaterThan(-1)
-    const rest = conf.slice(start)
-    const uploadsBlock = rest.slice(0, rest.indexOf('}'))
+    const uploadsBlock = locationBlock(conf, 'location ^~ /forum/uploads/')
+    expect(uploadsBlock, 'forum.conf 缺少 uploads location').toBeTruthy()
     for (const header of [
       'add_header X-Content-Type-Options "nosniff" always;',
       'add_header X-Frame-Options "SAMEORIGIN" always;',
@@ -110,9 +130,16 @@ describe('CSP 与内联脚本哈希', () => {
     expect(uploadsBlock).not.toContain('Content-Security-Policy')
   })
 
-  it('deploy.sh 含 CSP 与 uploads 头断言', () => {
+  it('deploy.sh 含 CSP 与 uploads 头断言（按唯一串断言，避免恒真）', () => {
     const script = readFileSync(DEPLOY_SH, 'utf8')
     expect(script).toContain('content-security-policy')
-    expect(script).toContain('/forum/uploads/')
+    // 哈希必须现算并与响应头比对（只查前缀的写法抓不到「改脚本忘改哈希」）
+    expect(script).toContain("grep -io 'sha256-")
+    expect(script).toContain('openssl dgst -sha256')
+    expect(script).toContain('expected_script_src=')
+    expect(script).toContain('expected_connect_src=')
+    // 这行 die 文案只出现在 uploads 断言循环里，是「断言还在」的唯一可靠证据
+    expect(script).toContain('uploads location 缺少安全响应头')
+    expect(script).toContain('for expected_header in')
   })
 })

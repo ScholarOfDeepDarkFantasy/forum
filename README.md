@@ -154,7 +154,7 @@ http://raspi/forum/            nginx :80
 两个对外入口：
 
 - 内网：`http://raspi/forum/`（`server_name raspi`，`deploy/nginx/forum.conf` 片段）
-- 公网：`https://treenewbee.men/forum/`（Cloudflare Tunnel → cloudflared → 本机 nginx 的 `deploy/nginx/public.conf`）；该 server 块只 `include` 论坛片段、只暴露 `/forum/`，源站对明文请求返回 308 到 https 并下发 HSTS 等 4 个安全响应头。第十轮验收记录见 [`docs/DEVELOPMENT.md` §4.15](docs/DEVELOPMENT.md)。
+- 公网：`https://treenewbee.men/forum/`（Cloudflare Tunnel → cloudflared → 本机 nginx 的 `deploy/nginx/public.conf`）；该 server 块只 `include` 论坛片段、只暴露 `/forum/`，源站对明文请求返回 308 到 https，并下发 HSTS、X-Content-Type-Options、X-Frame-Options、Referrer-Policy 与 `Content-Security-Policy`（内联主题脚本按 SHA-256 精确放行，第十一轮补）。第十轮验收记录见 [`docs/DEVELOPMENT.md` §4.15](docs/DEVELOPMENT.md)。
 
 相关文件：
 

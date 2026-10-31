@@ -223,21 +223,41 @@ public_stream_code="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Ho
     || die "经公网 Host 访问 SSE 返回 $public_stream_code（应为 401）"
 
 # 公网 HTML 必须带强制 CSP：script-src 只允许 self + 内联主题脚本的 SHA-256。
-# 三个断言分别覆盖「头存在」「哈希存在」「script-src/style-src 结构正确」，
-# 改 index.html 内联脚本却忘了同步哈希时，部署会在这里失败。
+# 这里不仅查结构，还会现算首页内联脚本的 SHA-256 与响应头比对 —— 改了 index.html
+# 却忘同步哈希时，部署会在这里失败。默认构建 RUN_TESTS=false 不跑 csp.spec.js，
+# 所以这条部署期校验是哈希失配的最后一道闸（csp.spec.js 只在显式开启测试时生效）。
 public_csp="$(curl -sS --max-time 5 -I -H 'Host: treenewbee.men' "http://127.0.0.1/forum/" | tr -d '\r' || true)"
 echo "$public_csp" | grep -qi '^content-security-policy:.*default-src' \
     || die "公网 /forum/ 缺少 Content-Security-Policy（实际：$(printf '%s\n' "$public_csp" | grep -i '^content-security-policy' || echo '无该头')）"
-echo "$public_csp" | grep -qi "^content-security-policy:.*script-src 'self' 'sha256-" \
-    || die "公网 CSP 的 script-src 未使用内联脚本 SHA-256（检查 forum.conf 与 frontend/index.html 是否同步）"
-echo "$public_csp" | grep -qi "content-security-policy:.*script-src 'self' 'sha256-[^']*'[^;]*; style-src 'self' 'unsafe-inline'" \
-    || die "公网 CSP 结构异常（应为 script-src 'self' 'sha256-…' [允许的额外主机]; style-src 'self' 'unsafe-inline'）"
-# CF 免费版会给 HTML 注入 Web Analytics 信标；CSP 必须放行该信标及其上报域名，
-# 否则每页控制台都会报 script 被拦截（真实访问者看到的是“报错”，不是功能故障）。
-echo "$public_csp" | grep -qi "script-src 'self' 'sha256-[^']*'[^;]*https://static\.cloudflareinsights\.com" \
-    || die "公网 CSP 未放行 Cloudflare Web Analytics 信标（static.cloudflareinsights.com），每页会报 CSP 违规"
-echo "$public_csp" | grep -qi "connect-src 'self'[^;]*https://cloudflareinsights\.com" \
-    || die "公网 CSP 未放行 Cloudflare Web Analytics 上报域名（cloudflareinsights.com）"
+csp_hash="$(printf '%s\n' "$public_csp" | grep -io 'sha256-[A-Za-z0-9+/=]*' | head -1 || true)"
+[ -n "$csp_hash" ] \
+    || die "公网 CSP 的 script-src 没有 sha256- 哈希（检查 forum.conf / public.conf 的 CSP）"
+
+# 现算首页内联主题脚本的哈希（<script> … </script> 之间的原始字节，含换行与缩进），
+# 与响应头里的哈希逐字比对；这一条能抓住「改脚本忘改哈希」而前缀检查抓不到的情况。
+public_html="$(curl -sS --max-time 5 -H 'Host: treenewbee.men' "http://127.0.0.1/forum/" || true)"
+inline_js="$(printf '%s' "$public_html" | perl -0777 -ne 'print $1 if /<script>(.*?)<\/script>/s' || true)"
+[ -n "$inline_js" ] \
+    || die "公网 /forum/ 首页没有内联主题脚本（frontend/index.html 是否被改成外链？CSP 哈希将失效）"
+actual_hash="sha256-$(printf '%s' "$inline_js" | openssl dgst -sha256 -binary | openssl base64 -A)"
+[ "$actual_hash" = "$csp_hash" ] \
+    || die "公网 CSP 哈希与页面内联脚本不一致（CSP: $csp_hash，实际: $actual_hash；改 index.html 后要同步 forum.conf/public.conf）"
+
+# script-src / connect-src 必须是预期值：精确匹配可同时挡住「偷塞 'unsafe-inline'」「把
+# CF 信标换成 cloudflareinsights.com.evil.com」这类只在尾部追加的绕过写法。
+script_src="$(printf '%s\n' "$public_csp" | sed -n 's/.*\(script-src [^;]*\).*/\1/p' | head -1)"
+connect_src="$(printf '%s\n' "$public_csp" | sed -n 's/.*\(connect-src [^;]*\).*/\1/p' | head -1)"
+style_src="$(printf '%s\n' "$public_csp" | sed -n 's/.*\(style-src [^;]*\).*/\1/p' | head -1)"
+expected_script_src="script-src 'self' '$csp_hash' https://static.cloudflareinsights.com"
+[ "$script_src" = "$expected_script_src" ] \
+    || die "公网 CSP 的 script-src 不是预期值（实际：${script_src:-空}；预期：$expected_script_src）"
+expected_connect_src="connect-src 'self' https://cloudflareinsights.com"
+[ "$connect_src" = "$expected_connect_src" ] \
+    || die "公网 CSP 的 connect-src 不是预期值（实际：${connect_src:-空}；预期：$expected_connect_src）"
+expected_style_src="style-src 'self' 'unsafe-inline'"
+[ "$style_src" = "$expected_style_src" ] \
+    || die "公网 CSP 的 style-src 不是预期值（实际：${style_src:-空}；预期：$expected_style_src）"
+log "CSP 校验通过：哈希与首页内联脚本一致（$csp_hash），script/connect/style-src 结构符合预期"
 
 # 上传目录（图片）也必须带全套安全头；用一个不存在的文件名，验证 add_header 的
 # always 生效（404 也下发）。这里只看头，不看状态码。

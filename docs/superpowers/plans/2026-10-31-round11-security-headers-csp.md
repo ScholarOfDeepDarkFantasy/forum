@@ -265,7 +265,7 @@ Jenkins 触发构建（预计 #28）；轮询 `Finished: SUCCESS`，记录构建
 - `curl -sI -H 'Host: treenewbee.men' http://127.0.0.1/forum/` → 含 CSP。
 - `curl -sI -H 'Host: raspi' http://127.0.0.1/forum/uploads/__probe_missing__.png` → 404 + 4 头。
 - 公网 `curl -sI https://treenewbee.men/forum/` → CSP + 原 4 头。
-- `deploy.sh` 在 Jenkins 日志里 15 组断言全过（若失败，先看部署日志里的 `[deploy][ERROR]`）。
+- `deploy.sh` 在 Jenkins 日志里断言全部通过（含 CSP 存在/结构/哈希现算比对、信标放行；若失败，先看部署日志里的 `[deploy][ERROR]`）。
 
 **Step 4-4** Playwright 无违规验证（本机 Chromium/Edge，经隧道或直接公网）：
 
@@ -280,7 +280,7 @@ Jenkins 触发构建（预计 #28）；轮询 `Finished: SUCCESS`，记录构建
 
 **Step 5-1** `docs/DEVELOPMENT.md`：
 
-- 新增 §4.16「第十一轮：安全头收敛与 CSP（2026-10-31）」，含：背景、改动表（3 文件）、CSP 策略值与各指令理由、内联脚本哈希方案与守护测试、uploads 补齐、HSTS 决策、验证矩阵 V1–V9、构建记录、已知限制（style-src 'unsafe-inline'、无 CSP 上报、哈希需手工同步但有测试、CF 设置手工）、上线验收段（先写 `⟨待回填⟩`，Task 5-4 填）。
+- 新增 §4.16「第十一轮：安全头收敛与 CSP（2026-10-31）」，含：背景、改动表（4 文件：forum.conf、public.conf、deploy.sh、csp.spec.js）、CSP 策略值与各指令理由、内联脚本哈希方案与守护测试、uploads 补齐、HSTS 决策、验证矩阵 V1–V9、构建记录、已知限制（style-src 'unsafe-inline'、无 CSP 上报、哈希需手工同步但有测试、CF 设置手工）、上线验收段（先写 `⟨待回填⟩`，Task 5-4 填）。
 - §3.2 前端基线 323→328、32→33 spec。
 - §5.2 候选更新（去掉「CSP」条，补「CSP Report 收集」与「CF 设置 IaC」）。
 - §8 变更日志插 5 行（本轮 5 提交）。
@@ -325,7 +325,7 @@ git commit -m "docs: 记录第十一轮安全头收敛与 CSP"
 - [x] B.5 uploads 404 带 4 头
 - [x] B.6 详情页/管理页/搜索页 Playwright 无 CSP 违规，暗色与头像正常
 - [x] B.7 SSE 401 不回归
-- [x] B.8 `deploy.sh` 15/15 组断言通过
+- [x] B.8 `deploy.sh` 全部断言通过（含 CSP 哈希现算比对与信标放行）
 - [x] B.9 回滚演练：删 CSP 两行 + 重跑部署可恢复（只记录方法，不实际执行全网回滚）
 - [x] B.10 远端 == HEAD、工作区干净
 
@@ -349,7 +349,7 @@ git commit -m "docs: 记录第十一轮安全头收敛与 CSP"
 
 1. **CSP 落错位置**（Build #28）：首版实现对 nginx conf 用「第一次出现的 HSTS 行 + `}`」做文本替换，CSP 被插进了 uploads 块；`index.html` location 自己写 `add_header` 会屏蔽 server 级，公网 HTML 实际没有 CSP。修复：改为先定位 `location = /forum/index.html` 再替换，并新增 2 条 spec（CSP 必须在 index location、uploads 不得有 CSP）。教训记入 `docs/DEVELOPMENT.md` §4.16。
 2. **Cloudflare Web Analytics 信标**：公网实测发现 CF 免费版注入 `static.cloudflareinsights.com/beacon.min.js`，严格 CSP 下每页控制台报违规。决定显式放行该主机与上报域名 `cloudflareinsights.com`（并在 `deploy.sh` 里断言放行，防误删），而非关闭 CF 的 Web Analytics（面板项不在仓库内）。
-3. **部署断言收紧**（Build #30）：`script-src` 结构断言原本要求哈希后直接跟 `;`，放行额外主机后失效。改为允许哈希后出现白名单主机，并新增信标放行断言；`deploy.sh` 断言组数从 13 组升到 15 组（CSP 结构组 + 信标放行组）。
+3. **部署断言收紧**（Build #30）：`script-src` 结构断言原本要求哈希后直接跟 `;`，放行额外主机后失效。改为允许哈希后出现白名单主机，并新增信标放行断言。最终部署期不靠「组数」计数，而是新增 CSP 存在、结构、**页面哈希现算比对**、信标主机锚定、uploads 4 头等断言（脚本输出为「全部断言通过」，文档不再写具体组数）。
 4. **前端测试数**：计划写 328/33（新增 5 条），实际 `csp.spec.js` 最终 7 条 → **330 / 33 spec**；`docs/DEVELOPMENT.md`、`README.md` 按实际回填。
 5. **HSTS `includeSubDomains`**：评估结论是不加（该域名下还有内网应用 `/imageweb/` 等），记入 §4.16 与部署手册。
 6. **验收顺序**：限流相关断言本轮不涉及；V10（锁 IP）本轮未重跑，沿用第十轮结果，避免再次锁验收机 15 分钟。
