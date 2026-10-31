@@ -2,7 +2,7 @@ import { test, expect } from './support/fixtures.js'
 
 test.describe('帖子详情', () => {
   test('渲染标题、Markdown 与点赞按钮', async ({ page, e2e }) => {
-    await page.goto(`/posts/${e2e.postId}`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`posts/${e2e.postId}`, { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('heading', { level: 1, name: e2e.title })).toBeVisible()
 
     const body = page.locator('.markdown-body')

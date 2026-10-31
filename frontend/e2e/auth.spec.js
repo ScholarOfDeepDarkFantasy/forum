@@ -3,7 +3,7 @@ import { test, expect } from './support/fixtures.js'
 test.describe('登录与登出', () => {
   // 错误密码在 dev 构建下会让 Vue 把未捕获的 401 重抛成 pageerror，用 annotation 精确声明预期。
   test('错误密码提示后端文案', { annotation: { type: 'expected-login-401' } }, async ({ page, e2e }) => {
-    await page.goto('/login', { waitUntil: 'domcontentloaded' })
+    await page.goto('login', { waitUntil: 'domcontentloaded' })
     await page.getByPlaceholder('用户名').fill(e2e.credentials.username)
     await page.getByPlaceholder('密码').fill(`${e2e.credentials.password}-wrong`)
     await page.locator('form .submit').click()
@@ -11,7 +11,7 @@ test.describe('登录与登出', () => {
   })
 
   test('正确密码登录后显示用户菜单，登出后清理本地状态', async ({ page, e2e }) => {
-    await page.goto('/login', { waitUntil: 'domcontentloaded' })
+    await page.goto('login', { waitUntil: 'domcontentloaded' })
     await page.getByPlaceholder('用户名').fill(e2e.credentials.username)
     await page.getByPlaceholder('密码').fill(e2e.credentials.password)
     await page.locator('form .submit').click()

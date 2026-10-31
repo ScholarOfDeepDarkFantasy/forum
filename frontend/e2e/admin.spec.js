@@ -2,13 +2,13 @@ import { test, expect } from './support/fixtures.js'
 
 test.describe('管理后台', () => {
   test('板块表格可见，删除确认框可取消', async ({ page, e2e }) => {
-    await page.goto('/login', { waitUntil: 'domcontentloaded' })
+    await page.goto('login', { waitUntil: 'domcontentloaded' })
     await page.getByPlaceholder('用户名').fill(e2e.credentials.username)
     await page.getByPlaceholder('密码').fill(e2e.credentials.password)
     await page.locator('form .submit').click()
     await expect(page.locator('.header .username')).toBeVisible()
 
-    await page.goto('/admin', { waitUntil: 'domcontentloaded' })
+    await page.goto('admin', { waitUntil: 'domcontentloaded' })
     const boardTable = page.locator('.el-table').first()
     await expect(boardTable.getByText('帖子数', { exact: true })).toBeVisible()
 
