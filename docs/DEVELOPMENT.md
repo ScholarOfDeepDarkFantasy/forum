@@ -928,10 +928,13 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 - 依赖后端可达；后端未起时错误信息会带 `BASE_URL` 与服务未启动提示。
 - `consoleGuard` 只拦 CSP 文案与 pageerror，不拦普通 `console.error`；白名单按 test 级 annotation 生效，不要上提到 describe 或复用到其他 401 用例。
 
-**上线验收（待回填）**
+**上线验收（Build #36，镜像 `forum-backend:36`）**
 
-- 本地 8 passed、公网 8 passed、Vitest 330/33、后端 177/21。
-- 明确记录公网运行所用构建号与镜像号（回填本轮 docs 提交触发的构建）。
+- 本地：`pnpm test:e2e`（`E2E_CHANNEL=msedge` + `pnpm dev` + 本地后端）**8 passed (19.8 s)**。
+- 公网：`E2E_BASE_URL=https://treenewbee.men/forum/` + 真实 admin 凭据 + `E2E_CHANNEL=msedge`，对 Build #36 部署复跑 **8 passed (50.6 s)**（`[E2E] worker 0: board=1 post=47`）。
+- 清理：跑完 `GET /api/posts?keyword=E2E 冒烟` 的 `totalElements=0`；帖子为软删除留痕，板块复用真实库板块 1（未新建）。
+- 回归：Vitest `33 spec / 330 用例` 全绿；后端 `177 / 0 / 0 / 1`（21 类）；`pnpm build` + `check:bundle` 五项在预算内。
+- 构建：`c18304d`（本次 docs 提交）触发 Jenkins **Build #36 SUCCESS**，镜像 `forum-backend:36` `Up (healthy)`，`/api/health` 200。
 
 ## 5. 待办与后续计划
 
@@ -1048,7 +1051,8 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-31 | docs | 记录第十二轮前端 E2E 骨架（§4.17、基线不变、T3 关闭 / T20 新增） | 本次提交 |
+| 2026-10-31 | docs | 回填第十二轮外网 E2E 冒烟与构建（Build #36 / 镜像 36） | 本次提交 |
+| 2026-10-31 | docs | 记录第十二轮前端 E2E 骨架（§4.17、基线不变、T3 关闭 / T20 新增） | `c18304d` |
 | 2026-10-31 | fix | 修正 E2E 公网子路径解析与空库清理副作用（相对路径、板块保留、远程凭据硬失败、failOnFlakyTests） | `38913f4` |
 | 2026-10-31 | test | E2E 覆盖管理页与删除确认框 | `e3b7057` |
 | 2026-10-31 | test | E2E 覆盖主题、帖子详情与登录登出 | `14a9e97` |

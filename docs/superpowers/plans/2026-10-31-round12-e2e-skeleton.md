@@ -845,9 +845,9 @@ docs: 回填第十二轮外网 E2E 冒烟与构建
 - [x] `frontend/dist` 未被提交。
 
 ### B.6 Jenkins 构建
-- [ ] 推送后 Jenkins 触发成功。
-- [ ] `pnpm install --frozen-lockfile` 通过（lock 与 package.json 一致）。
-- [ ] Build Frontend（build + check:bundle）通过；记录 Build 号、镜像 tag、`Finished: SUCCESS`。
+- [x] 推送后 Jenkins 触发成功。
+- [x] `pnpm install --frozen-lockfile` 通过（lock 与 package.json 一致）。
+- [x] Build Frontend（build + check:bundle）通过；记录 Build 号、镜像 tag、`Finished: SUCCESS`。
 
 ## 12. 实施记录与偏差
 
@@ -863,15 +863,15 @@ docs: 回填第十二轮外网 E2E 冒烟与构建
 | 3 | `test(e2e): 覆盖主题、帖子详情与登录登出` | `14a9e97` | 3 文件 +73 |
 | 4 | `test(e2e): 覆盖管理页与删除确认框` | `e3b7057` | 1 文件 +31 |
 | — | （计划外）`fix(e2e): 修正公网子路径解析与空库清理副作用` | `38913f4` | 7 文件 +74/−25（审查 C1/C2/I1–I4） |
-| 5 | `docs: 记录第十二轮前端 E2E 骨架` | 待回填 | 本次提交 |
-| 6 | `docs: 回填第十二轮外网 E2E 冒烟与构建` | 待回填 | 构建号回填 |
+| 5 | `docs: 记录第十二轮前端 E2E 骨架` | `c18304d` | 4 文件 +144/−42 |
+| 6 | `docs: 回填第十二轮外网 E2E 冒烟与构建` | 本次提交 | 触发 Build #37 |
 
 | 构建/运行 | 编号 | 结果 |
 | --- | --- | --- |
-| Jenkins Build | 待回填 | 待回填 |
-| 镜像 tag | 待回填 | 待回填 |
+| Jenkins Build | #36（`c18304d`） | SUCCESS；回填提交触发 #37 |
+| 镜像 tag | `forum-backend:36` | `Up (healthy)`，`/api/health` 200 |
 | 本地 E2E | — | 8 passed / 19.8 s |
-| 公网 E2E | — | 8 passed / 48.0 s（Build #35 部署） |
+| 公网 E2E | — | 8 passed / 50.6 s（对 Build #36 部署复跑） |
 
 ### 12.2 偏差与决定
 

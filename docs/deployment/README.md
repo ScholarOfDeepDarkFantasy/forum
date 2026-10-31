@@ -365,12 +365,16 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|
 >
 > ```bash
 > cd frontend
-> E2E_BASE_URL=https://treenewbee.men/forum/ > E2E_ADMIN_USERNAME=admin E2E_ADMIN_PASSWORD='<真实密码>' > E2E_CHANNEL=msedge pnpm test:e2e
+> E2E_BASE_URL=https://treenewbee.men/forum/ E2E_ADMIN_USERNAME=admin \n> E2E_ADMIN_PASSWORD='<真实密码>' E2E_CHANNEL=msedge pnpm test:e2e
 > # 期望 8 passed；结束时 worker 清理会删掉本轮帖子
 > ```
 >
 > E2E 会写真实库（帖子软删除留痕）、用真实 admin 账号登出（会让该账号 `token_version +1`），因此**不要与线上用户/其他 E2E 并行**。
 > 空库首次运行会自动创建并保留一个「E2E 板块」——这是软删除 + 外键的必然结果，不要手工删除。
+
+> **2026-10-31 验收实测（Build #36，镜像 `forum-backend:36`）**：本地 `8 passed (19.8 s)`；公网对 Build #36 部署复跑
+> `8 passed (50.6 s)`（`[E2E] worker 0: board=1 post=47`）；跑完 `GET /api/posts?keyword=E2E 冒烟` 的 `totalElements=0`，
+> 帖子已清理（软删除留痕），未新建板块（复用真实库板块 1）。
 
 ## 6. 排障
 
