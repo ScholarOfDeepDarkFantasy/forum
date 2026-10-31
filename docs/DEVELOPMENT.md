@@ -953,7 +953,9 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | Minor（构建号/耗时口径、`c18304d` 表述） | 按「首次 #35 / 验收 #36」区分，计划 §12 同步 |
 
 - 修复后本地 E2E：**8 passed (18.7 s)**；`--list` 仍为 8 tests / 5 files。
+- 修复后公网复核（对 Build #37 部署跑加固版用例）：**8 passed (1.1 m)**；`[E2E] worker 0: board=1 post=55`，跑完 `keyword=E2E 冒烟` 的 `totalElements=0`。
 - 最终代码基线：Vitest 330/33、后端 177/21 类/1 skip、`pnpm build` + `check:bundle` 不变。
+- 构建：`bbb9e43` 触发 **Build #38 SUCCESS**，镜像 `forum-backend:38` `Up (healthy)`。
 
 ## 5. 待办与后续计划
 
@@ -1070,7 +1072,8 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-31 | test | 加固 E2E 断言：板块筛选、取消不删数据、清理 404、白名单 annotation | 本次提交 |
+| 2026-10-31 | docs | 回填第十二轮 E2E 加固与构建 #38 | 本次提交 |
+| 2026-10-31 | test | 加固 E2E 断言：板块筛选、取消不删数据、清理 404、白名单 annotation | `bbb9e43` |
 | 2026-10-31 | docs | 回填第十二轮外网 E2E 冒烟与构建（Build #36 / 镜像 36） | `90cc735` |
 | 2026-10-31 | docs | 记录第十二轮前端 E2E 骨架（§4.17、基线不变、T3 关闭 / T20 新增） | `c18304d` |
 | 2026-10-31 | fix | 修正 E2E 公网子路径解析与空库清理副作用（相对路径、板块保留、远程凭据硬失败、failOnFlakyTests） | `38913f4` |
