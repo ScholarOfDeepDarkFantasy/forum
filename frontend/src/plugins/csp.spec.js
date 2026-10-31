@@ -73,6 +73,17 @@ describe('CSP 与内联脚本哈希', () => {
     expect(scriptSrc).not.toContain(' *')
   })
 
+  it('CSP 放行 Cloudflare Web Analytics 信标（否则每页都会报 script 被拦截）', () => {
+    const [csp] = cspValues(FORUM_CONF)
+    expect(csp, 'forum.conf 缺少 CSP').toBeTruthy()
+    const directives = csp.split(';').map((part) => part.trim())
+    const scriptSrc = directives.find((part) => part.startsWith('script-src'))
+    const connectSrc = directives.find((part) => part.startsWith('connect-src'))
+    // CF 免费版默认给 HTML 注入 beacon.min.js；不放行会在控制台每页报 CSP 违规
+    expect(scriptSrc).toContain('https://static.cloudflareinsights.com')
+    expect(connectSrc).toContain('https://cloudflareinsights.com')
+  })
+
   it('forum.conf 与 public.conf 的 CSP 逐字相同', () => {
     const [forumCsp] = cspValues(FORUM_CONF)
     const [publicCsp] = cspValues(PUBLIC_CONF)
