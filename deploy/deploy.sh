@@ -222,6 +222,30 @@ public_stream_code="$(curl --max-time 5 -s -o /dev/null -w '%{http_code}' -H 'Ho
 [ "$public_stream_code" = "401" ] \
     || die "经公网 Host 访问 SSE 返回 $public_stream_code（应为 401）"
 
+# 公网 HTML 必须带强制 CSP：script-src 只允许 self + 内联主题脚本的 SHA-256。
+# 三个断言分别覆盖「头存在」「哈希存在」「script-src/style-src 结构正确」，
+# 改 index.html 内联脚本却忘了同步哈希时，部署会在这里失败。
+public_csp="$(curl -sS --max-time 5 -I -H 'Host: treenewbee.men' "http://127.0.0.1/forum/" | tr -d '\r' || true)"
+echo "$public_csp" | grep -qi '^content-security-policy:.*default-src' \
+    || die "公网 /forum/ 缺少 Content-Security-Policy（实际：$(printf '%s\n' "$public_csp" | grep -i '^content-security-policy' || echo '无该头')）"
+echo "$public_csp" | grep -qi "^content-security-policy:.*script-src 'self' 'sha256-" \
+    || die "公网 CSP 的 script-src 未使用内联脚本 SHA-256（检查 forum.conf 与 frontend/index.html 是否同步）"
+echo "$public_csp" | grep -qi "content-security-policy:.*script-src 'self' 'sha256-[^']*'; style-src 'self' 'unsafe-inline'" \
+    || die "公网 CSP 结构异常（应为 script-src 'self' 'sha256-…'; style-src 'self' 'unsafe-inline'）"
+
+# 上传目录（图片）也必须带全套安全头；用一个不存在的文件名，验证 add_header 的
+# always 生效（404 也下发）。这里只看头，不看状态码。
+uploads_probe="$(curl -sS --max-time 5 -I -H 'Host: raspi' "http://127.0.0.1/forum/uploads/__probe_missing__.png" | tr -d '\r' || true)"
+for expected_header in \
+    '^x-content-type-options: nosniff' \
+    '^x-frame-options: SAMEORIGIN' \
+    '^referrer-policy: strict-origin-when-cross-origin' \
+    '^strict-transport-security: max-age=31536000'
+do
+    printf '%s\n' "$uploads_probe" | grep -qi "$expected_header" \
+        || die "uploads location 缺少安全响应头 $expected_header（实际：$(printf '%s\n' "$uploads_probe" | grep -i '^\(x-\|referrer\|strict\)' | tr '\n' ';')）"
+done
+
 # SSE 订阅端点必须由后端回答 401（ticket 缺失），而不是落到 SPA 的 index.html（200）：
 # 若 nginx 精确匹配缺失，请求会被 try_files 兜到 /forum/index.html，这里会拿到 200；
 # 后端未更新或未起则可能是 404/502 —— 三者都说明「实时通知不可用」，部署应立刻失败
