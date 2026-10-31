@@ -862,10 +862,13 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 - API 的 401（含 SSE 401）由 `snippet` 内层 `location /forum/api/` 返回，不带 CSP（JSON 不渲染，影响低）。
 - 部署序：CSP 与静态资源 must 同步上线；先上 CSP 后上新前端会因旧 index.html 的哈希变化被拦，所以 `deploy.sh` 断言失败即视为部署失败（当前流水线即如此）。
 
-**上线验收（Build #32/#33，见回填）**
+**上线验收（Build #32，镜像 `localhost/forum-backend:32`）**
 
-- 本地全量：后端 177 / 21 类（1 skipped）、前端 33 spec / 330 用例；`pnpm build` + `check:bundle` 通过。
-- 公网 V1–V9 全部复测；`deploy.sh` 15/15；远端 master == 本地 HEAD。
+- 本地全量：后端 `177 / 0 / 0 / 1`（21 类）、前端 `33 spec / 330 用例`；`VITE_BASE_PATH=/forum/ pnpm build` 通过（入口 84.43 kB / gzip 31.34，JS 总量 835.87 kB、CSS 181.57 kB，无 >500 kB 告警）；`pnpm check:bundle` exit 0。
+- Build #32 部署日志：`deploy.sh` 15/15 组断言通过（含新增 CSP 3 条与信标放行 2 条）、`部署完成：http://raspi/forum/ （镜像 localhost/forum-backend:32）`、容器 `localhost/forum-backend:32 Up ... (healthy)`。
+- 公网复核（Build #32 部署后）：`/forum/` 200，一条 `Cache-Control: no-cache` + 4 个安全头 + 完整 CSP（含哈希与 `static.cloudflareinsights.com`）；`/forum/posts/1` CSP 1 条；`Host: raspi` 1 条；uploads 404 带 4 头且 CSP 计数 0；asset `index-Dm2pwhnr.js` 200 + 单条 immutable、无 CSP；`/forum/api/health` `status=UP`；SSE 401。
+- 浏览器复核（Build #31，配置与 #32 相同）：Playwright（Chromium/Edge）按 V6 六项全过，CSP 违规 0 条，控制台仅点「取消」的 `cancel`。
+- 远端 master == 本地 HEAD；本次回填提交触发 Build #33（docs-only 重建，镜像 33）。
 
 ## 5. 待办与后续计划
 
@@ -979,7 +982,8 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-31 | docs | 记录第十一轮安全头收敛与 CSP（§4.16、测试基线 330/33、CF 信标放行） | 本次提交 |
+| 2026-10-31 | docs | 回填第十一轮构建与上线验收（Build #32、镜像 32、V1–V9、15/15 断言） | 本次提交 |
+| 2026-10-31 | docs | 记录第十一轮安全头收敛与 CSP（§4.16、测试基线 330/33、CF 信标放行） | `ea42624` |
 | 2026-10-31 | fix | 放宽 CSP 部署断言以允许放行 CF 信标 | `bd24453` |
 | 2026-10-31 | fix | CSP 放行 Cloudflare Web Analytics 信标 | `db88a9f` |
 | 2026-10-31 | fix | 把 CSP 下发点修正到 HTML location | `0c897c9` |

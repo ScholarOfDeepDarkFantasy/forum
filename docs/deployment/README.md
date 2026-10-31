@@ -352,10 +352,11 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|
 | Rocket Loader | 关 | 会改写页面脚本、破坏 CSP 哈希且拖慢首屏 |
 | Brotli | 开（若有） | 与源站 gzip 不冲突 |
 
-> **2026-10-31 第十一轮验收（Build #31，镜像 `forum-backend:31`；待回填 Build #32/#33）**：公网 `/forum/` 200 +
+> **2026-10-31 第十一轮验收（Build #32，镜像 `forum-backend:32`）**：公网 `/forum/` 200 +
 > 4 个安全头 + 完整 CSP；`/forum/posts/1` 与内网 `Host: raspi` 各 1 条 CSP；uploads 404 带 4 头、CSP 计数 0；
 > asset 200 + 单条 immutable、无 CSP；SSE 401；`deploy.sh` 15/15 组断言通过；Playwright（Chromium/Edge）六项渲染回归，
-> CSP 违规 0 条，控制台仅点「取消」时的 `cancel`。
+> CSP 违规 0 条，控制台仅点「取消」时的 `cancel`。回填提交 `ea42624` 触发 Build #32（镜像 32）与
+> 本次 docs 回填提交触发 Build #33，两者均为 docs-only 重建，产物与断言结果不变。
 
 ## 6. 排障
 

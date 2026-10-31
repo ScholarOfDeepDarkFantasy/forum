@@ -342,14 +342,14 @@ git commit -m "docs: 记录第十一轮安全头收敛与 CSP"
 | 3 | `0c897c9` | 把 CSP 移到 `location = /forum/index.html`；spec 扩到 6 条 | **Build #29 SUCCESS**（镜像 29） |
 | 4 | `db88a9f` | 放行 CF Web Analytics 信标（`static.cloudflareinsights.com` + 上报域） | **Build #30 FAILURE**：`公网 CSP 结构异常`（`deploy.sh` 的 `script-src` 结构断言过严） |
 | 5 | `bd24453` | 放宽结构断言 + 2 条信标放行断言 | **Build #31 SUCCESS**（镜像 31） |
-| 6 | 本次 docs 提交 | `docs: 记录第十一轮安全头收敛与 CSP` | Build #32 |
-| 7 | 回填提交 | `docs: 回填第十一轮构建与上线验收` | Build #33 |
+| 6 | `ea42624` | `docs: 记录第十一轮安全头收敛与 CSP` | Build #32 SUCCESS（镜像 32） |
+| 7 | 本次回填提交 | `docs: 回填第十一轮构建与上线验收` | Build #33（docs-only 重建） |
 
 ### 12.2 偏差与决定
 
 1. **CSP 落错位置**（Build #28）：首版实现对 nginx conf 用「第一次出现的 HSTS 行 + `}`」做文本替换，CSP 被插进了 uploads 块；`index.html` location 自己写 `add_header` 会屏蔽 server 级，公网 HTML 实际没有 CSP。修复：改为先定位 `location = /forum/index.html` 再替换，并新增 2 条 spec（CSP 必须在 index location、uploads 不得有 CSP）。教训记入 `docs/DEVELOPMENT.md` §4.16。
 2. **Cloudflare Web Analytics 信标**：公网实测发现 CF 免费版注入 `static.cloudflareinsights.com/beacon.min.js`，严格 CSP 下每页控制台报违规。决定显式放行该主机与上报域名 `cloudflareinsights.com`（并在 `deploy.sh` 里断言放行，防误删），而非关闭 CF 的 Web Analytics（面板项不在仓库内）。
-3. **部署断言收紧**（Build #30）：`script-src` 结构断言原本要求哈希后直接跟 `;`，放行额外主机后失效。改为允许哈希后出现白名单主机，并新增信标放行断言；`deploy.sh` 组数从 13 组升到 15 组。
+3. **部署断言收紧**（Build #30）：`script-src` 结构断言原本要求哈希后直接跟 `;`，放行额外主机后失效。改为允许哈希后出现白名单主机，并新增信标放行断言；`deploy.sh` 断言组数从 13 组升到 15 组（CSP 结构组 + 信标放行组）。
 4. **前端测试数**：计划写 328/33（新增 5 条），实际 `csp.spec.js` 最终 7 条 → **330 / 33 spec**；`docs/DEVELOPMENT.md`、`README.md` 按实际回填。
 5. **HSTS `includeSubDomains`**：评估结论是不加（该域名下还有内网应用 `/imageweb/` 等），记入 §4.16 与部署手册。
 6. **验收顺序**：限流相关断言本轮不涉及；V10（锁 IP）本轮未重跑，沿用第十轮结果，避免再次锁验收机 15 分钟。
