@@ -61,19 +61,24 @@ export async function bootstrapData() {
   const token = auth.token
 
   let boardId
+  let boardName
   let boardCreated = false
   const boards = await request('/boards', { token })
   if (Array.isArray(boards) && boards.length > 0) {
     if (!boards[0]?.id) throw new Error('[E2E] GET /boards 返回了没有 id 的板块')
+    if (!boards[0]?.name) throw new Error('[E2E] GET /boards 返回了没有 name 的板块（首页板块筛选需要它）')
     boardId = boards[0].id
+    boardName = boards[0].name
   } else {
+    const createdName = `E2E 板块 ${stamp}`
     const board = await request('/boards', {
       method: 'POST',
       token,
-      body: { name: `E2E 板块 ${stamp}`, description: 'Playwright 空库时自动创建，作为 E2E 专用板块保留', sortOrder: 999 },
+      body: { name: createdName, description: 'Playwright 空库时自动创建，作为 E2E 专用板块保留', sortOrder: 999 },
     })
     if (!board?.id) throw new Error('[E2E] 创建板块成功但响应里没有 id')
     boardId = board.id
+    boardName = board.name || createdName
     boardCreated = true
     console.log(`[E2E] 空库，已创建并保留 E2E 专用板块 boardId=${boardId}（软删除外键限制，无法在清理时删除）`)
   }
@@ -102,14 +107,12 @@ export async function bootstrapData() {
     } catch (err) {
       failures.push(`[E2E] 清理前重新登录失败: ${err.message}`)
     }
+    // 不把 404 当作清理成功：本轮的帖子是刚创建的，DELETE 返回 404 通常意味着
+    // base path / 路由 / postId 错了，帖子其实还在库里；吞掉就会假绿。
     const remove = async (path) => {
       try {
         await request(path, { method: 'DELETE', token: cleanupToken })
       } catch (err) {
-        if (/HTTP 404/.test(err.message)) {
-          console.log(`[E2E] ${path} 已是删除状态（404），视为清理成功`)
-          return
-        }
         failures.push(err.message)
       }
     }
@@ -124,5 +127,5 @@ export async function bootstrapData() {
     }
   }
 
-  return { boardId, postId: post.id, title, boardCreated, adminToken: token, credentials, cleanup }
+  return { boardId, boardName, postId: post.id, title, boardCreated, adminToken: token, credentials, cleanup }
 }

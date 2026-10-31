@@ -864,14 +864,15 @@ docs: 回填第十二轮外网 E2E 冒烟与构建
 | 4 | `test(e2e): 覆盖管理页与删除确认框` | `e3b7057` | 1 文件 +31 |
 | — | （计划外）`fix(e2e): 修正公网子路径解析与空库清理副作用` | `38913f4` | 7 文件 +74/−25（审查 C1/C2/I1–I4） |
 | 5 | `docs: 记录第十二轮前端 E2E 骨架` | `c18304d` | 4 文件 +144/−42 |
-| 6 | `docs: 回填第十二轮外网 E2E 冒烟与构建` | 本次提交 | 触发 Build #37 |
+| 6 | `docs: 回填第十二轮外网 E2E 冒烟与构建` | `90cc735` | 触发 Build #37 |
+| — | （计划外）`test(e2e): 加固 E2E 断言与清理严格性` | 本次提交 | 终审 I1/I2/I4/M1 修复，见 §12.4 |
 
 | 构建/运行 | 编号 | 结果 |
 | --- | --- | --- |
-| Jenkins Build | #36（`c18304d`） | SUCCESS；回填提交触发 #37 |
-| 镜像 tag | `forum-backend:36` | `Up (healthy)`，`/api/health` 200 |
-| 本地 E2E | — | 8 passed / 19.8 s |
-| 公网 E2E | — | 8 passed / 50.6 s（对 Build #36 部署复跑） |
+| Jenkins Build | #36（`c18304d`）/#37（`90cc735`） | 均 SUCCESS；本修订提交触发 #38 |
+| 镜像 tag | `forum-backend:37` | `Up (healthy)`，`/api/health` 200 |
+| 本地 E2E | — | 8 passed / 18.7 s（修复后；修复前 19.8 s） |
+| 公网 E2E | — | 首次 #35 部署 8 passed / 48.0 s；验收 #36 部署 8 passed / 50.6 s |
 
 ### 12.2 偏差与决定
 
@@ -883,7 +884,7 @@ docs: 回填第十二轮外网 E2E 冒烟与构建
 | 2026-10-31 | 任务描述称 `check:bundle` 为「60 组」，实际是 5 项体积 + 9 个 CSS 选择器 | 文档按实际脚本描述 |
 | 2026-10-31 | Playwright 实际版本 | `@playwright/test ^1.64.1`（lock 已提交）；`failOnFlakyTests` 需要 1.64+ |
 | 2026-10-31 | 实际 spec / test 数量 | 5 spec / 8 test（`--list` 8 tests in 5 files） |
-| 2026-10-31 | 公网耗时与重试次数 | 48.0 s；`retries=1` 但未触发（一次全绿） |
+| 2026-10-31 | 公网耗时与重试次数 | 首次（Build #35 部署）48.0 s、验收（Build #36 部署）50.6 s；两次 `retries=1` 均未触发 |
 | 2026-10-31 | 公网清理结果 | 帖子软删除（行在、用户不可见）；空库板块 board=1 按设计保留；`keyword=E2E 冒烟` 为 0 |
 | 2026-10-31 | 选择器兜底 | 管理页用 `.el-table`、确认框用 `.el-message-box`；dropdown `menuitem` 直接可用，无其它兜底 |
 
@@ -893,9 +894,22 @@ docs: 回填第十二轮外网 E2E 冒烟与构建
 | --- | --- | --- |
 | Playwright 版本 | `^1.x` | 1.64.1 |
 | E2E spec / test | 5 / 8 | 5 / 8 |
-| 本地 E2E 耗时 | — | 8 passed / 19.8 s（`E2E_CHANNEL=msedge`，maxWorkers=1） |
-| 公网 E2E 耗时 | — | 8 passed / 48.0 s（对 Build #35 部署，retries 未触发） |
+| 本地 E2E 耗时 | — | 8 passed / 18.7 s（修复后；`E2E_CHANNEL=msedge`，maxWorkers=1） |
+| 公网 E2E 耗时 | — | 首次 #35 48.0 s / 验收 #36 50.6 s（retries 未触发） |
 | Vitest | 330 / 33 | 330 / 33 全绿 |
 | 后端 | 177 / 21 类 / 1 skip | 177 / 21 类 / 1 skip（无 Java 改动） |
 | 构建 5 项体积 | 在预算内 | 84.43/150、39.02/70、233.74/300、835.87/950、181.57/260 kB，exit 0 |
 | 9 个 CSS 选择器 | 全覆盖 | 9/9 覆盖 |
+
+### 12.4 终审复验与修复（2026-10-31）
+
+终审对 `1eb9bd2..90cc735` 给出 CHANGES_REQUESTED，指出测试有效性缺口（非功能缺陷）：
+
+| # | 发现 | 处理 | 验证 |
+| --- | --- | --- | --- |
+| I1 | `admin.spec` 取消后只断言首行可见，删掉首行仍可能绿 | 取消前记录全部行文本，取消后断言行文本与行数不变 | 本地全量 8 passed |
+| I2 | `api.js` 把 DELETE 404 当清理成功（假绿） | 移除 404 吞掉分支，失败一律计入 | 清理后 `keyword=E2E 冒烟` totalElements=0 |
+| I3 | 部署手册命令含字面转义不能执行 | 改为真多行续行 | 人工核对 |
+| I4 | home 未真正覆盖板块筛选 | 点击本轮板块 → 断言高亮且列表只剩该板块 → 点回「全部」 | 本地全量 8 passed |
+| M1 | `cancel` 白名单全局无条件 | 改为 `expected-cancel-dialog` annotation 限定 | 文档与 fixtures 同步 |
+| C1（误报） | 认为 Build #36/#37 不可复核 | 实际已推送：`ls-remote` = `90cc735`；本地 `origin/master` 是陈旧跟踪 ref（显式 URL 推送不更新） | 已在 §4.17 写明判断方法 |

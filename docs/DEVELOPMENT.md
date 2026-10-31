@@ -897,7 +897,7 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 - **子路径解析**：公网入口是 `/forum/`，`page.goto('/login')` 会解析到站点根 `https://treenewbee.men/login`（源站只有 `/forum/`，404）。因此 `baseURL` 统一补尾斜杠，**所有 spec 的 `goto` 一律写相对路径**（`goto('./')`、`goto('login')`、`goto(\`posts/${id}\`)`）。
 - **确定性数据**：不依赖库里已有帖子；worker 级 fixture 通过 `POST /api/auth/login`、`GET/POST /api/boards`、`POST /api/posts` 造数据，标题带时间戳便于定位。空库时自动创建的「E2E 板块」**按设计保留**——帖子删除是软删除（行仍在）且有 `board_id` 外键，删板块必 500；之后每轮复用同一个板块，不再增长。清理只删本轮帖子，失败会让测试红（配合 `failOnFlakyTests`，不会被重试吞掉）。
 - **登出副作用**：`auth.spec` 走真实登出，服务端 `token_version +1` 会让 bootstrap 拿到的 token 立刻 401；因此清理前重新登录换一枚与当前版本匹配的 token。
-- **控制台守卫**：auto fixture 把 CSP 违规（`console.error` 含 `Content Security Policy`/`Refused to`）与 `pageerror` 记为测试失败；只放行两类预期噪音——(1) 删除确认框点「取消」时的 `cancel` reject；(2) 显式声明 `annotation: { type: 'expected-login-401' }` 的用例里那条 `Request failed with status code 401`（`LoginView.submit` 没有 `catch`，Vue dev 构建会把它重抛成 pageerror）。
+- **控制台守卫**：auto fixture 把 CSP 违规（`console.error` 含 `Content Security Policy`/`Refused to`）与 `pageerror` 记为测试失败；只放行两类预期噪音，且都按 test 级 annotation 生效——(1) `annotation: { type: 'expected-cancel-dialog' }` 的用例里，删除确认框点「取消」时的 `cancel` reject；(2) `annotation: { type: 'expected-login-401' }` 的用例里，那条 `Request failed with status code 401`（`LoginView.submit` 没有 `catch`，Vue dev 构建会把它重抛成 pageerror）。
 - **CI 决策**：不加入 Jenkins 默认流水线（`RUN_TESTS` 仍是可选开关），E2E 会写真实库，属于发版前手动验收，记 T20。
 - **选择器约定**：表格用 `.el-table`、确认框用 `.el-message-box`（Element Plus 未提供稳定 role），按钮尽量用 role 名（「删除」「取消」），文本断言用 `exact`。
 
@@ -905,17 +905,18 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | spec | 用例 | 断言要点 |
 | --- | --- | --- |
-| `home.spec.js` | 2 | 品牌、帖子列表（含本轮 bootstrap 帖子）、板块筛选「全部」；未登录 header 有登录入口 |
+| `home.spec.js` | 2 | 品牌、帖子列表（含本轮 bootstrap 帖子）、板块筛选（点本轮板块 → 高亮 + 列表只剩该板块 → 点回「全部」恢复）；未登录 header 有登录入口 |
 | `theme.spec.js` | 2 | 切深色 → `html.dark` + `localStorage.jf_theme=dark`，刷新保持；切浅色 → 移除 `dark` |
 | `post-detail.spec.js` | 1 | 标题、Markdown（`h1`/`strong`/`pre code`）、点赞按钮 |
 | `auth.spec.js` | 2 | 错误密码提示「用户名或密码错误」；正确密码登录 → `.header .username` 可见 → 退出登录 → `jf_token`/`jf_user` 清空 |
-| `admin.spec.js` | 1 | 板块表格可见、首行存在；点「删除」弹确认框（「提示」「确定删除板块」）→ 只点「取消」→ 框关闭且行仍在 |
+| `admin.spec.js` | 1 | 板块表格可见、首行存在；点「删除」弹确认框（「提示」「确定删除板块」）→ 只点「取消」→ 框关闭且**行内容与行数均未变** |
 
 **验证结果**
 
 - `pnpm exec playwright test --list` → `Total: 8 tests in 5 files`。
-- 本地（`pnpm dev --host 127.0.0.1` + `E2E_CHANNEL=msedge`）：**8 passed (19.8s)**。
-- 公网（`E2E_BASE_URL=https://treenewbee.men/forum/` + 真实 admin 凭据 + `E2E_CHANNEL=msedge`，Build #35 已部署）：**8 passed (48.0s)**，`[E2E] worker 0: board=1 post=46`，清理后 `keyword=E2E 冒烟` 的 `totalElements=0`。
+- 本地（`pnpm dev --host 127.0.0.1` + `E2E_CHANNEL=msedge`）：**8 passed (18.7s)**（终审修复后最终一次；修复前为 19.8s）。
+- 公网首次（Build #35 已部署，修复前）：**8 passed (48.0s)**，`[E2E] worker 0: board=1 post=46`。
+- 公网验收（Build #36 部署，修复后）：**8 passed (50.6s)**，`[E2E] worker 0: board=1 post=47`；两次跑完 `keyword=E2E 冒烟` 均为 `totalElements=0`。
 - 空库路径（临时 H2 实例 + 角色种子，端口 18080）：`bootstrapData()` 自动建板块并保留，`cleanup()` 不报错、板块仍在、帖子不可见。
 - 回归：Vitest `33 spec / 330 用例` 全绿；后端 `177 / 0 / 0 / 1`（21 类）；`pnpm build` 与 `check:bundle` 不受影响。
 
@@ -926,7 +927,8 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 - 写真实库（帖子软删除留痕，不可见但计入表行数）；每轮生成 1 帖，长期跑需要偶尔清理。
 - 不做截图比对、不做跨浏览器矩阵（仅 Chromium / 系统 Edge）、不覆盖上传头像与 SSE。
 - 依赖后端可达；后端未起时错误信息会带 `BASE_URL` 与服务未启动提示。
-- `consoleGuard` 只拦 CSP 文案与 pageerror，不拦普通 `console.error`；白名单按 test 级 annotation 生效，不要上提到 describe 或复用到其他 401 用例。
+- `consoleGuard` 只拦 CSP 文案与 pageerror，不拦普通 `console.error`；两类白名单（`expected-cancel-dialog`、`expected-login-401`）都按 test 级 annotation 生效，不要上提到 describe 或复用到其他用例。
+- 首页按「置顶优先、时间倒序」排序：若线上置顶帖 ≥ 一页，新 E2E 帖可能不在第一页，`home.spec` 会 flake；当前置顶很少，置顶变多后需改用搜索定位。
 
 **上线验收（Build #36，镜像 `forum-backend:36`）**
 
@@ -934,7 +936,24 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 - 公网：`E2E_BASE_URL=https://treenewbee.men/forum/` + 真实 admin 凭据 + `E2E_CHANNEL=msedge`，对 Build #36 部署复跑 **8 passed (50.6 s)**（`[E2E] worker 0: board=1 post=47`）。
 - 清理：跑完 `GET /api/posts?keyword=E2E 冒烟` 的 `totalElements=0`；帖子为软删除留痕，板块复用真实库板块 1（未新建）。
 - 回归：Vitest `33 spec / 330 用例` 全绿；后端 `177 / 0 / 0 / 1`（21 类）；`pnpm build` + `check:bundle` 五项在预算内。
-- 构建：`c18304d`（本次 docs 提交）触发 Jenkins **Build #36 SUCCESS**，镜像 `forum-backend:36` `Up (healthy)`，`/api/health` 200。
+- 构建：`c18304d`（docs 记录提交）触发 Jenkins **Build #36 SUCCESS**，镜像 `forum-backend:36` `Up (healthy)`，`/api/health` 200；回填提交 `90cc735` 触发 **Build #37 SUCCESS**，镜像 `forum-backend:37`。
+- 推送证据：`git ls-remote git@github.com:ScholarOfDeepDarkFantasy/forum.git refs/heads/master` → `90cc735…`。注意：用「显式 URL 推送」时本地 `origin/master` 远程跟踪 ref 不会更新（仍停在 `086c329`），判断是否已推送请用 `ls-remote`，不要看 `git status -sb` 的 ahead 计数。
+
+**终审复验与修复（2026-10-31）**
+
+终审（只读子代理）对 `1eb9bd2..90cc735` 给出 CHANGES_REQUESTED。代码侧结论：C1（公网子路径）/C2（空库板块清理）修复真实有效、提交卫生干净、Vitest/后端/构建基线全绿；但测试有效性存在缺口，已在本修订中修复：
+
+| 发现 | 处理 |
+| --- | --- |
+| I1「取消不删数据」只断言首行可见，删掉首行后仍可能绿 | `admin.spec` 取消前记录全部行文本，取消后断言行文本与行数都不变 |
+| I2 cleanup 把 DELETE 404 当成功（假绿） | `api.js` 移除 404 吞掉分支，清理失败一律计入失败 |
+| I3 部署手册 E2E 命令含字面 `\n>` 无法复制执行 | 改为真多行 + `\` 续行 |
+| I4「板块筛选」未真正覆盖 | `home.spec` 点本轮板块断言高亮、列表只剩该板块，再点回「全部」 |
+| M1 `cancel` 白名单是全局无条件放行 | 改为 `expected-cancel-dialog` annotation 限定，文档同步 |
+| Minor（构建号/耗时口径、`c18304d` 表述） | 按「首次 #35 / 验收 #36」区分，计划 §12 同步 |
+
+- 修复后本地 E2E：**8 passed (18.7 s)**；`--list` 仍为 8 tests / 5 files。
+- 最终代码基线：Vitest 330/33、后端 177/21 类/1 skip、`pnpm build` + `check:bundle` 不变。
 
 ## 5. 待办与后续计划
 
@@ -1051,7 +1070,8 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-10-31 | docs | 回填第十二轮外网 E2E 冒烟与构建（Build #36 / 镜像 36） | 本次提交 |
+| 2026-10-31 | test | 加固 E2E 断言：板块筛选、取消不删数据、清理 404、白名单 annotation | 本次提交 |
+| 2026-10-31 | docs | 回填第十二轮外网 E2E 冒烟与构建（Build #36 / 镜像 36） | `90cc735` |
 | 2026-10-31 | docs | 记录第十二轮前端 E2E 骨架（§4.17、基线不变、T3 关闭 / T20 新增） | `c18304d` |
 | 2026-10-31 | fix | 修正 E2E 公网子路径解析与空库清理副作用（相对路径、板块保留、远程凭据硬失败、failOnFlakyTests） | `38913f4` |
 | 2026-10-31 | test | E2E 覆盖管理页与删除确认框 | `e3b7057` |

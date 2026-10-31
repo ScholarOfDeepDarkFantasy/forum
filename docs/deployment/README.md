@@ -365,7 +365,9 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|
 >
 > ```bash
 > cd frontend
-> E2E_BASE_URL=https://treenewbee.men/forum/ E2E_ADMIN_USERNAME=admin \n> E2E_ADMIN_PASSWORD='<真实密码>' E2E_CHANNEL=msedge pnpm test:e2e
+> E2E_BASE_URL=https://treenewbee.men/forum/ \
+>   E2E_ADMIN_USERNAME=admin \
+>   E2E_ADMIN_PASSWORD='<真实密码>' E2E_CHANNEL=msedge pnpm test:e2e
 > # 期望 8 passed；结束时 worker 清理会删掉本轮帖子
 > ```
 >

@@ -24,8 +24,10 @@ export const test = base.extend({
       })
       page.on('pageerror', (error) => {
         const message = typeof error === 'string' ? error : error?.message || String(error)
-        // 管理页点「取消」时 ElMessageBox.confirm 以 'cancel' 拒绝，Vue 会自行记录，这里兜底放行。
-        if (message === 'cancel') return
+        // 管理页点「取消」时 ElMessageBox.confirm 以 'cancel' 拒绝，Vue 会自行记录，这里兜底放行；
+        // 仅对显式声明 annotation 的用例放行，避免把所有真实 'cancel' 错误一起吞掉。
+        const expectsCancelDialog = testInfo.annotations.some((a) => a.type === 'expected-cancel-dialog')
+        if (expectsCancelDialog && message === 'cancel') return
         // 登录页错误密码：axios 以 Error('Request failed with status code 401') 拒绝，
         // LoginView.submit 只有 try/finally 没有 catch，Vue 3 dev 构建会把未捕获错误重新抛给浏览器。
         // 仅放行「测试显式声明 annotation + 该确定文案」的组合，其它页面/其它错误照常拦截。
