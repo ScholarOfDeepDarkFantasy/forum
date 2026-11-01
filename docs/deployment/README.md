@@ -401,6 +401,10 @@ sudo -u pi XDG_RUNTIME_DIR=/run/user/$(id -u pi) podman logs --tail 200 forum-ba
 > `CSP_REPORT_*` 已由 `docker-compose.yml` 透传，改 `.env` 即生效。单次请求最多输出 10 行 WARN
 > （批量上报可以被伪造得很长，这是防止单请求放大日志的上限）。
 
+> **2026-11-01 验收实测（Build #40，镜像 `forum-backend:40`）**：`Reporting-Endpoints` 与 CSP 两条指令均下发；
+> 合成 legacy/批量上报均 204 且后端日志可见（真实 CF 客户端 IP）；坏 JSON 204、GET 405、无 ERROR；
+> 真实 Edge 注入内联脚本后日志出现 `directive=script-src-elem blocked=inline`。
+
 真实浏览器的验证（可选）：用 Playwright 打开公网页面后注入一段内联脚本（会被 `script-src` 拦截），
 再回看后端日志应出现 `blocked=inline`：
 

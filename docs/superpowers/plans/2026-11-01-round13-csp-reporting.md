@@ -347,12 +347,12 @@ log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，G
 | 提交 | 内容 | Jenkins |
 | --- | --- | --- |
 | `fda6306` | 设计与计划入库 | — |
-| `8301208` | 后端 `/api/csp-report` + 限速 + 清洗 + 13 个测试 | 待回填 |
-| `91b9e19` | nginx 上报配置 + deploy 断言 + csp.spec 守护 | 待回填 |
-| `43efc71` | 审查修复：日志注入清洗、单请求 WARN 上限、测试缺口（+5 例） | 待回填 |
-| `4f84910` | 审查修复：deploy 探针补 `Host: raspi`、csp.spec 锚定断言、compose 透传 4 个 `CSP_REPORT_*` | 待回填 |
-| 本次 docs 提交 | 文档记录（§4.18、README、部署手册、计划） | 待回填 |
-| 待回填提交 | 回填构建号与公网验收 | 待回填 |
+| `8301208` | 后端 `/api/csp-report` + 限速 + 清洗 + 13 个测试 | #40（同批推送，一次构建） |
+| `91b9e19` | nginx 上报配置 + deploy 断言 + csp.spec 守护 | #40（同批推送） |
+| `43efc71` | 审查修复：日志注入清洗、单请求 WARN 上限、测试缺口（+5 例） | #40（同批推送） |
+| `4f84910` | 审查修复：deploy 探针补 `Host: raspi`、csp.spec 锚定断言、compose 透传 4 个 `CSP_REPORT_*` | #40（同批推送） |
+| `3370c94` | 文档记录（§4.18、README、部署手册、计划） | #40 SUCCESS / 镜像 40 |
+| 本次回填提交 | 回填构建号与公网验收 | Build #41（预期） |
 
 ### 12.2 偏差
 
@@ -378,7 +378,7 @@ log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，G
 | 前端 RED | 还原旧 conf/deploy 后 `csp.spec.js` 2 failed（`report-uri` 缺失、`reporting-endpoints` 缺失） |
 | 前端 GREEN | csp.spec 9/9 → 10/10；全量 `Test Files 33 passed (33)` / `Tests 333 passed (333)` |
 | `bash -n` | `deploy/deploy.sh` 通过 |
-| 构建/预算 | 待回填（本轮无前端产物改动，预期与上一轮一致） |
+| 构建/预算 | 入口 84.43 kB / CSS 39.02 kB / 最大 chunk 233.74 kB / JS 835.87 kB / CSS 181.57 kB，全部在预算内；E2E 公网 8 passed (47.6 s) |
 
 ### 12.4 审查修复（2026-11-01）
 
@@ -388,6 +388,16 @@ log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，G
 `/ESC）、I2 单请求日志放大、I3 体积守卫无测试、I4 限速清理与构造校验无测试 | `43efc71` 全部修复并补 5 例；变异验证 4 个新测试分别杀掉对应变异 |
 | Task 3 质量审查 | CHANGES_REQUESTED：C1 两条 curl 缺 `-H 'Host: raspi'`（POST 404 → 每次部署假红）；I1 csp.spec 对注释敏感；I2 spec 未逐字断言 204/405；I3 compose 未透传 `CSP_REPORT_*` | `4f84910` 全部修复；`deploy.sh` 用桩 curl 端到端验证 204/405 与 200 假绿两条路径；csp.spec 变异（注释 add_header、删 204/405 断言）均红 |
 
-### 12.5 待回填
+### 12.5 上线验收（Build #40，镜像 `forum-backend:40`）
 
-- Jenkins 构建号与镜像号、公网 V1–V7 结果、真实浏览器违规观测（`blocked=inline`）、回填提交哈希。
+| 项 | 结果 |
+| --- | --- |
+| 推送与构建 | `c4c41c0..3370c94`（SSH）→ Build #40 SUCCESS，容器 `forum-backend:40` healthy，health 200 |
+| V1/V2 | `Reporting-Endpoints: csp-endpoint="/forum/api/csp-report"` 与 CSP 的 `report-uri`/`report-to` 均实测下发 |
+| V3/V4 | legacy 与批量上报均 204，日志分别见 `directive=script-src blocked=inline` 与 `directive=img-src`，IP 为真实客户端 `27.19.110.237` |
+| V5 | 坏 JSON 204、GET 405、容器日志 `ERROR` 计数 0 |
+| V6 | Edge 注入内联脚本：控制台 1 条 CSP 违规，后端日志 `directive=script-src-elem blocked=inline doc=https://treenewbee.men/forum/` |
+| V7 | 后端 195/24/1 skip、前端 333/33、公网 E2E 8 passed (47.6 s)、`check:bundle` exit 0 |
+| deploy.sh | 13 组断言 + 新增上报通道断言全过（部署探针本身也会产生一条 `127.0.0.1` 合成 WARN，预期内） |
+
+回填提交触发 Build #41（docs-only）。

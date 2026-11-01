@@ -982,15 +982,15 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | # | 验证点 | 结果 |
 | --- | --- | --- |
-| V1 | 公网 `/forum/` 带 `Reporting-Endpoints: csp-endpoint="/forum/api/csp-report"` | 待回填 |
-| V2 | 公网 CSP 含 `report-uri /forum/api/csp-report` 与 `report-to csp-endpoint` | 待回填 |
-| V3 | legacy 合成上报 → 204，后端日志 `CSP 违规上报 ... directive=script-src` | 待回填 |
-| V4 | Reporting API 批量上报 → 204 | 待回填 |
-| V5 | 坏 JSON / 20KB body / `text/plain` → 204；GET → 405；容器日志无 ERROR | 待回填 |
-| V6 | Playwright 公网注入内联脚本触发真实违规 → 日志 `blocked=inline` | 待回填 |
-| V7 | 基线 195/24、333/33、E2E 8/8、`check:bundle` 0 | 待回填 |
+| V1 | 公网 `/forum/` 带 `Reporting-Endpoints: csp-endpoint="/forum/api/csp-report"` | ✅ 实测下发 |
+| V2 | 公网 CSP 含 `report-uri /forum/api/csp-report` 与 `report-to csp-endpoint` | ✅ 两条指令都在 |
+| V3 | legacy 合成上报 → 204，后端日志 `CSP 违规上报 ... directive=script-src` | ✅ 204；日志 `directive=script-src blocked=inline doc=https://treenewbee.men/forum/posts/1 ip=27.19.110.237` |
+| V4 | Reporting API 批量上报 → 204 | ✅ 204；日志 `directive=img-src blocked=https://evil.example/x.png` |
+| V5 | 坏 JSON / 20KB body / `text/plain` → 204；GET → 405；容器日志无 ERROR | ✅ badjson 204、GET 405、`grep -c ' ERROR '` = 0 |
+| V6 | Playwright 公网注入内联脚本触发真实违规 → 日志 `blocked=inline` | ✅ 控制台 1 条 CSP 违规；后端日志 `directive=script-src-elem blocked=inline doc=https://treenewbee.men/forum/` |
+| V7 | 基线 195/24、333/33、E2E 8/8、`check:bundle` 0 | ✅ 195/24/1 skip、333/33、公网 E2E 8 passed (47.6s)、五项预算内 |
 
-**构建记录**：`fda6306` 设计与计划 → `8301208` 后端 → `91b9e19` nginx 与断言 → `43efc71` 日志安全加固 → `4f84910` 部署探针与配置透传 → 本轮文档 → 待回填。
+**构建记录**：`fda6306` 设计与计划 → `8301208` 后端 → `91b9e19` nginx 与断言 → `43efc71` 日志安全加固 → `4f84910` 部署探针与配置透传 → `3370c94` 文档记录 → 回填提交 → Jenkins **Build #40 SUCCESS**（镜像 `forum-backend:40`）。
 
 **已知限制**
 
@@ -1022,7 +1022,12 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 - 变异验证：4 个新增测试分别杀掉「去控制字符」「体积守卫」「单请求上限」「清理过期」四个变异；
   `csp.spec.js` 对「注释掉 add_header」「删掉 204/405 断言」均变红。
 
-**上线验收（2026-11-01）**：待回填。
+**上线验收（2026-11-01，Build #40，镜像 `forum-backend:40`）**
+
+- 推送 `c4c41c0..3370c94`（SSH）→ Build #40 SUCCESS，容器 `forum-backend:40` 健康，`/api/health` 200。
+- 公网 V1–V7 全过（见上表）；V6 由真实 Edge 浏览器注入内联脚本触发，后端日志记录 `script-src-elem`/`inline`。
+- `deploy.sh` 13 组断言 + 新增上报通道断言全过（部署期间还会产生一条 `doc=http://127.0.0.1/forum/` 的合成 WARN，属断言探针，预期内）。
+- 已知口径：上报 IP 为 Cloudflare 真实客户端 IP（realip 生效），不是容器网关。
 
 ## 5. 待办与后续计划
 
@@ -1141,7 +1146,8 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-11-01 | docs | 记录第十三轮 CSP 违规上报（§4.18、T18 关闭、基线 195/333） | 本次提交 |
+| 2026-11-01 | docs | 回填第十三轮构建与上线验收（Build #40 / 镜像 40、V1–V7） | 本次提交 |
+| 2026-11-01 | docs | 记录第十三轮 CSP 违规上报（§4.18、T18 关闭、基线 195/333） | `3370c94` |
 | 2026-11-01 | fix | 修正 CSP 上报部署探针（补 `Host: raspi`）并透传 `CSP_REPORT_*` 配置 | `4f84910` |
 | 2026-11-01 | fix | 加固 CSP 上报清洗与限速的日志安全（控制字符、单请求上限、测试缺口） | `43efc71` |
 | 2026-11-01 | feat | nginx 下发 CSP 上报配置并断言通道（`report-uri`/`report-to` + deploy 断言） | `91b9e19` |
