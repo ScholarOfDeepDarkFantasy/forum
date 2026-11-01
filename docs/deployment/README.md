@@ -378,6 +378,51 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|
 > `8 passed (50.6 s)`（`[E2E] worker 0: board=1 post=47`）；跑完 `GET /api/posts?keyword=E2E 冒烟` 的 `totalElements=0`，
 > 帖子已清理（软删除留痕），未新建板块（复用真实库板块 1）。
 
+### CSP 违规上报（第十三轮）验证
+
+浏览器只在**页面收到 CSP 头**时才会上报，所以先确认头与指令都下发了：
+
+```bash
+# 1) 上报端点声明（Reporting-Endpoints）与 CSP 两条指令
+curl -sS -I -H 'Host: treenewbee.men' 'http://127.0.0.1/forum/' | grep -iE '^(reporting-endpoints|content-security-policy):'
+# 期望：reporting-endpoints: csp-endpoint="/forum/api/csp-report"
+#       content-security-policy: ...; report-uri /forum/api/csp-report; report-to csp-endpoint
+
+# 2) 合成一条 legacy 报告（模拟浏览器 POST），应为 204
+curl -sS -o /dev/null -w '%{http_code}
+' -X POST -H 'Content-Type: application/csp-report'   --data '{"csp-report":{"document-uri":"http://127.0.0.1/forum/","violated-directive":"script-src","blocked-uri":"inline"}}'   http://127.0.0.1/forum/api/csp-report
+
+# 3) 后台日志应有一行结构化记录（第十三轮新增）
+sudo -u pi XDG_RUNTIME_DIR=/run/user/$(id -u pi) podman logs --tail 200 forum-backend | grep 'CSP 违规上报'
+# 期望：CSP 违规上报 ip=... directive=script-src blocked=inline doc=http://127.0.0.1/forum/ src=... sample=...
+```
+
+> 被刷量时把 `CSP_REPORT_MAX_PER_MINUTE` 调小（如 `1`）再 `podman-compose up -d` 即可止血：4 个
+> `CSP_REPORT_*` 已由 `docker-compose.yml` 透传，改 `.env` 即生效。单次请求最多输出 10 行 WARN
+> （批量上报可以被伪造得很长，这是防止单请求放大日志的上限）。
+
+真实浏览器的验证（可选）：用 Playwright 打开公网页面后注入一段内联脚本（会被 `script-src` 拦截），
+再回看后端日志应出现 `blocked=inline`：
+
+```bash
+cd frontend && E2E_BASE_URL=https://treenewbee.men/forum/ E2E_CHANNEL=msedge   node --input-type=module -e "
+import { chromium } from 'playwright';
+const browser = await chromium.launch({ channel: 'msedge' });
+const page = await browser.newPage();
+await page.goto('https://treenewbee.men/forum/');
+await page.addScriptTag({ content: 'window.__csp_probe = 1' });
+await page.waitForTimeout(2000);
+await browser.close();
+"
+```
+
+排障要点：
+
+- 上报端点只接受 POST（GET 返回 405），体积上限 16k（nginx）与 8k（后端，超出不解析但仍是 204）。
+- 每 IP 每分钟最多记录 20 条，超出静默丢弃；日志量大可临时设 `CSP_REPORT_MAX_PER_MINUTE=1` 重启，
+  或在 nginx 把 `location = /forum/api/csp-report` 改成 `return 204;` 直接吞掉上报。
+- `report-to` 需要 HTTPS；内网 `http://raspi/forum/` 只有 `report-uri` 生效，属预期。
+
 ## 6. 排障
 
 | 现象 | 排查 |
@@ -394,6 +439,7 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|
 | `/forum/` 404 | `app.conf` 是否 include snippet；`/pd/Program/forum/frontend/index.html` 是否存在 |
 | **公网域名**访问 `/forum/` 404，内网 `http://raspi/forum/` 正常 | 典型的 `server_name` 不匹配：cloudflared 保留原始 Host（`treenewbee.men`）到 nginx，而 `app.conf` 是 `server_name raspi`，请求落到 `sites-enabled/default`（`server_name _`，root=`/var/www/html`）→ 404。确认 `/etc/nginx/conf.d/forum-public.conf` 存在且 `nginx -t` + reload 过；本机验证：`curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: treenewbee.men' http://127.0.0.1/forum/` 应为 **200** |
 | 公网访问时所有用户被当成同一个 IP（一人打满限流，全站 429） | `forum-public.conf` 的 realip 没生效：cloudflared 从回环连入，缺 `real_ip_header CF-Connecting-IP` 时 `$remote_addr` 恒为 `::1`，后端 `ClientIpResolver` 只能拿到环回地址。确认该文件含 `set_real_ip_from 127.0.0.1; set_real_ip_from ::1; real_ip_header CF-Connecting-IP;` 并已 reload；`sudo tail /var/log/nginx/access.log` 里公网请求的第一列应是真实公网 IP 而非 `::1` |
+| CSP 上报量大 / 被刷 | 日志里 `CSP 违规上报` 刷屏：临时 `CSP_REPORT_MAX_PER_MINUTE=1` 重启容器；或把 nginx 该 location 改 `return 204;` 直接吞掉（不影响页面） |
 | `/forum/api/` 502 | `forum-backend` 未起或未监听 8086：`sudo -u pi curl -v http://127.0.0.1:8086/api/health` |
 | `/forum/uploads/xxx` 返回 200 HTML | nginx 的 `^~ /forum/uploads/` 必须排在 `location /forum/`（SPA 回退）之前，否则 `try_files` 把请求兜到 `index.html`；确认 snippet 顺序后 `sudo nginx -t && sudo systemctl reload nginx` |
 | 上传返回 `413` 或 `400 图片不能超过 2MB` | 413 来自 nginx：snippet 的 `/forum/api/` 已设 `client_max_body_size 3m`，若仍出现说明服务器上是旧版 snippet（重新发布或手工 `cp` 后 reload）；400 来自后端（超过 2MB 或 multipart 上限），响应体里带 `图片不能超过 2MB` |
@@ -431,13 +477,15 @@ curl -sI -H 'Host: raspi' "http://127.0.0.1$ASSET" | grep -iE '^(cache-control:|
 - **公网强制 HTTPS 在源站兜底**：`forum-public.conf` 用 `X-Forwarded-Proto` 把明文请求 308 到 https；Cloudflare 面板的 Always Use HTTPS 未纳入仓库，属手工设置，开启后是多一层保险。HSTS 不带 `includeSubDomains`，避免误伤该域名下的其它内网子域。
 - **CSP 由 nginx 注入，前端代码不感知**：新增内联 `<script>` 必须同步 `script-src` 里的 SHA-256，否则线上会被浏览器拦掉（目前只有首屏主题脚本这一条内联脚本）；新增内联 `<style>` 无需处理（`style-src` 已允许 `'unsafe-inline'`）。`frontend/src/plugins/csp.spec.js` 与 `deploy.sh` 会同时报警。
 - **CSP 放行了 Cloudflare Web Analytics 信标**：CF 免费版会给 HTML 注入 `static.cloudflareinsights.com/beacon.min.js`，不放行时每页控制台都报 CSP 违规。放行主机为 `static.cloudflareinsights.com`（脚本）与 `cloudflareinsights.com`（上报）；关掉 Web Analytics 后可以删掉这两条并同步 `csp.spec.js` 与 `deploy.sh`。
-- **CSP 没有违规上报**：目前靠控制台人工回归与一次性 Playwright 脚本；需要线上感知时可加 `report-to`/`Reporting-Endpoints`，或先上 Report-Only 观察。
+- **CSP 违规上报已实现（第十三轮）**：`/forum/api/csp-report` + `report-uri`/`report-to`，见上文验证小节；`report-to` 在非安全上下文（内网 http）不生效，内网只有 `report-uri`。
 - **HSTS 未加 `includeSubDomains`**：该域名下还有内网应用（`/imageweb/` 等）；确认没有子域依赖 HTTP 后再加，并同步 `deploy/nginx/public.conf`。
 
 
 - **E2E 会写真实库**：`frontend/e2e` 通过公开 API 创建帖子和（空库时）板块；帖子是软删除，行仍在表里、对用户不可见。套件不在 Jenkins 默认流水线中，需发版前手动跑。
 - **E2E 用真实 admin 账号登出**：`token_version` 会全局 +1，正在使用该账号的其它会话（包括另一个 E2E 进程）会立刻 401。请串行执行、避开真实用户使用时段。
 - **空库首次跑 E2E 会留下「E2E 板块 ...」**：`posts.board_id` 外键 + 帖子软删除使板块无法通过 API 删除；该板块按设计保留并复用，不要手工删（删除会连带帖子外键冲突）。
+- **CSP 违规上报只进后端日志**：没有聚合/告警/看板，需 `podman logs forum-backend | grep 'CSP 违规上报'` 查看；单 IP 每分钟最多 20 个请求、单请求最多 10 行 WARN（超出静默丢弃），重启容器计数器清零；日志字段已去控制字符与 query 串，不会记录原始 body。
+- **`report-to` 需要安全上下文**：内网 `http://raspi/forum/` 只有 `report-uri` 生效，公网经 Cloudflare HTTPS 两者都生效；现代浏览器会各发一份，日志出现重复条目属预期。
 
 ## 附录 A：Jenkins job `config.xml`
 

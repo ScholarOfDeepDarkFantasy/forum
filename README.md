@@ -16,6 +16,7 @@
 - 帖子：板块内发帖、编辑、删除（软删除），分页列表与关键词搜索，浏览量统计
 - 互动：点赞、收藏与「我的收藏」；评论支持楼中楼，删除后保留占位
 - 权限：管理员 / 版主 / 普通用户三级角色，支持置顶、加精、禁言、封禁
+- **CSP 违规上报**：公网入口下发 `report-uri` + `report-to`（`Reporting-Endpoints: csp-endpoint="/forum/api/csp-report"`），浏览器把被 CSP 拦截的资源自动 POST 到后端；后端对两种上报格式（legacy `application/csp-report` 与 Reporting API `application/reports+json`）都返回 204，按客户端 IP 每分钟最多记录 20 条结构化 WARN（字段去 query、截断），部署脚本断言上报通道可用
 - **会话安全**：登出与封禁会让旧 JWT 立即失效（`users.token_version` 版本号校验，过滤器每请求比对一次）；登录失败按客户端 IP 计数，`LOGIN_MAX_FAILURES`（默认 5）次密码错误后锁定 `LOGIN_LOCK_MS`（默认 15 分钟），锁定期间返回 429 并带 `Retry-After` 秒数，即使密码正确也拒绝
 - 通知：点赞、收藏、回复三类通知（另有 `SYSTEM` 预留类型），未读角标与单条已读，点击跳转到帖子或具体评论；新通知经 SSE 实时到达（顶栏角标即时 +1、右上角轻提示），断线按 1s→30s 退避自动重连，重连后校准未读数
 - **Markdown 渲染**：帖子正文按 CommonMark + 表格/删除线（`markdown-it`）渲染（标题、列表、表格、代码块高亮、链接、图片），编辑页提供实时预览；渲染结果经 DOMPurify 白名单过滤、外链补 `target`/`rel`、图片懒加载后才插入 DOM，服务端仍只存纯文本
@@ -124,8 +125,12 @@ java -jar target/forum-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
 | `LOGIN_WINDOW_MS` | `900000`（失败计数窗口，15 分钟；窗口外的失败自动作废） |
 | `LOGIN_LOCK_MS` | `900000`（锁定时长，15 分钟；锁定内即使密码正确也返回 429） |
 | `LOGIN_CLEANUP_INTERVAL_MS` | `60000`（清理过期窗口的间隔；只为回收内存，不影响判定） |
+| `CSP_REPORT_MAX_PER_MINUTE` | `20`（同一 IP 每分钟最多记录多少条 CSP 违规日志，超出静默丢弃） |
+| `CSP_REPORT_WINDOW_MS` | `60000`（CSP 上报限速的固定窗口长度） |
+| `CSP_REPORT_MAX_BODY_BYTES` | `8192`（单条上报 body 上限，超出不解析；nginx 侧另有 16k 上限） |
+| `CSP_REPORT_CLEANUP_INTERVAL_MS` | `60000`（清理过期限速窗口的间隔） |
 
-以上 4 个 `LOGIN_*` 已由 `docker-compose.yml` 透传（默认值同上表），生产改 `.env` 后 `podman-compose up -d` 即生效。
+以上 4 个 `LOGIN_*` 与 4 个 `CSP_REPORT_*` 均已由 `docker-compose.yml` 透传（默认值同上表），生产改 `.env` 后 `podman-compose up -d` 即生效。
 
 ### 5. 验证启动
 
@@ -245,7 +250,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 21 个测试类、177 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 24 个测试类、195 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 
@@ -255,7 +260,7 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 33 个 spec、330 个用例，覆盖：
+当前为 33 个 spec、333 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
@@ -323,6 +328,7 @@ node scripts/check-bundle.mjs --dist /tmp/some-dist   # 也可以检查任意一
 
 ## 已知限制
 
+- **CSP 违规上报只进日志**：没有聚合、看板与告警，需要登录服务器 `podman logs forum-backend | grep 'CSP 违规上报'` 或 `journalctl` 查看；单 IP 每分钟上限 20 条，超出静默丢弃；`report-to` 需要 HTTPS（内网 `http://raspi/forum/` 只有 `report-uri` 生效）。
 - **历史纯文本帖子中的 Markdown 语法会被解释**：Markdown 渲染上线后，正文里恰好长得像 Markdown 的写法（`# 标题`、`*斜体*`、`[文字](链接)`、`| 表格 |` 等）会按语法渲染，而不是原样显示。本轮不按帖子版本区分渲染：单换行会转成 `<br>` 以尽量保留纯文本帖子的换行观感，需要原样展示的符号可用反斜杠转义或放进代码块。
 - **REPLY 通知的评论锚点只覆盖第一页评论**：帖子详情页每页加载 10 条根评论（后端按 `createTime` 升序只返回根评论，子回复随父评论平铺渲染）。若通知指向的根评论排在第 11 条之后，页面里不存在对应元素。此时不再静默失败：当该帖评论数大于 10 时会提示「目标评论可能在后面的评论分页里，可翻页查看」，需手动翻页定位。评论已删除也会命中同一条提示（该提示无法区分两种情况），这是本轮接受的误报。彻底修法是按 `commentId` 逐页回溯后再选中目标页——其代价（每次通知跳转最多多出若干次请求，且仍受页数上限约束）见 `docs/superpowers/specs/2026-10-16-experience-iteration-design.md` §5。
 - **全文搜索按子串匹配**：中文没有分词，「关键词 + 相关度排序」的能力有限；1–2 个字的关键词用不上 pg_trgm 索引，会退化为顺序扫描（数据量小时无感）。
