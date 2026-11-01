@@ -1035,6 +1035,8 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 - 清洗正则从 `\p{Cntrl}` 扩展为 `[\p{Cc}\p{Cf}\u2028\u2029]`，补 C1 控制字符与行/段分隔符测试。
 - 修复后基线：后端 **197/24/1 skip**、前端 **334/33**；`csp` 10→11、`CspReportSanitizerTest` 6→7、
   `CspReportIntegrationTest` 7→8。
+- 部署验证（Build #42，镜像 `forum-backend:42`）：匿名 `PUT`→401；带认证 `PUT`→405 且 `Allow: POST`；
+  公网/内网 HTML 的 CSP 仍为 1 条；合成 `POST`→204、`GET`→405；容器日志 `ERROR` 计数 0。
 
 **上线验收（2026-11-01，Build #40 → 回填 Build #41）**
 
@@ -1162,7 +1164,8 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-11-01 | fix | 修正非 POST 方法 500（全局 405 + `Allow`）与 csp.spec 注释假绿，清洗 C1 字符 | 本次提交 |
+| 2026-11-01 | docs | 回填第十三轮审查修复构建（Build #42 / 镜像 42、非 POST 405 实测） | 本次提交 |
+| 2026-11-01 | fix | 修正非 POST 方法 500（全局 405 + `Allow`）与 csp.spec 注释假绿，清洗 C1 字符 | `165c469` |
 | 2026-11-01 | docs | 回填第十三轮构建与上线验收（Build #41 / 镜像 41、V1–V7） | `c8751fa` |
 | 2026-11-01 | docs | 记录第十三轮 CSP 违规上报（§4.18、T18 关闭、基线 195/333） | `3370c94` |
 | 2026-11-01 | fix | 修正 CSP 上报部署探针（补 `Host: raspi`）并透传 `CSP_REPORT_*` 配置 | `4f84910` |
