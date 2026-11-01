@@ -99,6 +99,27 @@ class CspReportSanitizerTest {
     }
 
     @Test
+    void stripsControlCharactersFromDirectiveDispositionAndUrlFields() {
+        // 这些字段会原样进 WARN 日志：CR/LF 可伪造日志行，ESC 可做 ANSI 终端注入（CWE-117）
+        String body = "{\"csp-report\":{"
+                + "\"document-uri\":\"https://example.com/post/1\\r\\nFAKE-LINE?token=secret\","
+                + "\"effective-directive\":\"script-src\\nFAKE\\u001b[31m\","
+                + "\"blocked-uri\":\"inline\\r\\nFAKE\","
+                + "\"disposition\":\"enforce\\nFAKE\"}}";
+
+        CspViolation violation = sanitize("application/csp-report", body).get(0);
+
+        for (String value : List.of(violation.documentUri(), violation.directive(),
+                violation.blockedUri(), violation.disposition())) {
+            assertThat(value).doesNotContain("\r").doesNotContain("\n").doesNotContain("\u001b");
+        }
+        assertThat(violation.documentUri()).isEqualTo("https://example.com/post/1FAKE-LINE");
+        assertThat(violation.directive()).isEqualTo("script-srcFAKE[31m");
+        assertThat(violation.blockedUri()).isEqualTo("inlineFAKE");
+        assertThat(violation.disposition()).isEqualTo("enforceFAKE");
+    }
+
+    @Test
     void returnsEmptyListForBadJsonEmptyBodyOrMissingReportNode() {
         assertThat(sanitize("application/csp-report", "{not-json")).isEmpty();
         assertThat(sanitize("application/csp-report", "   ")).isEmpty();

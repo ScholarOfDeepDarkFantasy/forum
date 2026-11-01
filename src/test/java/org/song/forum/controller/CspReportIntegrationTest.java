@@ -137,6 +137,36 @@ class CspReportIntegrationTest {
     }
 
     @Test
+    void oversizedValidReportIsDroppedWithoutWarnLog() {
+        // 合法 JSON 前缀 + 空格填充到 20KB：没有体积守卫时会被解析并写 WARN，
+        // 有守卫时必须整条丢弃（对比 invalidInputs 用例，后者截断后 JSON 本身已损坏）
+        String payload = LEGACY_JSON + " ".repeat(20 * 1024);
+
+        ResponseEntity<String> response = post("198.51.100.36", "application/csp-report", payload);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(cspWarns()).isEmpty();
+    }
+
+    @Test
+    void batchReportLogsAtMostTenEntriesPerRequest() {
+        StringBuilder body = new StringBuilder("[");
+        for (int i = 0; i < 15; i++) {
+            if (i > 0) {
+                body.append(',');
+            }
+            body.append("{\"type\":\"csp-violation\",\"body\":{"
+                    + "\"effective-directive\":\"script-src\",\"blocked-uri\":\"inline\"}}");
+        }
+        body.append(']');
+
+        ResponseEntity<String> response = post("198.51.100.37", "application/reports+json", body.toString());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(cspWarns()).hasSize(CspReportService.MAX_LOGS_PER_REQUEST);
+    }
+
+    @Test
     void getIsNotAllowed() {
         ResponseEntity<String> response = rest.exchange(
                 url("/api/csp-report"), HttpMethod.GET, HttpEntity.EMPTY, String.class);

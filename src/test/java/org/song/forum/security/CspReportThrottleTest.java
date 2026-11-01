@@ -9,6 +9,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * CSP 上报限速器纯单元测试：上限放行、窗口滚动、IP 隔离。
@@ -62,6 +63,30 @@ class CspReportThrottleTest {
 
         assertThat(throttle.tryAcquire("198.51.100.21")).isTrue();
         assertThat(throttle.tryAcquire("198.51.100.22")).isTrue();
+    }
+
+    @Test
+    void cleanupKeepsFreshWindowsAndRemovesExpiredOnes() {
+        assertThat(throttle.tryAcquire(IP)).isTrue();
+        assertThat(throttle.tryAcquire("198.51.100.23")).isTrue();
+
+        // 半窗口：都还没过期，清理不应删除任何记录（否则计数被清零可绕过限速）
+        clock.advance(WINDOW_MS / 2);
+        assertThat(throttle.cleanupExpired()).isZero();
+
+        clock.advance(WINDOW_MS);
+        assertThat(throttle.cleanupExpired()).isEqualTo(2);
+        assertThat(throttle.cleanupExpired()).isZero();
+    }
+
+    @Test
+    void rejectsInvalidConfigurationAtConstruction() {
+        assertThatThrownBy(() -> new CspReportThrottle(clock, 0, WINDOW_MS))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("max-per-minute");
+        assertThatThrownBy(() -> new CspReportThrottle(clock, 1, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("window-ms");
     }
 
     // ---------- 辅助 ----------

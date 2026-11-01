@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -38,6 +39,12 @@ public class CspReportSanitizer {
     /** 触发样本最大长度。 */
     private static final int MAX_SAMPLE_LENGTH = 120;
 
+    /** 指令名最大长度（正常值都很短，超长只可能是伪造）。 */
+    private static final int MAX_DIRECTIVE_LENGTH = 60;
+
+    /** disposition 最大长度（合法值只有 enforce / report）。 */
+    private static final int MAX_DISPOSITION_LENGTH = 20;
+
     private static final Pattern CONTROL_CHARS = Pattern.compile("\\p{Cntrl}");
 
     private final ObjectMapper objectMapper;
@@ -62,7 +69,7 @@ public class CspReportSanitizer {
             if (root == null || root.isMissingNode() || root.isNull()) {
                 return List.of();
             }
-            if (contentType != null && contentType.contains(REPORTS_CONTENT_TYPE)) {
+            if (contentType != null && contentType.toLowerCase(Locale.ROOT).contains(REPORTS_CONTENT_TYPE)) {
                 return parseBatch(root);
             }
             JsonNode report = root.path("csp-report");
@@ -103,11 +110,11 @@ public class CspReportSanitizer {
         }
         return new CspViolation(
                 cleanUrl(text(report, "document-uri", "documentURL")),
-                directive,
+                cleanToken(directive, MAX_DIRECTIVE_LENGTH),
                 cleanUrl(text(report, "blocked-uri", "blockedURL")),
                 cleanUrl(text(report, "source-file", "sourceFile")),
                 cleanSample(text(report, "script-sample", "sample")),
-                text(report, "disposition", null));
+                cleanToken(text(report, "disposition", null), MAX_DISPOSITION_LENGTH));
     }
 
     /** 取文本字段：缺失、JSON null 或非值节点都视为空串。 */
@@ -122,21 +129,26 @@ public class CspReportSanitizer {
         return value.asText();
     }
 
-    /** URL 清洗：去掉 query/fragment，trim 后截断到 300；{@code inline}/{@code eval} 等字面量原样保留。 */
+    /** URL 清洗：去掉控制字符与 query/fragment，trim 后截断到 300；{@code inline}/{@code eval} 等字面量原样保留。 */
     static String cleanUrl(String raw) {
         if (raw == null || raw.isEmpty()) {
             return "";
         }
-        int end = raw.length();
-        int queryIndex = raw.indexOf('?');
+        // 先去控制字符：这些字段会原样进日志，\r\n 可伪造日志行、ESC 可做 ANSI 注入
+        String value = CONTROL_CHARS.matcher(raw).replaceAll("");
+        if (value.isEmpty()) {
+            return "";
+        }
+        int end = value.length();
+        int queryIndex = value.indexOf('?');
         if (queryIndex >= 0) {
             end = Math.min(end, queryIndex);
         }
-        int fragmentIndex = raw.indexOf('#');
+        int fragmentIndex = value.indexOf('#');
         if (fragmentIndex >= 0) {
             end = Math.min(end, fragmentIndex);
         }
-        return truncate(raw.substring(0, end).trim(), MAX_URL_LENGTH);
+        return truncate(value.substring(0, end).trim(), MAX_URL_LENGTH);
     }
 
     /** 样本清洗：去掉控制字符（含换行），trim 后截断到 120。 */
@@ -147,7 +159,28 @@ public class CspReportSanitizer {
         return truncate(CONTROL_CHARS.matcher(raw).replaceAll("").trim(), MAX_SAMPLE_LENGTH);
     }
 
+    /**
+     * 短标识清洗：去掉控制字符（含 CR/LF/ESC）并截断。
+     *
+     * <p>{@code directive} 与 {@code disposition} 是浏览器填的字段，但不排除被伪造成
+     * 多行内容；原样拼进 WARN 就能伪造日志行（CWE-117），所以先清洗再截断。</p>
+     */
+    static String cleanToken(String raw, int maxLength) {
+        if (raw == null || raw.isEmpty()) {
+            return "";
+        }
+        return truncate(CONTROL_CHARS.matcher(raw).replaceAll("").trim(), maxLength);
+    }
+
+    /** 按 code point 截断，避免把代理对劈成孤立字符。 */
     private static String truncate(String value, int maxLength) {
-        return value.length() <= maxLength ? value : value.substring(0, maxLength);
+        if (value.length() <= maxLength) {
+            return value;
+        }
+        int codePoints = value.codePointCount(0, value.length());
+        if (codePoints <= maxLength) {
+            return value;
+        }
+        return value.substring(0, value.offsetByCodePoints(0, maxLength));
     }
 }

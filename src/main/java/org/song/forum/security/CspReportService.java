@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * 接收浏览器 CSP 上报并输出结构化日志。
  *
@@ -18,6 +20,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class CspReportService {
 
+    /** 单次请求最多输出多少条 WARN（批量上报可以被伪造得很长）。 */
+    public static final int MAX_LOGS_PER_REQUEST = 10;
+
     private final ClientIpResolver clientIpResolver;
     private final CspReportThrottle throttle;
     private final CspReportSanitizer sanitizer;
@@ -27,6 +32,10 @@ public class CspReportService {
                             CspReportThrottle throttle,
                             CspReportSanitizer sanitizer,
                             @Value("${app.security.csp-report.max-body-bytes:8192}") int maxBodyBytes) {
+        if (maxBodyBytes < 1) {
+            throw new IllegalArgumentException(
+                    "app.security.csp-report.max-body-bytes 必须 >= 1，当前 " + maxBodyBytes);
+        }
         this.clientIpResolver = clientIpResolver;
         this.throttle = throttle;
         this.sanitizer = sanitizer;
@@ -34,13 +43,15 @@ public class CspReportService {
     }
 
     /**
-     * 接收一次上报。日志每条违规一行 WARN，单 IP 的条数由 {@link CspReportThrottle} 限制。
+     * 接收一次上报。日志每条违规一行 WARN（单次请求最多 {@value #MAX_LOGS_PER_REQUEST} 行），
+     * 单 IP 的请求条数由 {@link CspReportThrottle} 限制。
      *
      * @param request 原始请求；方法不会写入响应，也不会抛出异常
      */
     public void accept(HttpServletRequest request) {
-        String ip = clientIpResolver.resolve(request);
+        String ip = "";
         try {
+            ip = clientIpResolver.resolve(request);
             if (!throttle.tryAcquire(ip)) {
                 log.debug("CSP 上报被限速丢弃 ip={}", ip);
                 return;
@@ -55,9 +66,18 @@ public class CspReportService {
                 return;
             }
             String contentType = request.getContentType() == null ? "" : request.getContentType();
-            for (CspViolation v : sanitizer.sanitize(contentType, body)) {
-                log.warn("CSP 违规上报 ip={} directive={} blocked={} doc={} sample={} disposition={}",
-                        ip, v.directive(), v.blockedUri(), v.documentUri(), v.sample(), v.disposition());
+            List<CspViolation> violations = sanitizer.sanitize(contentType, body);
+            int logged = 0;
+            for (CspViolation v : violations) {
+                if (logged >= MAX_LOGS_PER_REQUEST) {
+                    log.debug("CSP 上报条目过多，仅记录前 {} 条 ip={} 总数={}",
+                            MAX_LOGS_PER_REQUEST, ip, violations.size());
+                    break;
+                }
+                log.warn("CSP 违规上报 ip={} directive={} blocked={} doc={} src={} sample={} disposition={}",
+                        ip, v.directive(), v.blockedUri(), v.documentUri(), v.sourceFile(),
+                        v.sample(), v.disposition());
+                logged++;
             }
         } catch (Exception e) {
             // 上报端点不允许因为坏输入产生 5xx，也不允许把异常栈刷进日志
