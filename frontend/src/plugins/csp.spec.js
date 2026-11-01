@@ -130,6 +130,27 @@ describe('CSP 与内联脚本哈希', () => {
     expect(uploadsBlock).not.toContain('Content-Security-Policy')
   })
 
+  it('CSP 声明 report-uri 与 report-to，并由 index location 下发 Reporting-Endpoints', () => {
+    const conf = readFileSync(FORUM_CONF, 'utf8')
+    const [csp] = cspValues(FORUM_CONF)
+    expect(csp, 'forum.conf 缺少 CSP').toBeTruthy()
+    expect(csp).toContain('report-uri /forum/api/csp-report')
+    expect(csp).toContain('report-to csp-endpoint')
+    // 必须写在 index.html 的精确 location 里：HTML 的实际响应由它产出，写 server 级会被屏蔽
+    const block = locationBlock(conf, 'location = /forum/index.html')
+    expect(block, 'forum.conf 缺少 index.html location').toBeTruthy()
+    expect(block).toContain('Reporting-Endpoints')
+    expect(block).toContain('csp-endpoint="/forum/api/csp-report"')
+  })
+
+  it('deploy.sh 含 CSP 上报通道断言（响应头 + 真实 POST 204）', () => {
+    const script = readFileSync(DEPLOY_SH, 'utf8')
+    expect(script).toContain('reporting-endpoints')
+    expect(script).toContain('csp-endpoint="/forum/api/csp-report"')
+    expect(script).toContain('/forum/api/csp-report')
+    expect(script).toContain('CSP 上报通道校验通过')
+  })
+
   it('deploy.sh 含 CSP 与 uploads 头断言（按唯一串断言，避免恒真）', () => {
     const script = readFileSync(DEPLOY_SH, 'utf8')
     expect(script).toContain('content-security-policy')

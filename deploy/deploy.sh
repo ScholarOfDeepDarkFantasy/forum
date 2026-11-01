@@ -259,6 +259,22 @@ expected_style_src="style-src 'self' 'unsafe-inline'"
     || die "公网 CSP 的 style-src 不是预期值（实际：${style_src:-空}；预期：$expected_style_src）"
 log "CSP 校验通过：哈希与首页内联脚本一致（$csp_hash），script/connect/style-src 结构符合预期"
 
+# 第十三轮：CSP 上报通道必须真的通。浏览器只会把违规 POST 到 /forum/api/csp-report；
+# 头/指令缺失时上报会静默丢失（浏览器不报错），所以这些断言只能在部署期拦住配置漂移。
+reporting_endpoints="$(printf '%s
+' "$public_csp" | grep -i '^reporting-endpoints:' || true)"
+printf '%s
+' "$reporting_endpoints" | grep -qi 'csp-endpoint="/forum/api/csp-report"'     || die "公网 /forum/ 缺少 Reporting-Endpoints: csp-endpoint（实际：${reporting_endpoints:-无该头}）"
+printf '%s
+' "$public_csp" | grep -qi 'report-uri /forum/api/csp-report'     || die "公网 CSP 缺少 report-uri /forum/api/csp-report"
+printf '%s
+' "$public_csp" | grep -qi 'report-to csp-endpoint'     || die "公网 CSP 缺少 report-to csp-endpoint"
+csp_report_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5     -X POST -H 'Content-Type: application/csp-report'     --data '{"csp-report":{"document-uri":"http://127.0.0.1/forum/","violated-directive":"script-src","blocked-uri":"inline"}}'     http://127.0.0.1/forum/api/csp-report || true)"
+[ "$csp_report_code" = "204" ]     || die "CSP 上报端点未返回 204（实际：${csp_report_code:-空}）"
+csp_report_get="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5     http://127.0.0.1/forum/api/csp-report || true)"
+[ "$csp_report_get" = "405" ]     || die "CSP 上报端点不应接受 GET（实际：${csp_report_get:-空}）"
+log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，GET 405"
+
 # 上传目录（图片）也必须带全套安全头；用一个不存在的文件名，验证 add_header 的
 # always 生效（404 也下发）。这里只看头，不看状态码。
 uploads_probe="$(curl -sS --max-time 5 -I -H 'Host: raspi' "http://127.0.0.1/forum/uploads/__probe_missing__.png" | tr -d '\r' || true)"
