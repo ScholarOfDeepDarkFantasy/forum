@@ -14,6 +14,7 @@ const ROOT = resolve(process.cwd(), '..')
 const FORUM_CONF = resolve(ROOT, 'deploy/nginx/forum.conf')
 const PUBLIC_CONF = resolve(ROOT, 'deploy/nginx/public.conf')
 const DEPLOY_SH = resolve(ROOT, 'deploy/deploy.sh')
+const COMPOSE_FILE = resolve(ROOT, 'docker-compose.yml')
 const INDEX_HTML = resolve(process.cwd(), 'index.html')
 
 const CSP_RE = /add_header\s+Content-Security-Policy\s+"([^"]+)"\s+always;/g
@@ -139,16 +140,41 @@ describe('CSP 与内联脚本哈希', () => {
     // 必须写在 index.html 的精确 location 里：HTML 的实际响应由它产出，写 server 级会被屏蔽
     const block = locationBlock(conf, 'location = /forum/index.html')
     expect(block, 'forum.conf 缺少 index.html location').toBeTruthy()
-    expect(block).toContain('Reporting-Endpoints')
-    expect(block).toContain('csp-endpoint="/forum/api/csp-report"')
+    // 必须锚定到真实的 add_header 行：注释里也出现过 Reporting-Endpoints，
+    // 只写 toContain 的话「注释掉这一行」仍然会绿。
+    expect(block).toMatch(
+      /^\s*add_header\s+Reporting-Endpoints\s+'csp-endpoint="\/forum\/api\/csp-report"'\s+always;\s*$/m
+    )
   })
 
-  it('deploy.sh 含 CSP 上报通道断言（响应头 + 真实 POST 204）', () => {
+  it('deploy.sh 的 CSP 上报探针带 Host 头并逐字断言 204/405', () => {
     const script = readFileSync(DEPLOY_SH, 'utf8')
-    expect(script).toContain('reporting-endpoints')
-    expect(script).toContain('csp-endpoint="/forum/api/csp-report"')
-    expect(script).toContain('/forum/api/csp-report')
-    expect(script).toContain('CSP 上报通道校验通过')
+    const start = script.indexOf('# 第十三轮：CSP 上报通道')
+    const end = script.indexOf('CSP 上报通道校验通过', start)
+    expect(start, 'deploy.sh 缺少 CSP 上报通道断言块').toBeGreaterThan(-1)
+    expect(end, 'deploy.sh 缺少 CSP 上报通道校验日志').toBeGreaterThan(start)
+    const block = script.slice(start, end)
+    expect(block).toContain('csp-endpoint="/forum/api/csp-report"')
+    expect(block).toContain('report-uri /forum/api/csp-report')
+    expect(block).toContain('report-to csp-endpoint')
+    // 缺 Host: raspi 时请求落到默认站点拿 404，部署会假红；两个探针都必须带
+    expect(block.match(/-H 'Host: raspi'/g) || []).toHaveLength(2)
+    expect(block).toContain('[ "$csp_report_code" = "204" ]')
+    expect(block).toContain('[ "$csp_report_get" = "405" ]')
+  })
+
+  it('docker-compose 透传 CSP 上报配置（止血路径可用）', () => {
+    // 设计 §4.5：被刷量时把 CSP_REPORT_MAX_PER_MINUTE 调小即可止血；
+    // 若 compose 不透传，改 .env 不会进容器，止血路径会静默失效。
+    const compose = readFileSync(COMPOSE_FILE, 'utf8')
+    for (const name of [
+      'CSP_REPORT_MAX_PER_MINUTE',
+      'CSP_REPORT_WINDOW_MS',
+      'CSP_REPORT_CLEANUP_INTERVAL_MS',
+      'CSP_REPORT_MAX_BODY_BYTES'
+    ]) {
+      expect(compose, `docker-compose 缺少 ${name} 透传`).toContain(`${name}: \${${name}:-`)
+    }
   })
 
   it('deploy.sh 含 CSP 与 uploads 头断言（按唯一串断言，避免恒真）', () => {

@@ -35,6 +35,11 @@ services:
       LOGIN_WINDOW_MS: ${LOGIN_WINDOW_MS:-900000}
       LOGIN_LOCK_MS: ${LOGIN_LOCK_MS:-900000}
       LOGIN_CLEANUP_INTERVAL_MS: ${LOGIN_CLEANUP_INTERVAL_MS:-60000}
+      # CSP 上报限速与体积上限（application.yml 有同名默认值）；调小 max-per-minute 可快速止血
+      CSP_REPORT_MAX_PER_MINUTE: ${CSP_REPORT_MAX_PER_MINUTE:-20}
+      CSP_REPORT_WINDOW_MS: ${CSP_REPORT_WINDOW_MS:-60000}
+      CSP_REPORT_CLEANUP_INTERVAL_MS: ${CSP_REPORT_CLEANUP_INTERVAL_MS:-60000}
+      CSP_REPORT_MAX_BODY_BYTES: ${CSP_REPORT_MAX_BODY_BYTES:-8192}
       # 显式 -Xmx 而不是 -XX:MaxRAMPercentage：raspi 内核 cmdline 带 cgroup_disable=memory，
       # 容器看不到内存上限，MaxRAMPercentage 会按整机内存算，反而容易 OOM 整机
       JAVA_OPTS: ${JAVA_OPTS:--Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError}
