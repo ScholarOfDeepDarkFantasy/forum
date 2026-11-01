@@ -19,7 +19,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.song.forum.dto.auth.AuthResponse;
+import org.song.forum.dto.auth.LoginRequest;
+import org.song.forum.dto.auth.RegisterRequest;
 import org.song.forum.security.CspReportService;
+import org.song.forum.util.Result;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -172,6 +176,39 @@ class CspReportIntegrationTest {
                 url("/api/csp-report"), HttpMethod.GET, HttpEntity.EMPTY, String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+    }
+
+    @Test
+    void nonPostMethodsReturn405InsteadOfServerError() {
+        // 匿名 PUT 先被 Security 拦成 401（脚本无法拿到有效 JWT 大量刷）
+        ResponseEntity<String> anonymousPut = rest.exchange(
+                url("/api/csp-report"), HttpMethod.PUT, HttpEntity.EMPTY, String.class);
+        assertThat(anonymousPut.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // 带合法 JWT 时不能再落到 Exception 兜底：405 + Allow，而不是 500 + ERROR 堆栈
+        RegisterRequest register = new RegisterRequest();
+        register.setUsername("csp405_" + System.nanoTime());
+        register.setPassword("password123");
+        register.setEmail(register.getUsername() + "@test.com");
+        ResponseEntity<Result> registered = rest.postForEntity(url("/api/auth/register"), register, Result.class);
+        assertThat(registered.getStatusCode().value()).isEqualTo(201);
+
+        LoginRequest login = new LoginRequest();
+        login.setUsername(register.getUsername());
+        login.setPassword("password123");
+        ResponseEntity<Result<AuthResponse>> loginResp = rest.exchange(url("/api/auth/login"),
+                HttpMethod.POST, new HttpEntity<>(login),
+                new org.springframework.core.ParameterizedTypeReference<>() {
+                });
+        String token = loginResp.getBody().getData().getToken();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        ResponseEntity<String> authenticatedPut = rest.exchange(
+                url("/api/csp-report"), HttpMethod.PUT, new HttpEntity<>("{}", headers), String.class);
+
+        assertThat(authenticatedPut.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(authenticatedPut.getHeaders().getFirst(HttpHeaders.ALLOW)).contains("POST");
     }
 
     // ---------- 辅助 ----------

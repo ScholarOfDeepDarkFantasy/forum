@@ -139,10 +139,10 @@ cd frontend && pnpm test --run
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 87 | 5535 |
-| 后端测试（`src/test/java`） | 25 | 5561 |
+| 后端主代码（`src/main/java`） | 87 | 5537 |
+| 后端测试（`src/test/java`） | 25 | 5625 |
 | 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4780 |
-| 前端测试（`*.spec.js`） | 33 | 5941 |
+| 前端测试（`*.spec.js`） | 33 | 6001 |
 | 前端 E2E（`frontend/e2e` + `playwright.config.js`） | 8 | 360 |
 
 后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 10、`service/` 11、`security/` 11（+`ClientIpResolver`、`LoginRateLimiter`、CSP 上报四件套，`exception/` 另加 `TooManyLoginAttemptsException`）、`config/` 7（+`ClockConfig`）、`util/` 4、`exception/` 4。
@@ -153,14 +153,14 @@ cd frontend && pnpm test --run
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **195** 个用例 / 24 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
-| 前端 | **333** 个用例 / 33 个 spec | 全绿 |
+| 后端 | **197** 个用例 / 24 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 前端 | **334** 个用例 / 33 个 spec | 全绿 |
 | 前端 E2E | **8** 个用例 / 5 个 spec（Playwright） | 全绿（手动执行，不计入上面两行基线） |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布（合计 195）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CspReportIntegrationTest` 7、`CspReportSanitizerTest` 6、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`CspReportThrottleTest` 5、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
+后端测试类分布（合计 197）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CspReportIntegrationTest` 8、`CspReportSanitizerTest` 7、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`CspReportThrottleTest` 5、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
 
-前端 spec 分布（合计 333）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）17、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3、`elementAutoImport` 2、`csp` 10。
+前端 spec 分布（合计 334）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）17、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3、`elementAutoImport` 2、`csp` 11。
 
 > 分布行在此前的记录里与实际总数对不上（2026-10-24 复核时后端、前端两行均已按 `target/surefire-reports` 与 `pnpm test` 输出重新点数并对齐）；此后以本行标注的合计与 `mvn` / `vitest` 的实际输出为准。
 
@@ -971,12 +971,13 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | `deploy/nginx/forum.conf` | `index.html` location 的 CSP 追加 `report-uri /forum/api/csp-report; report-to csp-endpoint`，并下发 `Reporting-Endpoints: csp-endpoint="/forum/api/csp-report"`；新增精确 location `= /forum/api/csp-report`（反代 8086、`client_max_body_size 16k`、`access_log off`、`proxy_read_timeout 10s`） |
 | `deploy/nginx/public.conf` | server 级 CSP 同步追加两条上报指令（与 `forum.conf` 逐字相同，`csp.spec.js` 断言） |
 | `deploy/deploy.sh` | 部署期新增 5 条断言：`Reporting-Endpoints` 头、`report-uri`、`report-to`、真实 POST 204、GET 405 |
-| 后端 | 新增 `CspReportController`（`POST /api/csp-report`，永远 204 + `Cache-Control: no-store`，额外 `@GetMapping` 返回 405）、`CspReportService`（有界读取 8 KB、先限速后读 body、白名单字段结构化 WARN、任何异常只 debug）、`CspReportSanitizer`（兼容 legacy `application/csp-report` 与 Reporting API `application/reports+json`，URL 去 query/fragment、截断 300/120）、`CspReportThrottle`（每 IP 每分钟 20 条固定窗口，`@Scheduled` 清理）、`CspViolation`；`SecurityConfig` 放行匿名 POST；`application.yml` 增加 4 个 `CSP_REPORT_*` 配置 |
+| 后端 | 新增 `CspReportController`（`POST /api/csp-report`，永远 204 + `Cache-Control: no-store`；非 POST 方法由全局异常处理器统一返回 405 + `Allow: POST`，匿名请求先被 Security 拦成 401）、`CspReportService`（有界读取 8 KB、先限速后读 body、白名单字段结构化 WARN、任何异常只 debug）、`CspReportSanitizer`（兼容 legacy `application/csp-report` 与 Reporting API `application/reports+json`，URL 去 query/fragment、截断 300/120）、`CspReportThrottle`（每 IP 每分钟 20 条固定窗口，`@Scheduled` 清理）、`CspViolation`；`SecurityConfig` 放行匿名 POST；`application.yml` 增加 4 个 `CSP_REPORT_*` 配置 |
 | `frontend/src/plugins/csp.spec.js` | 新增 2 条守护：CSP 含两条上报指令且 `Reporting-Endpoints` 在 `index.html` location 内；`deploy.sh` 含上报通道断言唯一串 |
 
 **端点行为**：浏览器上报由页面发起、不带认证头，所以端点公开；防护靠「体积上限 + 每 IP 限速 +
-永不回显 + 不落原始 body + 坏输入一律 204」。现代浏览器同时识别 `report-uri` 与 `report-to` 时会
-各发一份，日志会出现重复条目（字段相同），按 `directive` 汇总即可。
+永不回显 + 不落原始 body + 坏输入一律 204」。CSP3 语义下，支持 `report-to` 的浏览器会忽略
+`report-uri`，通常只发一份；旧浏览器只发 `report-uri`。两者都收到时字段相同，按 `directive`
+汇总即可。
 
 **验证矩阵**
 
@@ -988,9 +989,9 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | V4 | Reporting API 批量上报 → 204 | ✅ 204；日志 `directive=img-src blocked=https://evil.example/x.png` |
 | V5 | 坏 JSON / 20KB body / `text/plain` → 204；GET → 405；容器日志无 ERROR | ✅ badjson 204、GET 405、`grep -c ' ERROR '` = 0 |
 | V6 | Playwright 公网注入内联脚本触发真实违规 → 日志 `blocked=inline` | ✅ 控制台 1 条 CSP 违规；后端日志 `directive=script-src-elem blocked=inline doc=https://treenewbee.men/forum/` |
-| V7 | 基线 195/24、333/33、E2E 8/8、`check:bundle` 0 | ✅ 195/24/1 skip、333/33、公网 E2E 8 passed (47.6s)、五项预算内 |
+| V7 | 基线 197/24、334/33、E2E 8/8、`check:bundle` 0 | ✅ 197/24/1 skip、334/33、公网 E2E 8 passed (47.6s)、五项预算内 |
 
-**构建记录**：`fda6306` 设计与计划 → `8301208` 后端 → `91b9e19` nginx 与断言 → `43efc71` 日志安全加固 → `4f84910` 部署探针与配置透传 → `3370c94` 文档记录 → 回填提交 → Jenkins **Build #40 SUCCESS**（镜像 `forum-backend:40`）。
+**构建记录**：`fda6306` 设计与计划 → `8301208` 后端 → `91b9e19` nginx 与断言 → `43efc71` 日志安全加固 → `4f84910` 部署探针与配置透传 → `3370c94` 文档记录 → Jenkins **Build #40 SUCCESS**（checkout `3370c94`，镜像 `forum-backend:40`）→ 回填提交 `c8751fa` → **Build #41 SUCCESS**（镜像 `forum-backend:41`，docs-only 但流水线仍构建部署）→ 第二轮审查修复提交 → **Build #42** → 回填提交 → **Build #43**。
 
 **已知限制**
 
@@ -1000,9 +1001,9 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 4. 只读白名单字段（`document-uri`/`directive`/`blocked-uri`/`source-file`/`script-sample`/`disposition`），
    不落原始 body；需要完整上下文时按 `doc` 字段人工复现。
 5. `access_log off` 只关 nginx 侧；上报证据在后端 WARN 里。
-6. 现代浏览器双指令重复上报（见上）。
-7. 日志字段已去控制字符（`
-`/ESC 无法伪造日志行或做 ANSI 注入），`directive` ≤60、`disposition` ≤20；
+6. 支持 `report-to` 的浏览器会忽略 `report-uri`（CSP3），通常只发一份；旧浏览器只发 `report-uri`。
+7. 日志字段已去控制字符（`\r`/`\n`/ESC 等无法伪造日志行或做 ANSI 注入；除 ASCII 控制字符外，
+   还覆盖 U+0085/U+009B/U+2028/U+2029 这类 C1/行分隔符），`directive` ≤60、`disposition` ≤20；
    单次请求最多输出 10 行 WARN——批量上报可以被伪造成几十条，不设上限时一次请求就能放大日志。
 8. 三个阈值（`max-body-bytes`、`max-per-minute`、`window-ms`）都有启动期校验；第 4 个
    `cleanup-interval-ms` 由 `@Scheduled` 占位符消费，没有显式校验（与登录限流器同款残留）。
@@ -1020,13 +1021,27 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
   并修正被写坏的 `printf` 与续行格式；`csp.spec.js` 锚定真实 `add_header` 行、逐字断言 204/405 与两个 Host 头、
   新增 compose 透传断言（`csp` 9→10）；`docker-compose.yml` 透传 4 个 `CSP_REPORT_*`（止血路径可用）；`forum.conf` 注释纠正。
 - 变异验证：4 个新增测试分别杀掉「去控制字符」「体积守卫」「单请求上限」「清理过期」四个变异；
-  `csp.spec.js` 对「注释掉 add_header」「删掉 204/405 断言」均变红。
+  把 `forum.conf` 的 CSP `add_header` 注释掉后 `csp.spec.js` **6 failed | 5 passed**（修复「注释仍绿」的假绿）。
 
-**上线验收（2026-11-01，Build #40，镜像 `forum-backend:40`）**
+**第二轮审查修复（2026-11-01）**
+
+- 非 POST 方法（PUT/PATCH/DELETE）带合法 JWT 时原本会被全局兜底处理器转成 500 并 `log.error` 打堆栈，
+  且绕过上报限速。已改为 `GlobalExceptionHandler` 统一处理 `HttpRequestMethodNotSupportedException`：
+  返回 405 + `Allow`（`POST`），匿名请求仍先被 Security 拦成 401；`CspReportController` 删掉专门的 GET 405 方法。
+  新增集成测试覆盖「匿名 PUT 401 / 带认证 PUT 405 且 Allow 含 POST」。
+- `csp.spec.js` 重写为「剔除注释行 + 行首锚定」的解析方式（新增 `stripComments`/`readActive`/`hasActiveLine`），
+  并把「注释掉的防护必须不计入」本身做成一条测试；此前注释掉 CSP `add_header`、uploads 头、deploy 的 204/405
+  断言、compose 透传行都能保持全绿。
+- 清洗正则从 `\p{Cntrl}` 扩展为 `[\p{Cc}\p{Cf}\u2028\u2029]`，补 C1 控制字符与行/段分隔符测试。
+- 修复后基线：后端 **197/24/1 skip**、前端 **334/33**；`csp` 10→11、`CspReportSanitizerTest` 6→7、
+  `CspReportIntegrationTest` 7→8。
+
+**上线验收（2026-11-01，Build #40 → 回填 Build #41）**
 
 - 推送 `c4c41c0..3370c94`（SSH）→ Build #40 SUCCESS，容器 `forum-backend:40` 健康，`/api/health` 200。
 - 公网 V1–V7 全过（见上表）；V6 由真实 Edge 浏览器注入内联脚本触发，后端日志记录 `script-src-elem`/`inline`。
 - `deploy.sh` 13 组断言 + 新增上报通道断言全过（部署期间还会产生一条 `doc=http://127.0.0.1/forum/` 的合成 WARN，属断言探针，预期内）。
+- 回填提交 `c8751fa` 触发 Build #41 SUCCESS（镜像 41），远端与 HEAD 一致；第二轮审查修复进一步产出 Build #42/#43（见上）。
 - 已知口径：上报 IP 为 Cloudflare 真实客户端 IP（realip 生效），不是容器网关。
 
 ## 5. 待办与后续计划
@@ -1137,16 +1152,18 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 ## 8. 变更日志
 
-> 新增条目请加在表格**最上方**（最新在前）。本表覆盖仓库全部提交，可用下方命令核对是否漏记：
+> 新增条目请加在表格**最上方**（最新在前）。本表从**第九轮回填基线（`9199d91`）之后**逐条记录，
+> 早期历史（约 37 条）不回填；核对缺口时只比较该基线之后的提交：
 >
 > ```bash
-> git log --format='%h' | wc -l          # 提交总数
-> grep -c '^| 2026-' docs/DEVELOPMENT.md  # 本表行数
+> git rev-list --count 9199d91..HEAD      # 基线之后的提交数
+> grep -c '^| 2026-' docs/DEVELOPMENT.md  # 本表行数（含更早条目，故比上一条多）
 > ```
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-11-01 | docs | 回填第十三轮构建与上线验收（Build #40 / 镜像 40、V1–V7） | 本次提交 |
+| 2026-11-01 | fix | 修正非 POST 方法 500（全局 405 + `Allow`）与 csp.spec 注释假绿，清洗 C1 字符 | 本次提交 |
+| 2026-11-01 | docs | 回填第十三轮构建与上线验收（Build #41 / 镜像 41、V1–V7） | `c8751fa` |
 | 2026-11-01 | docs | 记录第十三轮 CSP 违规上报（§4.18、T18 关闭、基线 195/333） | `3370c94` |
 | 2026-11-01 | fix | 修正 CSP 上报部署探针（补 `Host: raspi`）并透传 `CSP_REPORT_*` 配置 | `4f84910` |
 | 2026-11-01 | fix | 加固 CSP 上报清洗与限速的日志安全（控制字符、单请求上限、测试缺口） | `43efc71` |

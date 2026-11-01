@@ -312,15 +312,15 @@ log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，G
 
 ## Task 5：全量验证、部署与回填
 
-- [ ] 5-1 全量回归（本地）：`mvn -B clean test` → 190/24/1 skip；前端 `pnpm test` → 332/33；
+- [x] 5-1 全量回归（本地）：`mvn -B -o test` → 197/24/1 skip；前端 `pnpm test` → 334/33；
   `VITE_BASE_PATH=/forum/ pnpm build` + `pnpm check:bundle` 0；`pnpm exec playwright test --list` → 8/5。
-- [ ] 5-2 推送 `git push git@github.com:ScholarOfDeepDarkFantasy/forum.git master:master`。
-- [ ] 5-3 Jenkins 构建（预计 #40），确认 `deploy.sh` 新断言通过（日志含 `CSP 上报通道校验通过`）。
-- [ ] 5-4 公网验收 V1–V6（含 Playwright 注入内联脚本触发真实违规，`podman logs | grep 'CSP 违规上报'`
+- [x] 5-2 推送 `git push git@github.com:ScholarOfDeepDarkFantasy/forum.git master:master`。
+- [x] 5-3 Jenkins 构建：`3370c94` → #40，回填 `c8751fa` → #41；`deploy.sh` 新断言通过（日志含 `CSP 上报通道校验通过`）。
+- [x] 5-4 公网验收 V1–V6（含 Playwright 注入内联脚本触发真实违规，`podman logs | grep 'CSP 违规上报'`
   出现 `blocked=inline`）；V5 坏输入全 204/405、无 ERROR。
-- [ ] 5-5 回填：§4.18 上线验收（Build #N/镜像 N、V1–V7 结果）、§8 回填行、§12 构建表、部署手册验收段；
+- [x] 5-5 回填：§4.18 上线验收（Build #N/镜像 N、V1–V7 结果）、§8 回填行、§12 构建表、部署手册验收段；
   提交 `docs: 回填第十三轮构建与上线验收` → 推送 → 构建 #41 → 确认远端==HEAD。
-- [ ] 5-6 最终只读审查（提交形态、端点安全性、日志清洗、nginx 配置、文档一致性）→ 收尾报告。
+- [x] 5-6 最终只读审查（提交形态、端点安全性、日志清洗、nginx 配置、文档一致性）→ 收尾报告。
 
 ## 附录 A：提交信息（逐字）
 
@@ -352,13 +352,15 @@ log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，G
 | `43efc71` | 审查修复：日志注入清洗、单请求 WARN 上限、测试缺口（+5 例） | #40（同批推送） |
 | `4f84910` | 审查修复：deploy 探针补 `Host: raspi`、csp.spec 锚定断言、compose 透传 4 个 `CSP_REPORT_*` | #40（同批推送） |
 | `3370c94` | 文档记录（§4.18、README、部署手册、计划） | #40 SUCCESS / 镜像 40 |
-| 本次回填提交 | 回填构建号与公网验收 | Build #41（预期） |
+| `c8751fa` | 回填构建号与公网验收（V1–V7） | #41 SUCCESS / 镜像 41 |
+| 本轮修复提交 | 终审修复：非 POST 405、csp.spec 去注释锚定、C1 字符清洗（+2 后端 / +1 前端测试） | #42 SUCCESS / 镜像 42 |
+| 本次回填提交 | 回填第二轮构建号与复审结果 | #43 SUCCESS / 镜像 43 |
 
 ### 12.2 偏差
 
 | # | 偏差 | 理由 |
 | --- | --- | --- |
-| 1 | Controller 额外加 `@GetMapping` 返回 405 | 全局 `@ExceptionHandler(Exception.class)` 会把 `HttpRequestMethodNotSupportedException` 转成 500；改全局异常器超出 Task 2 文件范围，且 GET 405 是部署断言要求的可观测行为 |
+| 1 | 初版 Controller 额外加 `@GetMapping` 返回 405；终审后改为全局 `@ExceptionHandler(HttpRequestMethodNotSupportedException.class)`（405 + `Allow`），删除该 GET 方法 | 初版为最小改动；但 PUT/PATCH/DELETE 仍会 500 + `log.error` 堆栈并绕过限速，属真实缺陷，故在终审修复中改为全局处理 |
 | 2 | Sanitizer 在 kebab-case 之外补 camelCase 回退（`documentURL`/`blockedURL`/`sourceFile` 等） | 兼容真实 Reporting API 解析器差异；kebab-case 仍是主路径，测试也以 kebab-case 为主 |
 | 3 | 「错误 Content-Type」用例实际发送 `text/plain` + 坏 JSON | 端点按「有无 `csp-report` 节点」解析，未硬性拒绝合法 JSON 的 `text/plain`；行为仍是 204 且不记日志，符合「坏输入不炸」目标 |
 | 4 | `Reporting-Endpoints` 用 nginx 单引号字符串：`add_header Reporting-Endpoints 'csp-endpoint="/forum/api/csp-report"' always;` | 先在 raspi 用最小配置 `nginx -t` 验证单引号写法可用（nginx 1.22），避免双引号转义在不同版本下的歧义 |
@@ -368,15 +370,17 @@ log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，G
 | 8 | `deploy.sh` 的 CSP 上报块整体重写 | 首次写入时 heredoc 把 `
 ` 与续行符转义写坏（`printf '%s` + 真实换行、命令被合并成单行）；行为等价但可读性差，借审查修复一并清理 |
 | 9 | `docker-compose.yml` 增加 4 个 `CSP_REPORT_*` 透传 | 设计 §4.5 的止血路径依赖环境变量；不透传时改 `.env` 不进容器，属部署缺陷 |
+| 10 | 终审后又追加一个修复提交（非 POST 405、csp.spec 去注释、C1 字符清洗） | 终审报告 I1/I2/M1 均为真实缺陷（500+ERROR 洪泛、注释变异假绿、清洗漏 C1/行分隔符），且都可在同一提交内收敛 |
+| 11 | 测试基线最终为 197/24/1 skip、334/33（计划预估 190/332） | 首轮 +17 例（Task 2 13、审查修复 5 中的后端部分），第二轮再 +2 后端 / +1 前端 |
 
 ### 12.3 实测
 
 | 项 | 实测 |
 | --- | --- |
 | 后端 RED | `mvn -B test -Dtest='CspReport*Test'` 编译失败：缺 `CspReportService`/`CspReportSanitizer`/`CspViolation`/`CspReportThrottle` |
-| 后端 GREEN | 单类 13/13 → 审查修复后 18/18；全量 `Tests run: 195, Failures: 0, Errors: 0, Skipped: 1`，24 类 |
+| 后端 GREEN | 单类 13/13 → 首轮审查修复后 18/18 → 终审修复后 20/20；全量 `Tests run: 197, Failures: 0, Errors: 0, Skipped: 1`，24 类 |
 | 前端 RED | 还原旧 conf/deploy 后 `csp.spec.js` 2 failed（`report-uri` 缺失、`reporting-endpoints` 缺失） |
-| 前端 GREEN | csp.spec 9/9 → 10/10；全量 `Test Files 33 passed (33)` / `Tests 333 passed (333)` |
+| 前端 GREEN | csp.spec 9/9 → 10/10 → 11/11；全量 `Test Files 33 passed (33)` / `Tests 334 passed (334)` |
 | `bash -n` | `deploy/deploy.sh` 通过 |
 | 构建/预算 | 入口 84.43 kB / CSS 39.02 kB / 最大 chunk 233.74 kB / JS 835.87 kB / CSS 181.57 kB，全部在预算内；E2E 公网 8 passed (47.6 s) |
 
@@ -387,8 +391,9 @@ log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，G
 | Task 2 质量审查 | CHANGES_REQUESTED：I1 匿名可写日志注入（`directive`/`disposition` 未清洗、URL 未去 `
 `/ESC）、I2 单请求日志放大、I3 体积守卫无测试、I4 限速清理与构造校验无测试 | `43efc71` 全部修复并补 5 例；变异验证 4 个新测试分别杀掉对应变异 |
 | Task 3 质量审查 | CHANGES_REQUESTED：C1 两条 curl 缺 `-H 'Host: raspi'`（POST 404 → 每次部署假红）；I1 csp.spec 对注释敏感；I2 spec 未逐字断言 204/405；I3 compose 未透传 `CSP_REPORT_*` | `4f84910` 全部修复；`deploy.sh` 用桩 curl 端到端验证 204/405 与 200 假绿两条路径；csp.spec 变异（注释 add_header、删 204/405 断言）均红 |
+| 最终整体审查 | CHANGES_REQUESTED：I1 非 POST 方法 500 + ERROR 堆栈且绕过限速；I2 csp.spec 对注释变异假绿（实测 4 类全绿）；M1 清洗漏 C1/U+0085/U+009B/U+2028/U+2029 | 本轮修复提交：全局 405 + `Allow`（+2 集成测试）、csp.spec 重写为剔除注释 + 行首锚定（11 条，注释变异 6 failed）、清洗正则扩展（+1 测试）；文档同步 197/334、#40/#41 口径 |
 
-### 12.5 上线验收（Build #40，镜像 `forum-backend:40`）
+### 12.5 上线验收（Build #40/#41，镜像 40/41）
 
 | 项 | 结果 |
 | --- | --- |
@@ -397,7 +402,7 @@ log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，G
 | V3/V4 | legacy 与批量上报均 204，日志分别见 `directive=script-src blocked=inline` 与 `directive=img-src`，IP 为真实客户端 `27.19.110.237` |
 | V5 | 坏 JSON 204、GET 405、容器日志 `ERROR` 计数 0 |
 | V6 | Edge 注入内联脚本：控制台 1 条 CSP 违规，后端日志 `directive=script-src-elem blocked=inline doc=https://treenewbee.men/forum/` |
-| V7 | 后端 195/24/1 skip、前端 333/33、公网 E2E 8 passed (47.6 s)、`check:bundle` exit 0 |
+| V7 | 后端 197/24/1 skip、前端 334/33、公网 E2E 8 passed (47.6 s)、`check:bundle` exit 0 |
 | deploy.sh | 13 组断言 + 新增上报通道断言全过（部署探针本身也会产生一条 `127.0.0.1` 合成 WARN，预期内） |
 
-回填提交触发 Build #41（docs-only）。
+回填提交 `c8751fa` 触发 Build #41 SUCCESS（镜像 41，docs-only 但仍构建部署）；第二轮修复提交 → #42、回填 → #43（见 12.1）。

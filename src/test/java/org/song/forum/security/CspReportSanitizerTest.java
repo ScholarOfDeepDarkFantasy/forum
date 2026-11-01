@@ -120,6 +120,33 @@ class CspReportSanitizerTest {
     }
 
     @Test
+    void stripsUnicodeLineAndFormatSeparatorsToo() {
+        // \p{Cntrl} 只覆盖 ASCII：NEL(U+0085)、CSI(U+009B)、LS(U+2028)、PS(U+2029) 必须一起清掉，
+        // 否则 UTF-8 终端或日志采集器仍可能被伪造换行/转义序列切分。
+        String body = String.format(
+                "{\"csp-report\":{"
+                        + "\"document-uri\":\"https://example.com/a%cb%ccd\","
+                        + "\"effective-directive\":\"script-src%c31mFAKE\","
+                        + "\"blocked-uri\":\"inline%cFAKE\","
+                        + "\"disposition\":\"enforce%cFAKE\"}}",
+                (char) 0x85, (char) 0x2028, (char) 0x2029, (char) 0x9b, (char) 0x85, (char) 0x2028);
+
+        CspViolation violation = sanitize("application/csp-report", body).get(0);
+
+        for (String value : List.of(violation.documentUri(), violation.directive(),
+                violation.blockedUri(), violation.disposition())) {
+            assertThat(value).doesNotContain(String.valueOf((char) 0x85))
+                    .doesNotContain(String.valueOf((char) 0x9b))
+                    .doesNotContain(String.valueOf((char) 0x2028))
+                    .doesNotContain(String.valueOf((char) 0x2029));
+        }
+        assertThat(violation.documentUri()).isEqualTo("https://example.com/abcd");
+        assertThat(violation.directive()).isEqualTo("script-src31mFAKE");
+        assertThat(violation.blockedUri()).isEqualTo("inlineFAKE");
+        assertThat(violation.disposition()).isEqualTo("enforceFAKE");
+    }
+
+    @Test
     void returnsEmptyListForBadJsonEmptyBodyOrMissingReportNode() {
         assertThat(sanitize("application/csp-report", "{not-json")).isEmpty();
         assertThat(sanitize("application/csp-report", "   ")).isEmpty();

@@ -45,7 +45,7 @@ public class CspReportSanitizer {
     /** disposition 最大长度（合法值只有 enforce / report）。 */
     private static final int MAX_DISPOSITION_LENGTH = 20;
 
-    private static final Pattern CONTROL_CHARS = Pattern.compile("\\p{Cntrl}");
+    private static final Pattern CONTROL_CHARS = Pattern.compile("[\\p{Cc}\\p{Cf}\\u2028\\u2029]");
 
     private final ObjectMapper objectMapper;
 

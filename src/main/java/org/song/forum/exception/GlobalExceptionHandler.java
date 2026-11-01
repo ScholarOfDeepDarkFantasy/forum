@@ -2,12 +2,14 @@ package org.song.forum.exception;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -162,6 +164,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleIo(java.io.IOException e) {
         log.debug("IO 异常（连接已断开，按正常断连处理）: {}", e.toString());
         return null;
+    }
+
+    /**
+     * 请求方法不支持 → 405 + Allow。
+     * <p>原先落到 Exception 兜底会变成 500 并打印 ERROR 堆栈：像 {@code /api/csp-report}
+     * 这种匿名可写端点，任何注册用户都能用 PUT/PATCH/DELETE 持续制造 500 与堆栈日志
+     * （日志洪泛）；「方法不对」本来就是客户端错误，必须与真正的服务端故障区分开。</p>
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Result<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        java.util.Set<HttpMethod> supported = e.getSupportedHttpMethods();
+        if (supported != null && !supported.isEmpty()) {
+            builder.allow(supported.toArray(HttpMethod[]::new));
+        }
+        return builder.body(Result.fail("请求方法不被支持"));
     }
 
     /** 兜底 → 500 */
