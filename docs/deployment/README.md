@@ -410,6 +410,11 @@ sudo -u pi XDG_RUNTIME_DIR=/run/user/$(id -u pi) podman logs --tail 200 forum-ba
 > 合成 legacy/批量上报均 204 且后端日志可见（真实 CF 客户端 IP）；坏 JSON 204、GET 405、无 ERROR；
 > 真实 Edge 注入内联脚本后日志出现 `directive=script-src-elem blocked=inline`。
 
+> **2026-11-03 验收实测（Build #44，镜像 `forum-backend:44`）**：坏 JSON → `400` `请求体格式错误`；
+> `text/plain` → `415` `不支持的 Content-Type`；认证 `PUT/PATCH/DELETE /forum/api/csp-report` → `405` + `Allow: POST`；
+> 匿名 `OPTIONS` → `401`，认证 `OPTIONS` → `200` + `Allow: POST,OPTIONS`；CSP 上报 `POST` 仍 `204`；
+> 容器 5 分钟内 `ERROR` 计数 0；公网 HTTPS 同样 `400`/`415`；公网 E2E 8 passed (47.7 s)。
+
 真实浏览器的验证（可选）：用 Playwright 打开公网页面后注入一段内联脚本（会被 `script-src` 拦截），
 再回看后端日志应出现 `blocked=inline`：
 

@@ -34,9 +34,9 @@
 - Create `docs/superpowers/specs/2026-11-03-round14-error-contract-design.md`（已写好）
 - Create `docs/superpowers/plans/2026-11-03-round14-error-contract.md`（本文件）
 
-- [ ] **Step 1-1** 确认两份文件存在且 `git status` 只有这两个 `??`。
-- [ ] **Step 1-2** `git add` 两份文件，提交 `docs: 新增第十四轮错误契约收尾设计与计划`。
-- [ ] **Step 1-3** 验证：`git log --oneline -1` 信息逐字一致；`git status --short` 为空。
+- [x] **Step 1-1** 确认两份文件存在且 `git status` 只有这两个 `??`。
+- [x] **Step 1-2** `git add` 两份文件，提交 `docs: 新增第十四轮错误契约收尾设计与计划`。
+- [x] **Step 1-3** 验证：`git log --oneline -1` 信息逐字一致；`git status --short` 为空。
 
 ---
 
@@ -175,7 +175,7 @@ class ErrorContractIntegrationTest {
                 .noneMatch(event -> event.getLevel() == Level.ERROR);
 ```
 
-- [ ] **Step 2-2** 跑 RED 并保存原文：
+- [x] **Step 2-2** 跑 RED 并保存原文：
   ```bash
   cd /e/JavaSpace/forum
   mvn -B test -Dtest=ErrorContractIntegrationTest -q 2>&1 | tail -40
@@ -205,15 +205,15 @@ class ErrorContractIntegrationTest {
     }
 ```
 
-- [ ] **Step 2-4** 复跑：
+- [x] **Step 2-4** 复跑：
   ```bash
   mvn -B test -Dtest=ErrorContractIntegrationTest   # 5/5
   mvn -B test -Dtest=CspReportIntegrationTest       # 8/8（原 8，405 用例原地扩展、不新增 @Test）
   mvn -B clean test                                 # 202 / 0 / 0 / 1，25 类
   ```
   若 405 用例的 `Allow` 实际不是恰好 `POST`（例如 `POST,OPTIONS`），以真实值修订断言并在 §12.2 记录（不要放宽到 `contains`，先确认真实头）。
-- [ ] **Step 2-5** 变异验证（可选但推荐，报告里写结论）：把 `handleMethodNotSupported` 注释掉重跑 `CspReportIntegrationTest` → 405 用例应红（405→500）。
-- [ ] **Step 2-6** 提交 `fix: 收敛客户端错误映射并加固 405 守护`（3 文件），`git status` 干净。
+- [x] **Step 2-5** 变异验证（可选但推荐，报告里写结论）：把 `handleMethodNotSupported` 注释掉重跑 `CspReportIntegrationTest` → 405 用例应红（405→500）。
+- [x] **Step 2-6** 提交 `fix: 收敛客户端错误映射并加固 405 守护`（3 文件），`git status` 干净。
 
 ---
 
@@ -227,7 +227,7 @@ class ErrorContractIntegrationTest {
 - Modify `docs/superpowers/plans/2026-11-01-round13-csp-reporting.md`
 - Modify 本计划 `docs/superpowers/plans/2026-11-03-round14-error-contract.md`（§12）
 
-- [ ] **Step 3-1 README**
+- [x] **Step 3-1 README**
   - 测试基线：`24 个测试类、197 个用例` → `25 个测试类、202 个用例`；`33 个 spec、334 个用例` 不变（确认原文写法后精确替换）。
   - 在「API / 接口」相关小节末尾新增：
 
@@ -249,19 +249,19 @@ class ErrorContractIntegrationTest {
 | 500 | 未预期异常（唯一兜底；出现即代表需要修） |
 ```
 
-- [ ] **Step 3-2 DEVELOPMENT**
+- [x] **Step 3-2 DEVELOPMENT**
   - §3.1：按 `find|wc` 重测四行（后端主代码、后端测试、前端产品、前端 spec、E2E）。
   - §3.2：后端 `202 个用例 / 25 个测试类`，类分布把 `ErrorContractIntegrationTest` 5 加进去（放 `CspReportIntegrationTest` 之后），分布合计改为 202；前端 334/33 不变。
   - §4.18：把「非 POST 方法统一 405」改为「`PUT/PATCH/DELETE` → 405 + `Allow: POST`；`OPTIONS` 由 Spring 返回 200（`Allow: POST,OPTIONS`）；`HEAD` → 405」。
   - 在 §4.18 之后、`## 5.` 之前新增 **§4.19 第十四轮：错误契约收尾（2026-11-03）**：背景（坏 JSON/不支持 Content-Type 曾 500 + ERROR）、改动表（`GlobalExceptionHandler` +2 handler；测试 1 新类 + 1 扩展）、错误契约表（spec §4.R4 全表）、验证矩阵 V1–V7 结果、构建记录（待回填）、已知限制（文案未国际化、415 含英文、IOException 不写响应、handler 用 debug 排障需调日志级别）、上线验收（待回填）。
   - §5.2 加第十四轮说明 + 候选（错误文案国际化、`ProblemDetail` 迁移、CSP 上报聚合）。
   - §8 顶部加 4 行（docs 本次提交「本次提交」、`fix` 提交、Task 1 docs、第十三轮回填行 `d52751a` 保持不动——先核对现有行）。
-- [ ] **Step 3-3 部署手册**
+- [x] **Step 3-3 部署手册**
   - 修正第十三轮新增的合成上报 `curl` 示例：合并为单行 `curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/csp-report' --data '{"csp-report":{…}}' http://127.0.0.1/forum/api/csp-report`。
   - 在冒烟检查小节加两行「错误码速查」：坏 JSON→400（`请求体格式错误`）、`text/plain`→415（`不支持的 Content-Type`）。
-- [ ] **Step 3-4 nginx 注释**：`deploy/nginx/public.conf:39-40` 旧注释（uploads 仅 nosniff）改为「uploads 的 4 个安全头下发在 `forum.conf` 的 location 里；本文件只 include snippet」。
-- [ ] **Step 3-5 十三轮计划残留**：`docs/superpowers/plans/2026-11-01-round13-csp-reporting.md` 中 `cleanSample` 的 `\p{Cntrl}` 描述改为实际使用的 `[\p{Cc}\p{Cf}\u2028\u2029]`；两处「（待回填）」改为「（已于 `165c469` / 回填提交完成）」。
-- [ ] **Step 3-6** 验证：
+- [x] **Step 3-4 nginx 注释**：`deploy/nginx/public.conf:39-40` 旧注释（uploads 仅 nosniff）改为「uploads 的 4 个安全头下发在 `forum.conf` 的 location 里；本文件只 include snippet」。
+- [x] **Step 3-5 十三轮计划残留**：`docs/superpowers/plans/2026-11-01-round13-csp-reporting.md` 中 `cleanSample` 的 `\p{Cntrl}` 描述改为实际使用的 `[\p{Cc}\p{Cf}\u2028\u2029]`；两处「（待回填）」改为「（已于 `165c469` / 回填提交完成）」。
+- [x] **Step 3-6** 验证：
   ```bash
   grep -n "202 个用例" README.md docs/DEVELOPMENT.md
   grep -n "4.19 第十四轮" docs/DEVELOPMENT.md
@@ -269,15 +269,15 @@ class ErrorContractIntegrationTest {
   grep -c "待回填" docs/superpowers/plans/2026-11-01-round13-csp-reporting.md   # 期望 0
   bash -n deploy/deploy.sh
   ```
-- [ ] **Step 3-7** 提交 `docs: 记录第十四轮错误契约收尾`（约 6 文件），`git status` 干净。
+- [x] **Step 3-7** 提交 `docs: 记录第十四轮错误契约收尾`（约 6 文件），`git status` 干净。
 
 ---
 
 ## Task 4：全量验证、上线与回填
 
-- [ ] **Step 4-1** 后端：`mvn -B clean test` → `202 / 0 / 0 / 1`，25 类，BUILD SUCCESS。
-- [ ] **Step 4-2** 前端：`cd frontend && pnpm test` → 33/334；`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 成功；`pnpm check:bundle` exit 0（五项预算内）。
-- [ ] **Step 4-3** 本地错误契约冒烟（`pnpm dev` 或已部署）：
+- [x] **Step 4-1** 后端：`mvn -B clean test` → `202 / 0 / 0 / 1`，25 类，BUILD SUCCESS。
+- [x] **Step 4-2** 前端：`cd frontend && pnpm test` → 33/334；`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 成功；`pnpm check:bundle` exit 0（五项预算内）。
+- [x] **Step 4-3** 本地错误契约冒烟（`pnpm dev` 或已部署）：
 
   ```bash
   # 坏 JSON → 400
@@ -288,20 +288,20 @@ class ErrorContractIntegrationTest {
   curl -s -D - -o /dev/null -H "Authorization: Bearer $TOKEN" -X PUT http://127.0.0.1:8080/api/csp-report | grep -iE '^(HTTP/|allow:)'
   ```
 
-- [ ] **Step 4-4** 推送（SSH 显式 URL）：
+- [x] **Step 4-4** 推送（SSH 显式 URL）：
   ```bash
   git push git@github.com:ScholarOfDeepDarkFantasy/forum.git master:master
   git ls-remote git@github.com:ScholarOfDeepDarkFantasy/forum.git refs/heads/master
   ```
-- [ ] **Step 4-5** Jenkins：记录 `nextBuildNumber` → 轮询 `Finished: SUCCESS` 与 `Checking out Revision`（构建号与镜像号）。
-- [ ] **Step 4-6** 公网验收（经 nginx `Host: raspi`，以及 `https://treenewbee.men/forum`）：
+- [x] **Step 4-5** Jenkins：记录 `nextBuildNumber` → 轮询 `Finished: SUCCESS` 与 `Checking out Revision`（构建号与镜像号）。
+- [x] **Step 4-6** 公网验收（经 nginx `Host: raspi`，以及 `https://treenewbee.men/forum`）：
   - 坏 JSON → 400（`请求体格式错误`）；
   - `text/plain` → 415（`不支持的 Content-Type`）；
   - 认证 PUT/PATCH/DELETE → 405 + `Allow: POST`；
   - `OPTIONS`（**带认证**；匿名 401）→ 200 + `Allow: POST,OPTIONS`；`HEAD`（带认证）→ 405；
   - 容器 `ERROR` 日志计数 0；`/forum/api/health` 200。
-- [ ] **Step 4-7** 回填并提交 `docs: 回填第十四轮构建与上线验收`：§4.19 上线验收段写构建号/镜像号/V1–V7/公网冒烟；§8 回填行 + `fix` 行哈希；部署手册验收引用块；计划 §12.1 构建表补本轮回填行。
-- [ ] **Step 4-8** 推送 → 期望再一个 docs-only 构建 SUCCESS；确认远端 == HEAD。
+- [x] **Step 4-7** 回填并提交 `docs: 回填第十四轮构建与上线验收`：§4.19 上线验收段写构建号/镜像号/V1–V7/公网冒烟；§8 回填行 + `fix` 行哈希；部署手册验收引用块；计划 §12.1 构建表补本轮回填行。
+- [x] **Step 4-8** 推送 → 期望再一个 docs-only 构建 SUCCESS；确认远端 == HEAD。
 
 ---
 
@@ -330,7 +330,9 @@ class ErrorContractIntegrationTest {
 | --- | --- |
 | `9d51a4d` | 第十四轮错误契约收尾设计与计划 |
 | `43ff6eb` | 后端错误映射（坏 JSON→400、text/plain→415）+ 405 守护加固 |
-| 本次文档提交 | §4.19、README 错误响应契约、基线 202/25、部署手册与计划回填 |
+| `c5a8d51` | §4.19、README 错误响应契约、基线 202/25、部署手册与计划回填 |
+| `a124e17` | 审查后加固：400/415 的 ERROR 日志断言、`Allow` 用 `containsExactly`、计划验收脚本补认证 |
+| 本次回填提交 | §4.19 验证矩阵 V2/V3/V5/V6 与上线验收、§8 变更日志、部署手册 Build #44 验收、计划 §12 |
 
 **实测**
 
@@ -344,4 +346,5 @@ class ErrorContractIntegrationTest {
 1. `CspReportIntegrationTest` 实际为 **8** 个用例（计划写 9/9）：405 用例是在现有类上扩展，未新增测试类。
 2. 405 扩展断言在修复前已绿（第十三轮已把非 POST 收敛为 405），本轮 RED 只体现在坏 JSON/415；405 守护改由变异验证补足。
 3. README 没有独立的「API」小节，`### 错误响应契约` 放在 `## 功能` 列表之后。
-4. 推送、Jenkins 构建与公网验收按分工留给 Task 4；§4.19 的「构建记录 / 上线验收」保持待 Task 4 回填。
+4. 审查后追加计划外加固提交 `a124e17`：`ErrorContractIntegrationTest` 挂 Logback appender 断言 400/415 用例无 ERROR（原实现把 `log.debug` 改成 `log.error` 后测试仍绿）；`Allow` 断言由 `getFirst` 改为 `containsExactly("POST")`；计划 B.6/Step 4-6 的 OPTIONS/HEAD 验收脚本补齐 `Authorization`（匿名会被 Security 拦成 401，实测已确认）。
+5. 推送、Jenkins 构建与公网验收在 Task 4 完成：`d52751a..a124e17` 推送 → **Build #44 SUCCESS**（镜像 `forum-backend:44`），公网/内网冒烟与 E2E 8/8 全过；随后回填提交触发 Build #45（docs-only）。

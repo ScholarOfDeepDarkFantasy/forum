@@ -1080,14 +1080,14 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | # | 验证点 | 结果 |
 | --- | --- | --- |
 | V1 | 后端全量 `mvn -B clean test` | ✅ `Tests run: 202, Failures: 0, Errors: 0, Skipped: 1`，25 个测试类 |
-| V2 | 前端 Vitest 基线 334/33 | 本轮未改前端，沿用 334/33（Task 4 复跑） |
-| V3 | 前端构建 / bundle 预算 | 本轮未改前端，待 Task 4 复跑 |
+| V2 | 前端 Vitest 基线 334/33 | ✅ `Tests 334 passed (334)` / `Test Files 33 passed (33)`（8.70 s；本轮未改前端，沿用基线） |
+| V3 | 前端构建 / bundle 预算 | ✅ `✓ built in 721ms`；`check:bundle` 五项全部在预算内（84.43/150、39.02/70、233.74/300、835.87/950、181.57/260，CSS 覆盖 9/9，退出码 0） |
 | V4 | 坏 JSON → 400、`text/plain` → 415、认证 `PUT` → 405 + `Allow: POST`、无 ERROR | ✅ 由 `ErrorContractIntegrationTest` 与 `CspReportIntegrationTest` 真实 HTTP 覆盖（修复前 4 例 500、修复后全绿） |
-| V5 | 部署后同 V4 + 容器日志 ERROR 计数 0 | 待 Task 4 上线验收回填 |
-| V6 | 登录 → `/me` → 登出、E2E 8/8 无回归 | 全量集成测试已覆盖主流程；公网 E2E 待 Task 4 |
+| V5 | 部署后同 V4 + 容器日志 ERROR 计数 0 | ✅ Build #44 部署后经 nginx（`Host: raspi`）：坏 JSON → 400 + `请求体格式错误`、`text/plain` → 415 + `不支持的 Content-Type`、认证 `PUT` → 405 + `Allow: POST`、匿名 `OPTIONS` → 401、认证 `OPTIONS` → 200 + `Allow: POST,OPTIONS`、CSP 上报 `POST` 仍 204、`/api/auth/me` 200，容器近 5 分钟 `ERROR` 计数 0；公网 HTTPS 复核坏 JSON 400、`text/plain` 415 |
+| V6 | 登录 → `/me` → 登出、E2E 8/8 无回归 | ✅ 公网 E2E（`E2E_BASE_URL=https://treenewbee.men/forum/ E2E_CHANNEL=msedge`）**8 passed (47.7 s)**；`/api/auth/me` 200，登录/登出无回归 |
 | V7 | 变异：注释掉 `handleMethodNotSupported` 后 405 用例必须变红 | ✅ `CspReportIntegrationTest` 2 例失败，405 变 500（`expected: 405 METHOD_NOT_ALLOWED but was: 500 INTERNAL_SERVER_ERROR`）；恢复后 8/8 绿 |
 
-**构建记录**：`9d51a4d` 设计与计划 → `43ff6eb` 后端错误映射与 405 守护 → 本文档提交 → Jenkins 构建待 Task 4 回填。
+**构建记录**：`9d51a4d` 设计与计划 → `43ff6eb` 后端错误映射与 405 守护 → `c5a8d51` 文档记录（§4.19、README 错误契约、基线 202/25）→ `a124e17` 审查后加固（400/415 的 ERROR 日志断言、`Allow` 用 `containsExactly`、计划验收脚本补认证）→ **Build #44 SUCCESS**（checkout `a124e17`，镜像 `forum-backend:44`）→ 本次回填提交 → Build #45。
 
 **已知限制**
 
@@ -1096,7 +1096,7 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 3. 客户端提前断开导致的 `IOException` 仍不写响应（连接已不可用），只在容器日志留痕。
 4. 两个新处理器用 `log.debug`：排障坏 JSON/415 时需临时把 `org.song.forum.exception` 调到 DEBUG，默认级别下看不到。
 
-**上线验收**：待 Task 4（推送后的 Jenkins Build、公网 V4/V5/V6 复测）回填。
+**上线验收（2026-11-03，Build #44 / 镜像 `forum-backend:44`）**：推送 `d52751a..a124e17` 后 Jenkins **Build #44 SUCCESS**（checkout `a124e17`，容器 `Up (healthy)`，health 200）。公网/内网同一套冒烟：坏 JSON → 400 `请求体格式错误`；`text/plain` → 415 `不支持的 Content-Type`；认证 `PUT/PATCH/DELETE /api/csp-report` → 405 + `Allow: POST`；匿名 `OPTIONS` → 401、认证 `OPTIONS` → 200 + `Allow: POST,OPTIONS`；CSP 上报 `POST` 仍 204；容器 5 分钟内 ERROR 计数 0；公网 HTTPS 同样 400/415；公网 E2E 8 passed (47.7 s)。随后的回填提交触发 Build #45，属 docs-only 重建。
 
 ## 5. 待办与后续计划
 
@@ -1218,7 +1218,9 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-11-03 | docs | 记录第十四轮错误契约收尾（§4.19、错误响应契约、基线 202/25） | 本次提交 |
+| 2026-11-03 | docs | 回填第十四轮构建与上线验收（Build #44 / 镜像 44、公网 400/415/405、E2E 8/8） | 本次提交 |
+| 2026-11-03 | test | 加固错误契约的日志与 `Allow` 断言（400/415 无 ERROR、`containsExactly("POST")`、验收脚本带认证） | `a124e17` |
+| 2026-11-03 | docs | 记录第十四轮错误契约收尾（§4.19、错误响应契约、基线 202/25） | `c5a8d51` |
 | 2026-11-03 | fix | 收敛坏 JSON→400、text/plain→415，加固 405 守护（PUT/PATCH/DELETE + Allow + 无 ERROR） | `43ff6eb` |
 | 2026-11-03 | docs | 新增第十四轮错误契约收尾设计与计划 | `9d51a4d` |
 | 2026-11-01 | docs | 回填第十三轮审查修复构建（Build #42 / 镜像 42、非 POST 405 实测） | `d52751a` |
