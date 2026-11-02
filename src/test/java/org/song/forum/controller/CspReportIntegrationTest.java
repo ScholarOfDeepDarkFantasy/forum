@@ -22,6 +22,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.song.forum.dto.auth.AuthResponse;
 import org.song.forum.dto.auth.LoginRequest;
 import org.song.forum.dto.auth.RegisterRequest;
+import org.song.forum.exception.GlobalExceptionHandler;
 import org.song.forum.security.CspReportService;
 import org.song.forum.util.Result;
 
@@ -62,6 +63,8 @@ class CspReportIntegrationTest {
 
     private Logger serviceLogger;
     private ListAppender<ILoggingEvent> appender;
+    private Logger exceptionLogger;
+    private ListAppender<ILoggingEvent> exceptionAppender;
 
     @BeforeEach
     void attachLogAppender() {
@@ -69,6 +72,11 @@ class CspReportIntegrationTest {
         appender = new ListAppender<>();
         appender.start();
         serviceLogger.addAppender(appender);
+
+        exceptionLogger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        exceptionAppender = new ListAppender<>();
+        exceptionAppender.start();
+        exceptionLogger.addAppender(exceptionAppender);
     }
 
     @AfterEach
@@ -77,6 +85,11 @@ class CspReportIntegrationTest {
             serviceLogger.detachAppender(appender);
             appender.stop();
             appender.list.clear();
+        }
+        if (exceptionLogger != null && exceptionAppender != null) {
+            exceptionLogger.detachAppender(exceptionAppender);
+            exceptionAppender.stop();
+            exceptionAppender.list.clear();
         }
     }
 
@@ -204,11 +217,19 @@ class CspReportIntegrationTest {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
-        ResponseEntity<String> authenticatedPut = rest.exchange(
-                url("/api/csp-report"), HttpMethod.PUT, new HttpEntity<>("{}", headers), String.class);
+        for (HttpMethod method : List.of(HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE)) {
+            ResponseEntity<String> response = rest.exchange(
+                    url("/api/csp-report"), method, new HttpEntity<>("{}", headers), String.class);
 
-        assertThat(authenticatedPut.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
-        assertThat(authenticatedPut.getHeaders().getFirst(HttpHeaders.ALLOW)).contains("POST");
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+            assertThat(response.getHeaders().getFirst(HttpHeaders.ALLOW)).isEqualTo("POST");
+            assertThat(response.getBody())
+                    .contains("\"success\":false")
+                    .contains("\"message\":\"请求方法不被支持\"")
+                    .contains("\"timestamp\":");
+        }
+        assertThat(exceptionAppender.list)
+                .noneMatch(event -> event.getLevel() == Level.ERROR);
     }
 
     // ---------- 辅助 ----------

@@ -5,10 +5,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -114,6 +116,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleMultipart(MultipartException e) {
         log.warn("非 multipart 上传请求: {}", e.getMessage());
         return ResponseEntity.badRequest().body(Result.fail("请使用 multipart/form-data 上传图片"));
+    }
+
+    /** 请求体无法解析（坏 JSON / 类型不匹配）→ 400；用 debug 避免匿名请求刷日志 */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Result<Void>> handleNotReadable(HttpMessageNotReadableException e) {
+        log.debug("请求体无法解析: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(Result.fail("请求体格式错误"));
+    }
+
+    /** Content-Type 不受支持 → 415 */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Result<Void>> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException e) {
+        log.debug("不支持的 Content-Type: {}", e.getContentType());
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(Result.fail("不支持的 Content-Type"));
     }
 
     /** 已登录但无权限 → 403 */
