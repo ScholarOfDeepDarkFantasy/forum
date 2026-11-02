@@ -1087,7 +1087,7 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | V6 | 登录 → `/me` → 登出、E2E 8/8 无回归 | ✅ 公网 E2E（`E2E_BASE_URL=https://treenewbee.men/forum/ E2E_CHANNEL=msedge`）**8 passed (47.7 s)**；`/api/auth/me` 200，登录/登出无回归 |
 | V7 | 变异：注释掉 `handleMethodNotSupported` 后 405 用例必须变红 | ✅ `CspReportIntegrationTest` 2 例失败，405 变 500（`expected: 405 METHOD_NOT_ALLOWED but was: 500 INTERNAL_SERVER_ERROR`）；恢复后 8/8 绿 |
 
-**构建记录**：`9d51a4d` 设计与计划 → `43ff6eb` 后端错误映射与 405 守护 → `c5a8d51` 文档记录（§4.19、README 错误契约、基线 202/25）→ `a124e17` 审查后加固（400/415 的 ERROR 日志断言、`Allow` 用 `containsExactly`、计划验收脚本补认证）→ **Build #44 SUCCESS**（checkout `a124e17`，镜像 `forum-backend:44`）→ 本次回填提交 → Build #45。
+**构建记录**：`9d51a4d` 设计与计划 → `43ff6eb` 后端错误映射与 405 守护 → `c5a8d51` 文档记录（§4.19、README 错误契约、基线 202/25）→ `a124e17` 审查后加固（400/415 的 ERROR 日志断言、`Allow` 用 `containsExactly`、计划验收脚本补认证）→ **Build #44 SUCCESS**（checkout `a124e17`，镜像 `forum-backend:44`）→ 回填提交（`466bff7`）→ Build #45 → `80903ef` 修正错误契约文档（413/401/`timestamp`/轮次/提交数）→ Build #46（docs-only）→ 本补记提交 → Build #47。
 
 **已知限制**
 
@@ -1218,7 +1218,9 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-11-03 | docs | 回填第十四轮构建与上线验收（Build #44 / 镜像 44、公网 400/415/405、E2E 8/8） | 本次提交 |
+| 2026-11-03 | docs | 补记文档修正提交与 Build #46（本轮 docs-only 收尾） | 本次提交 |
+| 2026-11-03 | docs | 修正错误契约文档与实际行为不一致（413/401/`timestamp`、§2.2 第十四轮、计划提交数） | `80903ef` |
+| 2026-11-03 | docs | 回填第十四轮构建与上线验收（Build #44 / 镜像 44、公网 400/415/405、E2E 8/8） | `466bff7` |
 | 2026-11-03 | test | 加固错误契约的日志与 `Allow` 断言（400/415 无 ERROR、`containsExactly("POST")`、验收脚本带认证） | `a124e17` |
 | 2026-11-03 | docs | 记录第十四轮错误契约收尾（§4.19、错误响应契约、基线 202/25） | `c5a8d51` |
 | 2026-11-03 | fix | 收敛坏 JSON→400、text/plain→415，加固 405 守护（PUT/PATCH/DELETE + Allow + 无 ERROR） | `43ff6eb` |

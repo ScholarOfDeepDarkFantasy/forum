@@ -334,7 +334,9 @@ class ErrorContractIntegrationTest {
 | `43ff6eb` | 后端错误映射（坏 JSON→400、text/plain→415）+ 405 守护加固 |
 | `c5a8d51` | §4.19、README 错误响应契约、基线 202/25、部署手册与计划回填 |
 | `a124e17` | 审查后加固：400/415 的 ERROR 日志断言、`Allow` 用 `containsExactly`、计划验收脚本补认证 |
-| 本次回填提交 | §4.19 验证矩阵 V2/V3/V5/V6 与上线验收、§8 变更日志、部署手册 Build #44 验收、计划 §12 |
+| `466bff7` | 回填：§4.19 验证矩阵 V2/V3/V5/V6 与上线验收、§8 变更日志、部署手册 Build #44 验收、计划 §12 |
+| `80903ef` | 最终审查后的纯文档修正：413/401/`timestamp`/§2.2 第十四轮/计划提交数（Build #46） |
+| 本次补记提交 | §4.19 构建记录补 #46/#47、§8 两行、计划偏差 6（Build #47） |
 
 **实测**
 
@@ -350,3 +352,4 @@ class ErrorContractIntegrationTest {
 3. README 没有独立的「API」小节，`### 错误响应契约` 放在 `## 功能` 列表之后。
 4. 审查后追加计划外加固提交 `a124e17`：`ErrorContractIntegrationTest` 挂 Logback appender 断言 400/415 用例无 ERROR（原实现把 `log.debug` 改成 `log.error` 后测试仍绿）；`Allow` 断言由 `getFirst` 改为 `containsExactly("POST")`；计划 B.6/Step 4-6 的 OPTIONS/HEAD 验收脚本补齐 `Authorization`（匿名会被 Security 拦成 401，实测已确认）。
 5. 推送、Jenkins 构建与公网验收在 Task 4 完成：`d52751a..a124e17` 推送 → **Build #44 SUCCESS**（镜像 `forum-backend:44`），公网/内网冒烟与 E2E 8/8 全过；随后回填提交触发 Build #45（docs-only）。
+6. 最终只读审查发现「错误契约」文档与实际行为不符（413 行后端不存在、401 行误用前端 `请先登录`、`timestamp` 全称断言不成立、spec 现状审计两行错、403 文案、轮次/提交数），追加纯文档修正提交 `80903ef`（Build #46）；随后本补记提交 → Build #47。
