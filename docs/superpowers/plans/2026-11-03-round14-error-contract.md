@@ -208,11 +208,11 @@ class ErrorContractIntegrationTest {
 - [ ] **Step 2-4** 复跑：
   ```bash
   mvn -B test -Dtest=ErrorContractIntegrationTest   # 5/5
-  mvn -B test -Dtest=CspReportIntegrationTest       # 9/9（原 8 + 扩展现有 1 用例，不新增 @Test）
+  mvn -B test -Dtest=CspReportIntegrationTest       # 8/8（原 8，405 用例原地扩展、不新增 @Test）
   mvn -B clean test                                 # 202 / 0 / 0 / 1，25 类
   ```
   若 405 用例的 `Allow` 实际不是恰好 `POST`（例如 `POST,OPTIONS`），以真实值修订断言并在 §12.2 记录（不要放宽到 `contains`，先确认真实头）。
-- [ ] **Step 2-5** 变异验证（可选但推荐，报告里写结论）：把 `handleMethodNotSupported` 注释掉重跑 `CspReportIntegrationTest` → 405 用例应红（409/500）。
+- [ ] **Step 2-5** 变异验证（可选但推荐，报告里写结论）：把 `handleMethodNotSupported` 注释掉重跑 `CspReportIntegrationTest` → 405 用例应红（405→500）。
 - [ ] **Step 2-6** 提交 `fix: 收敛客户端错误映射并加固 405 守护`（3 文件），`git status` 干净。
 
 ---
@@ -298,7 +298,7 @@ class ErrorContractIntegrationTest {
   - 坏 JSON → 400（`请求体格式错误`）；
   - `text/plain` → 415（`不支持的 Content-Type`）；
   - 认证 PUT/PATCH/DELETE → 405 + `Allow: POST`；
-  - `OPTIONS` → 200 + `Allow: POST,OPTIONS`；
+  - `OPTIONS`（**带认证**；匿名 401）→ 200 + `Allow: POST,OPTIONS`；`HEAD`（带认证）→ 405；
   - 容器 `ERROR` 日志计数 0；`/forum/api/health` 200。
 - [ ] **Step 4-7** 回填并提交 `docs: 回填第十四轮构建与上线验收`：§4.19 上线验收段写构建号/镜像号/V1–V7/公网冒烟；§8 回填行 + `fix` 行哈希；部署手册验收引用块；计划 §12.1 构建表补本轮回填行。
 - [ ] **Step 4-8** 推送 → 期望再一个 docs-only 构建 SUCCESS；确认远端 == HEAD。
@@ -319,7 +319,7 @@ class ErrorContractIntegrationTest {
 - B.3 `text/plain` → 415 且 message=`不支持的 Content-Type`。
 - B.4 登录 → me → logout → 旧 token 401（不回归）。
 - B.5 认证 `PUT /forum/api/csp-report` → 405 + `Allow: POST`。
-- B.6 `OPTIONS /forum/api/csp-report` → 200 + `Allow` 含 `OPTIONS`。
+- B.6 `OPTIONS /forum/api/csp-report`（带 `Authorization: Bearer $TOKEN`；匿名会被 Security 拦成 401）→ 200 + `Allow` 含 `OPTIONS`；`HEAD`（带认证）→ 405。
 - B.7 容器 `ERROR` 日志计数 0；E2E 8/8（可选，本地或公网）。
 
 ## 12. 实施记录与偏差（2026-11-03）

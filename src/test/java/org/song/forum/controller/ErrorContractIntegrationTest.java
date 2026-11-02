@@ -1,5 +1,11 @@
 package org.song.forum.controller;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -11,7 +17,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.LoggerFactory;
 import org.springframework.test.context.ActiveProfiles;
+import org.song.forum.exception.GlobalExceptionHandler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,6 +43,26 @@ class ErrorContractIntegrationTest {
 
     @Autowired
     private TestRestTemplate rest;
+
+    private Logger exceptionLogger;
+    private ListAppender<ILoggingEvent> exceptionAppender;
+
+    @BeforeEach
+    void attachLogAppender() {
+        exceptionLogger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        exceptionAppender = new ListAppender<>();
+        exceptionAppender.start();
+        exceptionLogger.addAppender(exceptionAppender);
+    }
+
+    @AfterEach
+    void detachLogAppender() {
+        if (exceptionLogger != null && exceptionAppender != null) {
+            exceptionLogger.detachAppender(exceptionAppender);
+            exceptionAppender.stop();
+            exceptionAppender.list.clear();
+        }
+    }
 
     @Test
     void malformedJsonToLoginReturns400() {
@@ -74,7 +102,9 @@ class ErrorContractIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).contains("\"success\":false");
+        assertThat(response.getBody()).contains("\"message\":\"参数校验失败\"");
         assertThat(response.getBody()).contains("\"timestamp\":");
+        assertNoErrorLogs();
     }
 
     private ResponseEntity<String> postJson(String path, String body) {
@@ -90,6 +120,13 @@ class ErrorContractIntegrationTest {
                 .contains("\"success\":false")
                 .contains("\"message\":\"" + message + "\"")
                 .contains("\"timestamp\":");
+        assertNoErrorLogs();
+    }
+
+    /** 客户端错误不得打 ERROR（只有兜底处理器会打；排障级别为 DEBUG）。 */
+    private void assertNoErrorLogs() {
+        assertThat(exceptionAppender.list)
+                .noneMatch(event -> event.getLevel() == Level.ERROR);
     }
 
     private String url(String path) {

@@ -222,7 +222,7 @@ class CspReportIntegrationTest {
                     url("/api/csp-report"), method, new HttpEntity<>("{}", headers), String.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
-            assertThat(response.getHeaders().getFirst(HttpHeaders.ALLOW)).isEqualTo("POST");
+            assertThat(response.getHeaders().get(HttpHeaders.ALLOW)).containsExactly("POST");
             assertThat(response.getBody())
                     .contains("\"success\":false")
                     .contains("\"message\":\"请求方法不被支持\"")
