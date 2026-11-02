@@ -324,4 +324,24 @@ class ErrorContractIntegrationTest {
 
 ## 12. 实施记录与偏差（2026-11-03）
 
-（执行时填写：提交哈希与构建表、偏差、实测数字、审查结论、上线验收）
+**提交链**
+
+| 提交 | 内容 |
+| --- | --- |
+| `9d51a4d` | 第十四轮错误契约收尾设计与计划 |
+| `43ff6eb` | 后端错误映射（坏 JSON→400、text/plain→415）+ 405 守护加固 |
+| 本次文档提交 | §4.19、README 错误响应契约、基线 202/25、部署手册与计划回填 |
+
+**实测**
+
+- `mvn -B clean test`：`Tests run: 202, Failures: 0, Errors: 0, Skipped: 1`，25 个测试类。
+- 单类：`ErrorContractIntegrationTest` 5/5；`CspReportIntegrationTest` 8/8。
+- RED（修复前）：5 例中 4 例失败——登录/注册坏 JSON、JSON 数组当对象均 `expected: 400 BAD_REQUEST but was: 500 INTERNAL_SERVER_ERROR`，`text/plain` 为 `expected: 415 UNSUPPORTED_MEDIA_TYPE but was: 500`；空对象校验用例本就 400。
+- 变异：注释 `handleMethodNotSupported` 后 `CspReportIntegrationTest` 2 例红（405→500），恢复后全绿。
+
+**偏差**
+
+1. `CspReportIntegrationTest` 实际为 **8** 个用例（计划写 9/9）：405 用例是在现有类上扩展，未新增测试类。
+2. 405 扩展断言在修复前已绿（第十三轮已把非 POST 收敛为 405），本轮 RED 只体现在坏 JSON/415；405 守护改由变异验证补足。
+3. README 没有独立的「API」小节，`### 错误响应契约` 放在 `## 功能` 列表之后。
+4. 推送、Jenkins 构建与公网验收按分工留给 Task 4；§4.19 的「构建记录 / 上线验收」保持待 Task 4 回填。

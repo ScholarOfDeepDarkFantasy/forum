@@ -67,7 +67,7 @@ public record CspViolation(String documentUri, String directive, String blockedU
   - 字段白名单：`document-uri`、`effective-directive`（缺省 `violated-directive`，再缺省
     `"unknown"`）、`blocked-uri`、`source-file`、`script-sample`、`disposition`。
   - `cleanUrl`：空 → `""`；`?`/`#` 之前的部分；trim；截断 300。
-  - `cleanSample`：去 `\\p{Cntrl}`，trim，截断 120。
+  - `cleanSample`：去 `[\p{Cc}\p{Cf}\u2028\u2029]`，trim，截断 120。
   - 批量里忽略非 csp-violation 条目；legacy 节点缺失或非对象 → 空列表。
   - javadoc 写明「只读白名单字段，不落原始 body」。
 
@@ -296,7 +296,7 @@ log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，G
     `CspReportThrottleTest` 3、`CspReportIntegrationTest` 5；前端分布 `csp` 7→9）；
   - 新增 **§4.18 第十三轮：CSP 违规上报与可见性（2026-11-01）**：背景、改动表（nginx 2 + deploy.sh +
     后端 5 + 测试 3）、上报格式与端点行为（永远 204、限速、清洗规则）、V1–V7 验证矩阵、
-    构建记录（待回填）、已知限制（spec §7）；
+    构建记录（已回填）、已知限制（spec §7）；
   - §5.1 关闭 **T18**（删除线 + 「2026-11-01 第十三轮：`/api/csp-report` + `report-uri`/`report-to`
     + deploy 断言 + 结构化 WARN，见 §4.18」）；
   - §5.2 加第十三轮说明 + 2 条候选（违规日志聚合/看板；`report-to` 的 `max_age` 协商）；
@@ -307,7 +307,7 @@ log "CSP 上报通道校验通过：Reporting-Endpoints 已下发，POST 204，G
     真实浏览器违规（Playwright 注入内联脚本）步骤；
   - §6 排障加一行「CSP 上报量大/被刷」：`CSP_REPORT_MAX_PER_MINUTE=1` 或 nginx `return 204`；
   - §7 已知限制加 2 条（只进日志；`report-to` 需 HTTPS，内网走 report-uri）。
-- [x] 4-4 计划 §12「实施记录与偏差（2026-11-01）」：提交链、构建表（待回填）、偏差、实测表。
+- [x] 4-4 计划 §12「实施记录与偏差（2026-11-01）」：提交链、构建表（已回填）、偏差、实测表。
 - [x] 4-5 `git add` 4 文件 → 提交 `docs: 记录第十三轮 CSP 违规上报`。
 
 ## Task 5：全量验证、部署与回填

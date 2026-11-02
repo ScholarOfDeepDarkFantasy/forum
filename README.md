@@ -26,6 +26,22 @@
 - **全文搜索**：顶栏搜索框或 `/search?q=` 独立结果页，标题与正文子串匹配、标题命中优先、命中词高亮；正文命中时显示片段。中文按子串匹配，无分词与相关度排序
 - 部署：前端由 nginx 托管、后端容器化运行，Jenkins 自动构建发布（见 `docs/deployment/README.md`）
 
+### 错误响应契约
+
+所有失败响应体统一为 `{"success":false,"message":"…","timestamp":…}`，不泄露堆栈：
+
+| 状态 | 何时出现 |
+|---|---|
+| 400 | 业务规则不满足、`@Valid` 字段错误、缺/错 query 参数、**请求体不是合法 JSON** |
+| 401 | 未登录、token 失效/过期、密码错误、SSE 票据无效 |
+| 403 | 角色不足 |
+| 404 | 资源不存在 |
+| 405 | 方法不允许（`PUT/PATCH/DELETE/HEAD`），带 `Allow: POST`；`OPTIONS` 由 Spring 返回 200 |
+| 413 | 上传超限 |
+| 415 | `Content-Type` 不受支持（如对 JSON 接口发 `text/plain`） |
+| 429 | 登录失败次数超限，带 `Retry-After` 秒数 |
+| 500 | 未预期异常（唯一兜底；出现即代表需要修） |
+
 ## 环境要求
 
 - JDK 17+
@@ -250,7 +266,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 24 个测试类、197 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 25 个测试类、202 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 

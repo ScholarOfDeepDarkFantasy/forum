@@ -139,8 +139,8 @@ cd frontend && pnpm test --run
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 87 | 5537 |
-| 后端测试（`src/test/java`） | 25 | 5625 |
+| 后端主代码（`src/main/java`） | 87 | 5555 |
+| 后端测试（`src/test/java`） | 26 | 5744 |
 | 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4780 |
 | 前端测试（`*.spec.js`） | 33 | 6001 |
 | 前端 E2E（`frontend/e2e` + `playwright.config.js`） | 8 | 360 |
@@ -153,12 +153,12 @@ cd frontend && pnpm test --run
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **197** 个用例 / 24 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 后端 | **202** 个用例 / 25 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
 | 前端 | **334** 个用例 / 33 个 spec | 全绿 |
 | 前端 E2E | **8** 个用例 / 5 个 spec（Playwright） | 全绿（手动执行，不计入上面两行基线） |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布（合计 197）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CspReportIntegrationTest` 8、`CspReportSanitizerTest` 7、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`CspReportThrottleTest` 5、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
+后端测试类分布（合计 202）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CspReportIntegrationTest` 8、`ErrorContractIntegrationTest` 5、`CspReportSanitizerTest` 7、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`CspReportThrottleTest` 5、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
 
 前端 spec 分布（合计 334）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）17、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3、`elementAutoImport` 2、`csp` 11。
 
@@ -971,7 +971,7 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | `deploy/nginx/forum.conf` | `index.html` location 的 CSP 追加 `report-uri /forum/api/csp-report; report-to csp-endpoint`，并下发 `Reporting-Endpoints: csp-endpoint="/forum/api/csp-report"`；新增精确 location `= /forum/api/csp-report`（反代 8086、`client_max_body_size 16k`、`access_log off`、`proxy_read_timeout 10s`） |
 | `deploy/nginx/public.conf` | server 级 CSP 同步追加两条上报指令（与 `forum.conf` 逐字相同，`csp.spec.js` 断言） |
 | `deploy/deploy.sh` | 部署期新增 5 条断言：`Reporting-Endpoints` 头、`report-uri`、`report-to`、真实 POST 204、GET 405 |
-| 后端 | 新增 `CspReportController`（`POST /api/csp-report`，永远 204 + `Cache-Control: no-store`；非 POST 方法由全局异常处理器统一返回 405 + `Allow: POST`，匿名请求先被 Security 拦成 401）、`CspReportService`（有界读取 8 KB、先限速后读 body、白名单字段结构化 WARN、任何异常只 debug）、`CspReportSanitizer`（兼容 legacy `application/csp-report` 与 Reporting API `application/reports+json`，URL 去 query/fragment、截断 300/120）、`CspReportThrottle`（每 IP 每分钟 20 条固定窗口，`@Scheduled` 清理）、`CspViolation`；`SecurityConfig` 放行匿名 POST；`application.yml` 增加 4 个 `CSP_REPORT_*` 配置 |
+| 后端 | 新增 `CspReportController`（`POST /api/csp-report`，永远 204 + `Cache-Control: no-store`；`PUT/PATCH/DELETE` 由全局异常处理器返回 405 + `Allow: POST`；`OPTIONS` 由 Spring 返回 200（`Allow: POST,OPTIONS`）；`HEAD` 走 405；匿名请求先被 Security 拦成 401）、`CspReportService`（有界读取 8 KB、先限速后读 body、白名单字段结构化 WARN、任何异常只 debug）、`CspReportSanitizer`（兼容 legacy `application/csp-report` 与 Reporting API `application/reports+json`，URL 去 query/fragment、截断 300/120）、`CspReportThrottle`（每 IP 每分钟 20 条固定窗口，`@Scheduled` 清理）、`CspViolation`；`SecurityConfig` 放行匿名 POST；`application.yml` 增加 4 个 `CSP_REPORT_*` 配置 |
 | `frontend/src/plugins/csp.spec.js` | 新增 2 条守护：CSP 含两条上报指令且 `Reporting-Endpoints` 在 `index.html` location 内；`deploy.sh` 含上报通道断言唯一串 |
 
 **端点行为**：浏览器上报由页面发起、不带认证头，所以端点公开；防护靠「体积上限 + 每 IP 限速 +
@@ -1046,6 +1046,58 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 - 回填提交 `c8751fa` 触发 Build #41 SUCCESS（镜像 41），远端与 HEAD 一致；第二轮审查修复进一步产出 Build #42/#43（见上）。
 - 已知口径：上报 IP 为 Cloudflare 真实客户端 IP（realip 生效），不是容器网关。
 
+### 4.19 第十四轮：错误契约收尾（2026-11-03）
+
+**背景**：第十三轮给 `/api/csp-report` 补 405 时暴露出一个更普遍的问题——客户端错误没有统一映射。
+坏 JSON（`HttpMessageNotReadableException`）与不支持的 `Content-Type`（`HttpMediaTypeNotSupportedException`）
+落到兜底 `Exception` 处理器，返回 **500** 并 `log.error` 打堆栈：调用方以为是服务端故障，日志里也混入
+本不该告警的 ERROR。本轮只收尾错误契约，不加业务功能、不改前端、不改 nginx 路由。
+
+**改动**
+
+| 文件 | 改动 |
+| --- | --- |
+| `src/main/java/org/song/forum/exception/GlobalExceptionHandler.java` | 新增两个处理器（位置在 multipart 之后、`AccessDeniedException` 之前）：`HttpMessageNotReadableException` → 400 `请求体格式错误`；`HttpMediaTypeNotSupportedException` → 415 `不支持的 Content-Type`；两者均 `log.debug`，不落堆栈 |
+| `src/test/java/org/song/forum/controller/ErrorContractIntegrationTest.java` | 新增 5 例：登录/注册坏 JSON → 400、JSON 数组当对象 → 400、`text/plain` → 415、空对象触发 `@Valid` → 400；统一断言 `success=false`、`message`、`timestamp` |
+| `src/test/java/org/song/forum/controller/CspReportIntegrationTest.java` | 405 用例扩展为 `PUT/PATCH/DELETE` 循环，逐字断言 `Allow: POST` 与 `Result` 结构，并挂 `GlobalExceptionHandler` 的 Logback appender 断言全程无 ERROR |
+
+**错误契约**（所有失败响应体统一 `{"success":false,"message":"…","timestamp":…}`，不含堆栈）
+
+| 状态 | 触发 | `Result.message` | 额外响应头 |
+| --- | --- | --- | --- |
+| 400 | 业务规则不满足 / `@Valid` 字段错误 / 缺错 query / 请求体不是合法 JSON | 业务文案 / 字段错误 / `请求体格式错误` | — |
+| 401 | 未登录、token 失效或过期、密码错误、SSE 票据无效 | `请先登录` / `未登录或登录已过期` / `用户名或密码错误` | — |
+| 403 | 角色不足 | `无权限执行该操作` | — |
+| 404 | 资源不存在 | `…不存在` | — |
+| 405 | `PUT/PATCH/DELETE/HEAD` | `请求方法不被支持` | `Allow: POST`（`OPTIONS` 返回 200 + `Allow: POST,OPTIONS`） |
+| 413 | 上传文件过大 | `上传文件过大` | — |
+| 415 | `Content-Type` 不受支持（如对 JSON 接口发 `text/plain`） | `不支持的 Content-Type` | — |
+| 429 | 登录失败次数超限 | `登录失败次数过多，请 N 分钟后再试` | `Retry-After` |
+| 500 | 未预期异常（唯一兜底） | `服务器内部错误，请稍后重试` | — |
+
+**验证矩阵**
+
+| # | 验证点 | 结果 |
+| --- | --- | --- |
+| V1 | 后端全量 `mvn -B clean test` | ✅ `Tests run: 202, Failures: 0, Errors: 0, Skipped: 1`，25 个测试类 |
+| V2 | 前端 Vitest 基线 334/33 | 本轮未改前端，沿用 334/33（Task 4 复跑） |
+| V3 | 前端构建 / bundle 预算 | 本轮未改前端，待 Task 4 复跑 |
+| V4 | 坏 JSON → 400、`text/plain` → 415、认证 `PUT` → 405 + `Allow: POST`、无 ERROR | ✅ 由 `ErrorContractIntegrationTest` 与 `CspReportIntegrationTest` 真实 HTTP 覆盖（修复前 4 例 500、修复后全绿） |
+| V5 | 部署后同 V4 + 容器日志 ERROR 计数 0 | 待 Task 4 上线验收回填 |
+| V6 | 登录 → `/me` → 登出、E2E 8/8 无回归 | 全量集成测试已覆盖主流程；公网 E2E 待 Task 4 |
+| V7 | 变异：注释掉 `handleMethodNotSupported` 后 405 用例必须变红 | ✅ `CspReportIntegrationTest` 2 例失败，405 变 500（`expected: 405 METHOD_NOT_ALLOWED but was: 500 INTERNAL_SERVER_ERROR`）；恢复后 8/8 绿 |
+
+**构建记录**：`9d51a4d` 设计与计划 → `43ff6eb` 后端错误映射与 405 守护 → 本文档提交 → Jenkins 构建待 Task 4 回填。
+
+**已知限制**
+
+1. 错误文案未国际化：`message` 直接是中文（415 文案里还含英文 `Content-Type`），前端只能整体展示。
+2. 400 同时承载「业务规则」与「请求体解析」两类语义，调用方只能靠 `message` 区分，没有机器可读 `code`。
+3. 客户端提前断开导致的 `IOException` 仍不写响应（连接已不可用），只在容器日志留痕。
+4. 两个新处理器用 `log.debug`：排障坏 JSON/415 时需临时把 `org.song.forum.exception` 调到 DEBUG，默认级别下看不到。
+
+**上线验收**：待 Task 4（推送后的 Jenkins Build、公网 V4/V5/V6 复测）回填。
+
 ## 5. 待办与后续计划
 
 ### 5.1 技术债与风险（建议优先处理）
@@ -1099,6 +1151,8 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 > 第十二轮继续不加业务功能，只补前端 E2E 骨架（见 §4.17）：Playwright 1.64.1、5 spec / 8 用例、worker 级确定性数据、CSP 与 pageerror 守卫、本地与公网双模式；E2E 不计入 Vitest 基线（330/33 不变），也不进默认流水线（记 T20）。新增候选：①E2E 进 CI（需要独立测试库与账号）；②用 E2E 覆盖通知/SSE 与上传头像（当前明确不做，属下一轮评估）。
 
 > 第十三轮关闭 T18（见 §4.18）：浏览器 CSP 违规经 `report-uri`/`report-to` 上报到公开端点 `/api/csp-report`，后端按 IP 限速并写结构化 WARN；部署期断言上报通道。新增候选：①CSP 违规日志聚合/看板（如按 directive 计数并暴露指标）；②`report-to` 的 `max_age`/多端点协商（当前只声明一个 group）。
+
+> 第十四轮收尾错误契约（见 §4.19）：坏 JSON→400、不支持的 `Content-Type`→415，405 扩展为 `PUT/PATCH/DELETE/HEAD` 并断言 `Allow: POST` 与无 ERROR；不加业务功能。新增候选：①错误文案国际化（当前硬编码中文，415 还混英文）；②逐步迁移到 RFC 9457 `ProblemDetail`（需要前端同步解析）；③CSP 上报日志聚合（承接第十三轮候选①）。
 
 ---
 
@@ -1164,7 +1218,10 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-11-01 | docs | 回填第十三轮审查修复构建（Build #42 / 镜像 42、非 POST 405 实测） | 本次提交 |
+| 2026-11-03 | docs | 记录第十四轮错误契约收尾（§4.19、错误响应契约、基线 202/25） | 本次提交 |
+| 2026-11-03 | fix | 收敛坏 JSON→400、text/plain→415，加固 405 守护（PUT/PATCH/DELETE + Allow + 无 ERROR） | `43ff6eb` |
+| 2026-11-03 | docs | 新增第十四轮错误契约收尾设计与计划 | `9d51a4d` |
+| 2026-11-01 | docs | 回填第十三轮审查修复构建（Build #42 / 镜像 42、非 POST 405 实测） | `d52751a` |
 | 2026-11-01 | fix | 修正非 POST 方法 500（全局 405 + `Allow`）与 csp.spec 注释假绿，清洗 C1 字符 | `165c469` |
 | 2026-11-01 | docs | 回填第十三轮构建与上线验收（Build #41 / 镜像 41、V1–V7） | `c8751fa` |
 | 2026-11-01 | docs | 记录第十三轮 CSP 违规上报（§4.18、T18 关闭、基线 195/333） | `3370c94` |

@@ -134,6 +134,12 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' \
 ```
 
 ```bash
+# 错误契约速查（第十四轮）：坏 JSON → 400「请求体格式错误」、text/plain → 415「不支持的 Content-Type」
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' --data '{bad' http://127.0.0.1:8086/api/auth/login
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: text/plain' --data 'x' http://127.0.0.1:8086/api/auth/login
+```
+
+```bash
 # 头像上传冒烟：登录拿 token → 上传本地 avatar.jpg（JPEG，≤2MB）→ 经 nginx 取回
 TOKEN=$(curl -fsS -H 'Content-Type: application/json' \
   -d "{\"username\":\"${SMOKE_USER:-admin}\",\"password\":\"${SMOKE_PASS:-admin123456}\"}" \
@@ -389,8 +395,7 @@ curl -sS -I -H 'Host: treenewbee.men' 'http://127.0.0.1/forum/' | grep -iE '^(re
 #       content-security-policy: ...; report-uri /forum/api/csp-report; report-to csp-endpoint
 
 # 2) 合成一条 legacy 报告（模拟浏览器 POST），应为 204
-curl -sS -o /dev/null -w '%{http_code}
-' -X POST -H 'Content-Type: application/csp-report'   --data '{"csp-report":{"document-uri":"http://127.0.0.1/forum/","violated-directive":"script-src","blocked-uri":"inline"}}'   http://127.0.0.1/forum/api/csp-report
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/csp-report' --data '{"csp-report":{"document-uri":"http://127.0.0.1/forum/","violated-directive":"script-src","blocked-uri":"inline"}}' http://127.0.0.1/forum/api/csp-report
 
 # 3) 后台日志应有一行结构化记录（第十三轮新增）
 sudo -u pi XDG_RUNTIME_DIR=/run/user/$(id -u pi) podman logs --tail 200 forum-backend | grep 'CSP 违规上报'
