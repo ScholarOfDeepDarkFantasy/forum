@@ -36,10 +36,10 @@
 | `MethodArgumentNotValidException` | 400 | `@Valid` 字段校验，返回字段错误表 |
 | `BadCredentialsException` | 401 | 登录失败 |
 | `AuthenticationException` | 401 | 其它认证失败 |
-| `IllegalStateException` | 409 | 状态冲突 |
+| `IllegalStateException` | 401 / 400 | 消息含「未登录」→401，否则 400（状态冲突不是 409） |
 | `MissingServletRequestParameterException` | 400 | 缺 query 参数（已有） |
 | `MethodArgumentTypeMismatchException` | 400 | query 参数类型不符（已有） |
-| `MaxUploadSizeExceededException` / `MissingServletRequestPartException` / `MultipartException` | 413 / 400 / 400 | 上传相关 |
+| `MaxUploadSizeExceededException` / `MissingServletRequestPartException` / `MultipartException` | 400 / 400 / 400 | 上传相关（超限文案 `图片不能超过 2MB`；**413 只由 nginx `client_max_body_size` 产生**） |
 | `AccessDeniedException` | 403 | 权限不足 |
 | `NoSuchElementException` | 404 | 资源不存在 |
 | `InvalidStreamTicketException` | 401 | SSE 票据 |
@@ -104,17 +104,16 @@ public ResponseEntity<Result<Void>> handleUnsupportedMediaType(
 
 | 状态 | 触发 | 文案（`Result.message`） | 额外头 |
 |---|---|---|---|
-| 400 | 业务规则、`@Valid` 失败、缺/错 query 参数、**坏 JSON** | 业务文案 / 字段错误 / `请求体格式错误` | — |
-| 401 | 未登录、token 失效/过期、登录密码错、SSE 票据无效 | `请先登录` / `未登录或登录已过期` / `用户名或密码错误` / … | — |
-| 403 | 角色不足 | `无权限执行该操作` | — |
+| 400 | 业务规则、`@Valid` 失败、缺/错 query 参数、**坏 JSON**、上传超过 2MB | 业务文案 / 字段错误 / `请求体格式错误` / `图片不能超过 2MB` | — |
+| 401 | 未登录、token 失效/过期、登录密码错、SSE 票据无效 | `未登录或登录已过期` / `用户名或密码错误`（`请先登录` 是前端 401 拦截器文案，非后端 body） | — |
+| 403 | 角色不足 | `无权限执行此操作` | — |
 | 404 | 资源不存在 | `...不存在` | — |
-| 405 | 方法不允许（`PUT/PATCH/DELETE/HEAD`） | `请求方法不被支持` | `Allow: POST`（OPTIONS 由 Spring 返回 200） |
-| 413 | 上传超限 | `上传文件过大` | — |
+| 405 | **认证后** 方法不允许（`PUT/PATCH/DELETE/HEAD`；匿名先被 Security 拦成 401） | `请求方法不被支持` | `Allow: POST`（OPTIONS 由 Spring 返回 200） |
 | 415 | `Content-Type` 不受支持 | `不支持的 Content-Type` | — |
 | 429 | 登录失败次数超限 | `登录失败次数过多，请 N 分钟后再试` | `Retry-After` |
 | 500 | 未预期异常（唯一兜底） | `服务器内部错误，请稍后重试` | — |
 
-补充说明：所有响应体统一为 `{"success":false,"message":"…","timestamp":…}`；400/401 之外不泄露堆栈。
+补充说明：经 `@RestControllerAdvice`/业务异常返回的响应体统一为 `{"success":false,"message":"…","timestamp":…}`；Security 过滤器直接写出的 401/403 无 `timestamp`；nginx 的 413 是 HTML，不属本契约。400/401 之外不泄露堆栈。
 
 ### R5 第十三轮 Minor 修正
 

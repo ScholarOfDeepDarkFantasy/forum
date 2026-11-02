@@ -128,8 +128,9 @@ cd frontend && pnpm test --run
 | 第十一轮 | 安全头收敛与 CSP：内联脚本哈希放行、uploads 全套头、CF 信标放行、部署断言 | 5 | ✅ 已完成 | 2026-10-31 |
 | 第十二轮 | 前端 E2E 骨架：Playwright + 确定性数据引导 + 5 条关键路径 + 双模式（本地/公网） | 5 | ✅ 已完成 | 2026-10-31 |
 | 第十三轮 | CSP 违规上报与可见性：`report-uri`/`report-to` + 匿名上报端点 + 结构化日志 + 部署断言 | 5 | ✅ 已完成 | 2026-11-01 |
+| 第十四轮 | 错误契约收尾：坏 JSON→400、不支持 `Content-Type`→415、405 扩展与日志/`Allow` 断言 | 4 | ✅ 已完成 | 2026-11-03 |
 
-**当前进度：MVP 100% ｜ 已完成 13 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
+**当前进度：MVP 100% ｜ 已完成 14 轮迭代。** 全部提交见 §8 变更日志；实时总数用 `git rev-list --count HEAD` 查询（本文件不记录精确总数，因为每次提交都会改变它）。
 
 ---
 
@@ -140,7 +141,7 @@ cd frontend && pnpm test --run
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
 | 后端主代码（`src/main/java`） | 87 | 5555 |
-| 后端测试（`src/test/java`） | 26 | 5744 |
+| 后端测试（`src/test/java`） | 26 | 5781 |
 | 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4780 |
 | 前端测试（`*.spec.js`） | 33 | 6001 |
 | 前端 E2E（`frontend/e2e` + `playwright.config.js`） | 8 | 360 |
@@ -1061,16 +1062,15 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | `src/test/java/org/song/forum/controller/ErrorContractIntegrationTest.java` | 新增 5 例：登录/注册坏 JSON → 400、JSON 数组当对象 → 400、`text/plain` → 415、空对象触发 `@Valid` → 400；统一断言 `success=false`、`message`、`timestamp` |
 | `src/test/java/org/song/forum/controller/CspReportIntegrationTest.java` | 405 用例扩展为 `PUT/PATCH/DELETE` 循环，逐字断言 `Allow: POST` 与 `Result` 结构，并挂 `GlobalExceptionHandler` 的 Logback appender 断言全程无 ERROR |
 
-**错误契约**（所有失败响应体统一 `{"success":false,"message":"…","timestamp":…}`，不含堆栈）
+**错误契约**（经 `GlobalExceptionHandler`/业务异常返回的失败响应体统一为 `{"success":false,"message":"…","timestamp":…}`，不含堆栈；Security 过滤器直接写出的 401/403 只有 `success`/`message`，nginx 层的 413 是 HTML 页面）
 
 | 状态 | 触发 | `Result.message` | 额外响应头 |
 | --- | --- | --- | --- |
-| 400 | 业务规则不满足 / `@Valid` 字段错误 / 缺错 query / 请求体不是合法 JSON | 业务文案 / 字段错误 / `请求体格式错误` | — |
-| 401 | 未登录、token 失效或过期、密码错误、SSE 票据无效 | `请先登录` / `未登录或登录已过期` / `用户名或密码错误` | — |
-| 403 | 角色不足 | `无权限执行该操作` | — |
+| 400 | 业务规则不满足 / `@Valid` 字段错误 / 缺错 query / 请求体不是合法 JSON / 上传超过 2MB | 业务文案 / 字段错误 / `请求体格式错误` / `图片不能超过 2MB` | — |
+| 401 | 未登录、token 失效或过期、密码错误、SSE 票据无效 | `未登录或登录已过期` / `用户名或密码错误`（`请先登录` 是前端 401 拦截器提示，不来自后端） | — |
+| 403 | 角色不足 | `无权限执行此操作` | — |
 | 404 | 资源不存在 | `…不存在` | — |
-| 405 | `PUT/PATCH/DELETE/HEAD` | `请求方法不被支持` | `Allow: POST`（`OPTIONS` 返回 200 + `Allow: POST,OPTIONS`） |
-| 413 | 上传文件过大 | `上传文件过大` | — |
+| 405 | **认证后** `PUT/PATCH/DELETE/HEAD`（匿名先被 Security 拦成 401） | `请求方法不被支持` | `Allow: POST`（`OPTIONS` 返回 200 + `Allow: POST,OPTIONS`） |
 | 415 | `Content-Type` 不受支持（如对 JSON 接口发 `text/plain`） | `不支持的 Content-Type` | — |
 | 429 | 登录失败次数超限 | `登录失败次数过多，请 N 分钟后再试` | `Retry-After` |
 | 500 | 未预期异常（唯一兜底） | `服务器内部错误，请稍后重试` | — |

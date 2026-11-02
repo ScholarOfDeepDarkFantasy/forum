@@ -28,7 +28,7 @@
 
 ### 错误响应契约
 
-所有失败响应体统一为 `{"success":false,"message":"…","timestamp":…}`，不泄露堆栈：
+失败响应体统一为 `{"success":false,"message":"…","timestamp":…}`，不泄露堆栈；例外是 Security 过滤器直接写出的 401/403（无 `timestamp`）与 nginx 层的 413（HTML 页面）：
 
 | 状态 | 何时出现 |
 |---|---|
@@ -36,11 +36,12 @@
 | 401 | 未登录、token 失效/过期、密码错误、SSE 票据无效 |
 | 403 | 角色不足 |
 | 404 | 资源不存在 |
-| 405 | 方法不允许（`PUT/PATCH/DELETE/HEAD`），带 `Allow: POST`；`OPTIONS` 由 Spring 返回 200 |
-| 413 | 上传超限 |
+| 405 | 方法不允许（认证后 `PUT/PATCH/DELETE/HEAD`；匿名请求先被 Security 返回 401），带 `Allow: POST`；`OPTIONS` 由 Spring 返回 200 |
 | 415 | `Content-Type` 不受支持（如对 JSON 接口发 `text/plain`） |
 | 429 | 登录失败次数超限，带 `Retry-After` 秒数 |
 | 500 | 未预期异常（唯一兜底；出现即代表需要修） |
+
+补充：上传超过 2MB 时后端返回 **400** `图片不能超过 2MB`（不是 413）；413 只出现在 nginx 的 `client_max_body_size 3m`（HTML 响应，非本契约）。
 
 ## 环境要求
 

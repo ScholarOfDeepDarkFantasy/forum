@@ -6,11 +6,12 @@
 ## 0. 执行约定
 
 - 仓库：`E:\JavaSpace\forum`（Git Bash `/e/JavaSpace/forum`），master 直接提交，不建分支、不 amend、不 rebase。
-- 本轮共 **4 次提交**（顺序如下），每次提交后 `git status` 必须干净：
+- 本轮共 **5 次提交**（顺序如下；第 4 条是审查后追加的计划外加固，其余按 Task 顺序），每次提交后 `git status` 必须干净：
   1. `docs: 新增第十四轮错误契约收尾设计与计划`（Task 1）
   2. `fix: 收敛客户端错误映射并加固 405 守护`（Task 2）
   3. `docs: 记录第十四轮错误契约收尾`（Task 3）
-  4. `docs: 回填第十四轮构建与上线验收`（Task 4）
+  4. `test: 加固错误契约的日志与 Allow 断言`（计划外，审查反馈后补测试守护）
+  5. `docs: 回填第十四轮构建与上线验收`（Task 4）
 - 提交信息逐字使用附录 A。
 - 每次跑后端测试前确认没有并发 `mvn`；审查/复跑一律在 `/c/Temp` 一次性副本里做（`git -c core.autocrlf=false archive <commit> | tar -x -C ...`）。
 - 前端命令：`cd /e/JavaSpace/forum/frontend`；构建必须带 `MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH`。
@@ -310,7 +311,8 @@ class ErrorContractIntegrationTest {
 1. `docs: 新增第十四轮错误契约收尾设计与计划`
 2. `fix: 收敛客户端错误映射并加固 405 守护`
 3. `docs: 记录第十四轮错误契约收尾`
-4. `docs: 回填第十四轮构建与上线验收`
+4. `test: 加固错误契约的日志与 Allow 断言`（计划外，审查后追加）
+5. `docs: 回填第十四轮构建与上线验收`
 
 ## 附录 B：冒烟清单
 
@@ -343,7 +345,7 @@ class ErrorContractIntegrationTest {
 
 **偏差**
 
-1. `CspReportIntegrationTest` 实际为 **8** 个用例（计划写 9/9）：405 用例是在现有类上扩展，未新增测试类。
+1. `CspReportIntegrationTest` 实际为 **8** 个用例（初稿曾写 9/9，定稿为 8/8）：405 用例是在现有类上扩展，未新增测试类。
 2. 405 扩展断言在修复前已绿（第十三轮已把非 POST 收敛为 405），本轮 RED 只体现在坏 JSON/415；405 守护改由变异验证补足。
 3. README 没有独立的「API」小节，`### 错误响应契约` 放在 `## 功能` 列表之后。
 4. 审查后追加计划外加固提交 `a124e17`：`ErrorContractIntegrationTest` 挂 Logback appender 断言 400/415 用例无 ERROR（原实现把 `log.debug` 改成 `log.error` 后测试仍绿）；`Allow` 断言由 `getFirst` 改为 `containsExactly("POST")`；计划 B.6/Step 4-6 的 OPTIONS/HEAD 验收脚本补齐 `Authorization`（匿名会被 Security 拦成 401，实测已确认）。
