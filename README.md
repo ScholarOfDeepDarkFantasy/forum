@@ -281,7 +281,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 26 个测试类、214 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 26 个测试类、215 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 

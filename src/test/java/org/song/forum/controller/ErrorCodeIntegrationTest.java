@@ -121,6 +121,26 @@ class ErrorCodeIntegrationTest {
     }
 
     @Test
+    void noAcceptLanguageStaysChineseEvenWhenJvmDefaultIsEnglish() {
+        Locale previous = Locale.getDefault();
+        Locale.setDefault(Locale.ENGLISH);
+        try {
+            ResponseEntity<String> mvc = postBadJsonWithLocale(null);
+            assertThat(mvc.getBody())
+                    .contains("\"code\":\"BAD_JSON\"")
+                    .contains("\"message\":\"请求体格式错误\"");
+
+            ResponseEntity<String> security = rest.getForEntity(url("/api/auth/me"), String.class);
+            assertThat(security.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            assertThat(security.getBody())
+                    .contains("\"code\":\"UNAUTHORIZED\"")
+                    .contains("\"message\":\"未登录或登录已过期\"");
+        } finally {
+            Locale.setDefault(previous);
+        }
+    }
+
+    @Test
     void failureResultSerializesCode() throws Exception {
         String json = objectMapper.writeValueAsString(Result.fail(ErrorCode.BAD_JSON, "x"));
 

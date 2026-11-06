@@ -154,12 +154,12 @@ cd frontend && pnpm test --run
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **214** 个用例 / 26 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 后端 | **215** 个用例 / 26 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
 | 前端 | **336** 个用例 / 33 个 spec | 全绿 |
 | 前端 E2E | **8** 个用例 / 5 个 spec（Playwright） | 全绿（手动执行，不计入上面两行基线） |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布（合计 214）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CspReportIntegrationTest` 8、`ErrorContractIntegrationTest` 7、`CspReportSanitizerTest` 7、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`CspReportThrottleTest` 5、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1、`ErrorCodeIntegrationTest` 10。
+后端测试类分布（合计 215）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CspReportIntegrationTest` 8、`ErrorContractIntegrationTest` 7、`CspReportSanitizerTest` 7、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`CspReportThrottleTest` 5、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1、`ErrorCodeIntegrationTest` 11。
 
 前端 spec 分布（合计 336）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）19、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3、`elementAutoImport` 2、`csp` 11。
 
@@ -1144,7 +1144,7 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | # | 验证点 | 结果 |
 | --- | --- | --- |
-| V1 | 后端全量 `mvn -B clean test` | ✅ `Tests run: 214, Failures: 0, Errors: 0, Skipped: 1`，26 个测试类 |
+| V1 | 后端全量 `mvn -B clean test` | ✅ `Tests run: 215, Failures: 0, Errors: 0, Skipped: 1`，26 个测试类 |
 | V2 | 前端 Vitest 336/33 | ✅ `Tests 336 passed (336)` / `Test Files 33 passed (33)` |
 | V3 | 构建 / bundle 预算 | ✅ `VITE_BASE_PATH=/forum/ pnpm build` 通过；`check:bundle` 五项在预算内 |
 | V4 | 坏 JSON→`BAD_JSON`、`text/plain`→`UNSUPPORTED_MEDIA_TYPE`、认证 `PUT`→`METHOD_NOT_ALLOWED`+`Allow: POST` | ✅ `ErrorCodeIntegrationTest` 真实 HTTP 覆盖 |
@@ -1152,6 +1152,15 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | V6 | 匿名 `GET /api/auth/me` → 401 `UNAUTHORIZED` + `timestamp` | ✅ `ErrorCodeIntegrationTest.anonymousRequestReturnsUnauthorizedCodeFromSecurity` |
 | V7 | 变异：改坏 `messages.properties` 的中文后测试必须红 | ✅ `ErrorCodeIntegrationTest` 至少 2 例失败；恢复后 10/10 绿 |
 | V8 | 部署后公网复核 + 容器 ERROR 0（见本轮回填） | ⏳ 由 Task 6 回填 |
+
+**审查修复（2026-11-06，Task 2 质量审查）**：审查用 en 默认 locale 的 JVM 复现了 13 个既有
+用例变红——无 `Accept-Language` 时 `LocaleContextHolder` / `request.getLocale()` 会回退到 JVM
+默认 locale（生产容器为 `en_US`），「默认中文」失效，并会让 `deploy.sh` 的中文断言在部署时中断。
+修复：`application.yml` 增加 `spring.web.locale: zh_CN`（Boot 3 读 `spring.web.locale`，
+`spring.mvc.locale` 已不生效）；`SecurityConfig` 新增 `explicitLocale()`，无 `Accept-Language`
+头时传 `null`；`ErrorMessages.getMessage` 补 `code.name()` 缺键兜底；`ErrorCodeIntegrationTest`
+新增 `noAcceptLanguageStaysChineseEvenWhenJvmDefaultIsEnglish`（临时把 JVM 默认 locale 置为
+英文，断言 MVC 400 与 Security 401 都仍是中文，并用掉 `spring.web.locale` 做变异验证）。
 
 **构建记录**：`344b664` 设计与计划 → `ff2966e` 后端错误码与双语 → `3ce8687` 测试守护（214/26）→
 `0306082` 前端兜底（336/33）→ 本提交记录 → 回填提交见下。
@@ -1288,6 +1297,7 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-11-06 | fix | 修正无 `Accept-Language` 时的默认中文（`spring.web.locale` + Security 显式头判定）并补守护（215/26） | 本次提交 |
 | 2026-11-06 | docs | 记录第十五轮错误码与国际化（§4.20、基线 214/26） | 本次提交 |
 | 2026-11-06 | fix | 前端按错误码兜底展示并保留后端文案（336/33） | `0306082` |
 | 2026-11-06 | test | 守护错误码与双语错误文案（214/26） | `3ce8687` |

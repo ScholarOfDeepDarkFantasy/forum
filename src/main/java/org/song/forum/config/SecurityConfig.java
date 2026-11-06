@@ -1,6 +1,7 @@
 package org.song.forum.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -85,17 +86,26 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex
                         // 未认证访问受保护接口 → 401 JSON（而不是重定向登录页）
                         .authenticationEntryPoint((request, response, e) ->
-                                writeError(response, ErrorCode.UNAUTHORIZED, request.getLocale()))
+                                writeError(response, ErrorCode.UNAUTHORIZED, explicitLocale(request)))
                         // 已登录但权限不足 → 403 JSON
                         .accessDeniedHandler((request, response, e) ->
-                                writeError(response, ErrorCode.FORBIDDEN, request.getLocale()))
+                                writeError(response, ErrorCode.FORBIDDEN, explicitLocale(request)))
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
     /**
-     * Security 过滤器链在 MVC 之外，拿不到 LocaleContextHolder，只能显式传 request 的 locale；
+     * 只认显式的 Accept-Language：没有任何头时返回 null，让 ErrorMessages 归一成中文。
+     * 不能直接用 request.getLocale()——它回退到 JVM 默认 locale，生产容器里通常是 en。
+     */
+    private static Locale explicitLocale(HttpServletRequest request) {
+        String acceptLanguage = request.getHeader("Accept-Language");
+        return acceptLanguage == null || acceptLanguage.isBlank() ? null : request.getLocale();
+    }
+
+    /**
+     * Security 过滤器链在 MVC 之外，拿不到 LocaleContextHolder，只能显式传 locale；
      * JSON 交给 ObjectMapper 生成（不手拼字符串），字段与 GlobalExceptionHandler 保持一致。
      */
     private void writeError(HttpServletResponse response, ErrorCode code, Locale locale) throws IOException {

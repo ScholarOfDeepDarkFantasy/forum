@@ -4,8 +4,12 @@ spring:
 
   # ---- 错误文案国际化（第十五轮） ----
   # 默认资源 messages.properties 为中文，messages_en.properties 为英文。
-  # fallback-to-system-locale=false：请求无 locale 时不再看 JVM 默认 locale，
-  # 直接落到中文默认资源（容器 locale 常为 en，否则「默认中文」会失效）。
+  # spring.web.locale：显式把 Web 层默认 locale 固定为中文（Boot 3 读的是 spring.web.locale，
+  # spring.mvc.locale 已不再生效）；不设时无 Accept-Language 的请求会落到 JVM 默认 locale，
+  # 生产容器（temurin，LANG=en_US.UTF-8）会因此默认返回英文。
+  # messages.fallback-to-system-locale=false 只影响资源查找的兜底，不改变 locale 解析。
+  web:
+    locale: zh_CN
   messages:
     basename: messages
     encoding: UTF-8
