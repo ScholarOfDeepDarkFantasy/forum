@@ -140,9 +140,9 @@ cd frontend && pnpm test --run
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 89 | 5670 |
-| 后端测试（`src/test/java`） | 27 | 6002 |
-| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4780 |
+| 后端主代码（`src/main/java`） | 89 | 5682 |
+| 后端测试（`src/test/java`） | 27 | 6022 |
+| 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4808 |
 | 前端测试（`*.spec.js`） | 33 | 6020 |
 | 前端 E2E（`frontend/e2e` + `playwright.config.js`） | 8 | 360 |
 

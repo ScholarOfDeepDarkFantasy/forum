@@ -9,7 +9,7 @@
 ## 0 执行约定
 
 1. **分支**：直接在 `master` 上提交，不开分支、不 rebase、不 amend 已推送提交。
-2. **提交粒度**：每个 Task 一次提交，共 **6 次**；提交信息逐字使用附录 A，不得改写。
+2. **提交粒度**：每个 Task 一次提交，计划共 **6 次**；执行中因质量审查追加 `ad38754`（默认 locale 修复），实际 **7 次**，见 §12。提交信息逐字使用附录 A，不得改写。
    Task 内所有 Step 的改动先全部完成并验证，再一次性 `git add` + `git commit`。
 3. **Shell**：Windows Git Bash；仓库根 `E:/JavaSpace/forum`（Bash 路径 `/e/JavaSpace/forum`）。
    所有命令都在仓库根执行，除非明确 `cd frontend`。
@@ -44,7 +44,7 @@
 | `frontend/src/api/index.js` | 156 行，错误提示只读 `message` |
 | 仓库全局 | 无 `messages*.properties`、无 `MessageSource`、无 `LocaleContextHolder` |
 
-本轮结束基线：后端 **214 / 26 类 / 1 skipped**；前端 **336 / 33 spec**；E2E 8/8 不变。
+本轮结束基线：后端 **214 / 26 类 / 1 skipped**（审查修复后为 **215 / 26**，见 §12）；前端 **336 / 33 spec**；E2E 8/8 不变。
 
 ## Task 1 提交设计与计划（docs，第 1/6 次提交）
 
@@ -1696,7 +1696,7 @@ git status --short
 5. 若发现设计与实际代码不符（例如某 handler 已被删除），先按「实现现状 + 设计意图」做最小修正，
    并在 §12 记录偏差；不要静默改设计。
 
-## 附录 A 提交信息（逐字，共 6 条）
+## 附录 A 提交信息（逐字，计划 6 条；另加计划外 `ad38754`，见 §12）
 
 ```text
 docs: 新增第十五轮错误码与国际化设计与计划

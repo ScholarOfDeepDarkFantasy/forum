@@ -50,7 +50,7 @@ const CODE_MESSAGES = {
   NOT_FOUND: '资源不存在',
   UNSUPPORTED_MEDIA_TYPE: '不支持的 Content-Type',
   METHOD_NOT_ALLOWED: '请求方法不被支持',
-  TOO_MANY_ATTEMPTS: '操作过于频繁，请稍后再试',
+  TOO_MANY_ATTEMPTS: '登录失败次数过多，请稍后再试',
   INTERNAL_ERROR: '服务器内部错误，请稍后重试'
 }
 
