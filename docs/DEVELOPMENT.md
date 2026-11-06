@@ -1151,7 +1151,7 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 | V5 | `Accept-Language: en` 英文、默认/`fr` 中文 | ✅ `ErrorCodeIntegrationTest` 覆盖 |
 | V6 | 匿名 `GET /api/auth/me` → 401 `UNAUTHORIZED` + `timestamp` | ✅ `ErrorCodeIntegrationTest.anonymousRequestReturnsUnauthorizedCodeFromSecurity` |
 | V7 | 变异：改坏 `messages.properties` 的中文后测试必须红 | ✅ `ErrorCodeIntegrationTest` 至少 2 例失败；恢复后 10/10 绿 |
-| V8 | 部署后公网复核 + 容器 ERROR 0（见本轮回填） | ⏳ 由 Task 6 回填 |
+| V8 | 部署后内网/公网复核 + 容器 ERROR 0 | ✅ Build #49（镜像 49）：坏 JSON 400 `BAD_JSON` 中文、`Accept-Language: en` 英文、`text/plain` 415 `UNSUPPORTED_MEDIA_TYPE`、匿名 401 `UNAUTHORIZED`+`timestamp`、认证 `PUT` 405 `METHOD_NOT_ALLOWED`+`Allow: POST`、CSP `POST` 204；公网 HTTPS 同结果；ERROR 0；公网 E2E 8/8 |
 
 **审查修复（2026-11-06，Task 2 质量审查）**：审查用 en 默认 locale 的 JVM 复现了 13 个既有
 用例变红——无 `Accept-Language` 时 `LocaleContextHolder` / `request.getLocale()` 会回退到 JVM
@@ -1163,7 +1163,9 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 英文，断言 MVC 400 与 Security 401 都仍是中文，并用掉 `spring.web.locale` 做变异验证）。
 
 **构建记录**：`344b664` 设计与计划 → `ff2966e` 后端错误码与双语 → `3ce8687` 测试守护（214/26）→
-`0306082` 前端兜底（336/33）→ 本提交记录 → 回填提交见下。
+`0306082` 前端兜底（336/33）→ `0774de9` 文档记录 → `ad38754` 默认 locale 修复（215/26，Build #48 在部署断言「默认语言不是中文」处失败，正是该缺陷的生产复现）→ Build #49（镜像 49）→ 本回填提交 → Build #50。
+
+**上线验收（2026-11-07，Build #49，镜像 `forum-backend:49`）**：本地全量后端 215/26/1 skip、前端 336/33、构建与 `check:bundle` 通过；部署后内网冒烟 9 项全过（见 V8）、容器近 5 分钟 `ERROR` 计数 0；公网 HTTPS 坏 JSON→400 `BAD_JSON`（中文）、`en`→`Malformed request body`、`text/plain`→415、匿名 `/api/auth/me`→401+`timestamp`；公网 Playwright E2E **8 passed（1.1m）**；远端 master 与本地一致。
 
 **已知限制**
 
@@ -1297,8 +1299,9 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
-| 2026-11-06 | fix | 修正无 `Accept-Language` 时的默认中文（`spring.web.locale` + Security 显式头判定）并补守护（215/26） | 本次提交 |
-| 2026-11-06 | docs | 记录第十五轮错误码与国际化（§4.20、基线 214/26） | 本次提交 |
+| 2026-11-07 | docs | 回填第十五轮构建与上线验收（Build #49 / 镜像 49、E2E 8/8、默认中文修复） | 本次提交 |
+| 2026-11-06 | fix | 修正无 `Accept-Language` 时的默认中文（`spring.web.locale` + Security 显式头判定）并补守护（215/26） | `ad38754` |
+| 2026-11-06 | docs | 记录第十五轮错误码与国际化（§4.20、基线 214/26） | `0774de9` |
 | 2026-11-06 | fix | 前端按错误码兜底展示并保留后端文案（336/33） | `0306082` |
 | 2026-11-06 | test | 守护错误码与双语错误文案（214/26） | `3ce8687` |
 | 2026-11-06 | feat | 为失败响应增加机器可读错误码并支持中英文案 | `ff2966e` |

@@ -1709,7 +1709,7 @@ docs: 回填第十五轮构建与上线验收
 
 ## 附录 B 发版前冒烟清单（B.1–B.7）
 
-- **B.1 后端全量**：`cd /e/JavaSpace/forum && mvn -B clean test` → `Tests run: 214, Failures: 0,
+- **B.1 后端全量**：`cd /e/JavaSpace/forum && mvn -B clean test` → `Tests run: 215, Failures: 0,
   Errors: 0, Skipped: 1`；`ls target/surefire-reports/*.txt | wc -l` = 26。
 - **B.2 前端全量**：`cd frontend && pnpm test` → `Test Files 33 passed`、`Tests 336 passed`。
 - **B.3 构建预算**：`MSYS2_ENV_CONV_EXCL=VITE_BASE_PATH VITE_BASE_PATH=/forum/ pnpm build` 成功；
@@ -1724,5 +1724,31 @@ docs: 回填第十五轮构建与上线验收
 
 ## 12 实施记录与偏差（Task 6 回填）
 
-> 由 Task 6 Step 6-6 按实测追加：每个 Task 的提交哈希、与计划的偏差（无则写「无」）、
-> V1–V8 实测结果、以及执行中出现的意外与处理方式。
+| Task | 提交 | 与计划的偏差 |
+| --- | --- | --- |
+| T1 | `344b664` | 无 |
+| T2 | `ff2966e` | 无（代码逐字节一致）。执行手段偏差：`application.yml` / `deploy.sh` 用 heredoc 插入（awk 内嵌中文被本机 gawk 按 GBK 转码）；冒烟因无本地 PostgreSQL 用 H2 测试装配。 |
+| T3 | `3ce8687` | 计划 Step 3-2 写「ErrorContractIntegrationTest 5→7 例」，实际替换后为 6 例，补第 7 例 `plainTextContentTypeReturnsEnglishMessageWhenRequested`（text/plain + en → 415 英文）；全量 214 / 26 类。 |
+| T4 | `0306082` | 无（两例兜底测试 + 构建/预算符合预期，前端 336/33）。 |
+| T5 | `0774de9` | 无（README 错误契约整段替换并补语言协商示例）。 |
+| T6 | 本次回填提交 | 计划外追加 **`ad38754`** 修复「无 Accept-Language 时回退 JVM 默认 locale」缺陷；测试基线 214→**215**、`ErrorCodeIntegrationTest` 10→11。 |
+
+**验证实测**：V1 后端 **215 / 26 类 / 1 skip**；V2 前端 **336 / 33 spec**；V3 构建 + `check:bundle`
+五项预算通过（入口 84.43/150、CSS 39.02/70、单 chunk 234.28/300、JS 总量 836.41/950、CSS 总量 181.57/260）；
+V4–V6 内网与公网 HTTPS 均符合（坏 JSON 400 `BAD_JSON`、`en` 英文、text/plain 415、匿名 401
+`UNAUTHORIZED`+`timestamp`、认证 PUT 405 `METHOD_NOT_ALLOWED`+`Allow: POST`）；V7 公网 E2E **8 passed (1.1 m)**；
+V8 Build **#49**（镜像 `forum-backend:49`）部署成功、容器 `ERROR` 计数 0、health 200。
+
+**审查/意外**：
+
+1. Task 2 质量审查判 **CHANGES_REQUESTED**：C1 —— 无 `Accept-Language` 时 `LocaleContextHolder` /
+   `request.getLocale()` 回退 JVM 默认 locale，生产容器（temurin，`LANG=en_US.UTF-8`）默认返回英文，
+   与「默认中文」目标相反；审查实测 en 默认 JVM 下 13 个既有用例变红，且 `deploy.sh` 的中文断言会在
+   部署时失败。修复 `ad38754`：`spring.web.locale: zh_CN`（Boot 3 读 `spring.web.locale`，
+   `spring.mvc.locale` 已不生效）、`SecurityConfig.explicitLocale()`（无头传 null）、
+   `ErrorMessages.getMessage` 补 `code.name()` 缺键兜底，并新增守护用例
+   `noAcceptLanguageStaysChineseEvenWhenJvmDefaultIsEnglish`（变异验证：去掉 `spring.web.locale` 该例红）。
+   生产复现：**Build #48 FAILURE**，失败断言正是 `deploy.sh` 的「默认语言不是中文」。
+2. 计划把 Task 3 的 ErrorContract 用例数写多 1（见 T3 偏差）。
+3. Task 2 由 Lead 接手完成（实现队友 `impl-r15-t2` 中途空闲，工作区已有其未提交改动；Lead 按计划补完
+   Step 2-5…2-9 并统一提交，`git status` 干净）。

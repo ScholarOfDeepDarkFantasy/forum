@@ -419,6 +419,16 @@ sudo -u pi XDG_RUNTIME_DIR=/run/user/$(id -u pi) podman logs --tail 200 forum-ba
 > 匿名 `OPTIONS` → `401`，认证 `OPTIONS` → `200` + `Allow: POST,OPTIONS`；CSP 上报 `POST` 仍 `204`；
 > 容器 5 分钟内 `ERROR` 计数 0；公网 HTTPS 同样 `400`/`415`；公网 E2E 8 passed (47.7 s)。
 
+> **2026-11-07 验收实测（Build #49，镜像 `forum-backend:49`，第十五轮错误码与国际化）**：
+> 坏 JSON → `400` + `"code":"BAD_JSON"` + `请求体格式错误`（默认中文）；`Accept-Language: en` →
+> `"message":"Malformed request body"`；`text/plain` → `415` + `"code":"UNSUPPORTED_MEDIA_TYPE"`；
+> 匿名 `/forum/api/auth/me` → `401` + `"code":"UNAUTHORIZED"` + `timestamp`；认证 `PUT /forum/api/csp-report`
+> → `405` + `"code":"METHOD_NOT_ALLOWED"` + `Allow: POST`；CSP 上报 `POST` 仍 `204`；容器 5 分钟内
+> `ERROR` 计数 0；公网 HTTPS 同样 `400`（中/英）/`415`/`401`；公网 E2E 8 passed (1.1 m)。
+> 注：Build #48 曾在 `deploy.sh` 的「默认语言不是中文」断言处失败，暴露出无 `Accept-Language` 时
+> 回退 JVM 默认 locale（容器为 `en_US`）的缺陷，已由 `ad38754` 修复（`spring.web.locale: zh_CN` +
+> Security 显式头判定），#49 复验通过。
+
 真实浏览器的验证（可选）：用 Playwright 打开公网页面后注入一段内联脚本（会被 `script-src` 拦截），
 再回看后端日志应出现 `blocked=inline`：
 
