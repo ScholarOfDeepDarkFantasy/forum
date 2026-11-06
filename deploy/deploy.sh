@@ -123,6 +123,18 @@ curl -fsS -H 'Host: raspi' "http://127.0.0.1/forum/posts/1" | grep -q 'id="app"'
 curl -fsS -H 'Host: raspi' "http://127.0.0.1/forum/api/posts?page=0&size=1" >/dev/null \
     || die "经 nginx 访问 /forum/api/posts 失败（检查反代与数据库连通性）"
 
+# 第十五轮：失败响应必须带机器可读 code；不带 Accept-Language 时必须是中文
+# （容器 JVM 默认 locale 常为 en，靠 ErrorMessages 归一保持「默认中文」）
+bad_json_raw="$(curl -sS --max-time 5 -H 'Content-Type: application/json' \
+    --data '{bad' "http://127.0.0.1:$HOST_PORT/api/auth/login" || true)"
+printf '%s' "$bad_json_raw" | grep -q '"code":"BAD_JSON"' \
+    || die "坏 JSON 未返回 code=BAD_JSON（实际：${bad_json_raw:-空}）"
+printf '%s' "$bad_json_raw" | grep -q '"message":"请求体格式错误"' \
+    || die "默认语言不是中文（实际：${bad_json_raw:-空}）"
+bad_json_en="$(curl -sS --max-time 5 -H 'Accept-Language: en' -H 'Content-Type: application/json' \
+    --data '{bad' "http://127.0.0.1:$HOST_PORT/api/auth/login" || true)"
+printf '%s' "$bad_json_en" | grep -q '"message":"Malformed request body"' \
+    || die "Accept-Language: en 未返回英文文案（实际：${bad_json_en:-空}）"
 # 静态资源必须带 immutable 长缓存、入口页必须 no-cache（第九轮）：
 # 抓真实 asset 路径而不是硬编码文件名——每次构建的 hash 都会变。
 #

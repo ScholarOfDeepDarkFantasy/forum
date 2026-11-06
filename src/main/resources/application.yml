@@ -2,6 +2,15 @@ spring:
   application:
     name: JavaForum
 
+  # ---- 错误文案国际化（第十五轮） ----
+  # 默认资源 messages.properties 为中文，messages_en.properties 为英文。
+  # fallback-to-system-locale=false：请求无 locale 时不再看 JVM 默认 locale，
+  # 直接落到中文默认资源（容器 locale 常为 en，否则「默认中文」会失效）。
+  messages:
+    basename: messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
+
   # ---- 数据源：PostgreSQL ----
   # 密码与 JWT 密钥故意不设默认值：缺失时启动直接失败，
   # 而不是静默用弱默认值跑起来。参考 .env.example 设置环境变量。
