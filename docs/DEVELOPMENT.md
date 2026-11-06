@@ -140,13 +140,13 @@ cd frontend && pnpm test --run
 
 | 部分 | 文件数 | 行数 |
 | --- | --- | --- |
-| 后端主代码（`src/main/java`） | 87 | 5555 |
-| 后端测试（`src/test/java`） | 26 | 5781 |
+| 后端主代码（`src/main/java`） | 89 | 5670 |
+| 后端测试（`src/test/java`） | 27 | 6002 |
 | 前端产品代码（`frontend/src`，不含 spec 与 `assets/` 静态资源 3 文件 53 行） | 37 | 4780 |
-| 前端测试（`*.spec.js`） | 33 | 6001 |
+| 前端测试（`*.spec.js`） | 33 | 6020 |
 | 前端 E2E（`frontend/e2e` + `playwright.config.js`） | 8 | 360 |
 
-后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 10、`service/` 11、`security/` 11（+`ClientIpResolver`、`LoginRateLimiter`、CSP 上报四件套，`exception/` 另加 `TooManyLoginAttemptsException`）、`config/` 7（+`ClockConfig`）、`util/` 4、`exception/` 4。
+后端分层（文件数）：`entity/` 12、`dto/` 18、`repository/` 9、`controller/` 10、`service/` 11、`security/` 11（+`ClientIpResolver`、`LoginRateLimiter`、CSP 上报四件套，`exception/` 另加 `TooManyLoginAttemptsException`）、`config/` 7（+`ClockConfig`）、`util/` 4、`exception/` 6（`ErrorCode`、`ErrorMessages` 为第十五轮新增）。
 
 前端目录（文件数）：`views/` 20（11 个页面 + 9 个 spec）、`components/` 11（6 个组件 + 5 个 spec）、`composables/` 8（4 个组合式函数 + 4 个 spec）、`styles/` 7（4 个 css + 3 个 spec）、`utils/` 10（5 个纯函数 + 5 个 spec）、`stores/` 4（2 个 store + 2 个 spec）、`api/` 2（1 个封装 + 1 个 spec）、`router/` 1、根目录 5（`App.vue`、`main.js`、`style.css`、`viteConfig.spec.js`、`App.spec.js`）。
 
@@ -154,14 +154,14 @@ cd frontend && pnpm test --run
 
 | 层 | 数量 | 结果 |
 | --- | --- | --- |
-| 后端 | **202** 个用例 / 25 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
-| 前端 | **334** 个用例 / 33 个 spec | 全绿 |
+| 后端 | **214** 个用例 / 26 个测试类 | 全绿（其中 1 个 POSIX 文件权限用例在 Windows 上跳过） |
+| 前端 | **336** 个用例 / 33 个 spec | 全绿 |
 | 前端 E2E | **8** 个用例 / 5 个 spec（Playwright） | 全绿（手动执行，不计入上面两行基线） |
 | 构建 | `VITE_BASE_PATH=/forum/ pnpm build` | 通过 |
 
-后端测试类分布（合计 202）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CspReportIntegrationTest` 8、`ErrorContractIntegrationTest` 5、`CspReportSanitizerTest` 7、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`CspReportThrottleTest` 5、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1。
+后端测试类分布（合计 214）：`AvatarImageProcessorTest` 27、`AvatarFlowIntegrationTest` 20、`SearchFlowIntegrationTest` 14、`NotificationStreamServiceTest` 12、`LoginRateLimiterTest` 12、`NotificationServiceTest` 10、`RepositoryTests` 9、`TagFlowIntegrationTest` 9、`ClientIpResolverTest` 8、`AuthInvalidationIntegrationTest` 8、`JwtAuthenticationFilterTest` 7、`StreamTicketServiceTest` 6、`CspReportIntegrationTest` 8、`ErrorContractIntegrationTest` 7、`CspReportSanitizerTest` 7、`CommentFlowIntegrationTest` 6、`Stage5FlowIntegrationTest` 5、`PostFlowIntegrationTest` 5、`SseFlowIntegrationTest` 4、`LoginRateLimitIntegrationTest` 4、`AvatarServiceTest` 4、`JwtTokenProviderTest` 4、`CspReportThrottleTest` 5、`ForumApplicationTests` 2、`AuthFlowIntegrationTest` 1、`ErrorCodeIntegrationTest` 10。
 
-前端 spec 分布（合计 334）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）17、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3、`elementAutoImport` 2、`csp` 11。
+前端 spec 分布（合计 336）：`search` 30、`useNotificationStream` 22、`useTheme` 20、`SearchView` 19、`ProfileView` 18、`index`（api）19、`notifications` 16、`markdown` 14、`usePostActions` 13、`tokens` 12、`AdminView` 11、`cards` 10、`UserAvatar` 10、`HeaderSearch` 9、`avatar` 9、`format` 9、`PostListItem` 8、`HomeView` 8、`NotificationsView` 8、`notificationLink` 7、`breakpoint` 7、`viteConfig` 6、`ThemeToggle` 5、`common` 5、`PostDetailView` 5、`TagPostsView` 5、`TagsView` 5、`auth` 4、`useResponsive` 3、`PostEditView` 3、`App` 3、`elementAutoImport` 2、`csp` 11。
 
 > 分布行在此前的记录里与实际总数对不上（2026-10-24 复核时后端、前端两行均已按 `target/surefire-reports` 与 `pnpm test` 输出重新点数并对齐）；此后以本行标注的合计与 `mvn` / `vitest` 的实际输出为准。
 
@@ -1098,6 +1098,71 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 **上线验收（2026-11-03，Build #44 / 镜像 `forum-backend:44`）**：推送 `d52751a..a124e17` 后 Jenkins **Build #44 SUCCESS**（checkout `a124e17`，容器 `Up (healthy)`，health 200）。公网/内网同一套冒烟：坏 JSON → 400 `请求体格式错误`；`text/plain` → 415 `不支持的 Content-Type`；认证 `PUT/PATCH/DELETE /api/csp-report` → 405 + `Allow: POST`；匿名 `OPTIONS` → 401、认证 `OPTIONS` → 200 + `Allow: POST,OPTIONS`；CSP 上报 `POST` 仍 204；容器 5 分钟内 ERROR 计数 0；公网 HTTPS 同样 400/415；公网 E2E 8 passed (47.7 s)。随后的回填提交触发 Build #45，属 docs-only 重建。
 
+
+### 4.20 第十五轮：错误码与框架文案国际化（2026-11-06）
+
+**背景**：第十四轮收尾后错误契约仍缺两件事：失败响应没有机器可读 `code`（前端只能匹配中文
+`message`），以及 `GlobalExceptionHandler` 的 17 处文案硬编码中文、英文调用方没有可用提示。
+本轮只加 `code` 与中英双语，不改状态码语义、不改业务文案、不加业务功能。
+
+**改动**
+
+| 文件 | 改动 |
+| --- | --- |
+| `exception/ErrorCode.java`（新） | 17 个错误码枚举，常量名即响应 `code`，携带 HTTP 状态与 `messageKey` |
+| `exception/ErrorMessages.java`（新） | `MessageSource` 封装：`get` 走 `LocaleContextHolder`，`getForLocale` 供 Security 显式传 locale；只认 `en` 为英文，其余归一为中文 |
+| `resources/messages.properties` / `messages_en.properties`（新） | 中/英文案；中文与第十四轮逐字一致 |
+| `util/Result.java` | 新增可空 `code` 与三个 `fail(ErrorCode…)` 工厂；成功响应仍不含 `code` |
+| `exception/GlobalExceptionHandler.java` | 全部处理器改用 `ErrorCode` + `ErrorMessages`；业务异常与字段校验文案保持原样；`IOException` 仍返回 null |
+| `config/SecurityConfig.java` | 注入 `ObjectMapper`/`ErrorMessages`，401/403 用 `Result` 序列化（补 `code`、`timestamp`），不再手拼 JSON |
+| `application.yml` | `spring.messages`：`basename=messages`、`encoding=UTF-8`、`fallback-to-system-locale=false` |
+| `deploy/deploy.sh` | 冒烟新增 3 条断言：坏 JSON 带 `code=BAD_JSON`、默认中文、`Accept-Language: en` 英文 |
+| `frontend/src/api/index.js` | 新增 `CODE_MESSAGES` 兜底与 `errorMessageOf`：`message` → `code` → `请求失败`/`网络错误` |
+
+**错误码与文案**（完整表见本轮 spec；`message` 默认中文，`en` 时取英文）：
+
+| 状态 | `code` | 中文 |
+| --- | --- | --- |
+| 400 | `BAD_JSON` | 请求体格式错误 |
+| 400 | `VALIDATION_FAILED` | 参数校验失败（`data` 为字段 Map） |
+| 400 | `BUSINESS_ERROR` | 业务异常原文（不翻译） |
+| 400 | `MISSING_PARAMETER` / `TYPE_MISMATCH` | 缺少必需参数: X / 参数格式不正确: X |
+| 400 | `UPLOAD_TOO_LARGE` / `MISSING_PART` / `MULTIPART_REQUIRED` | 图片不能超过 2MB / 缺少图片文件 / 请使用 multipart/form-data 上传图片 |
+| 401 | `UNAUTHORIZED` / `BAD_CREDENTIALS` / `STREAM_TICKET_INVALID` | 未登录或登录已过期 / 用户名或密码错误 / 通知连接凭证无效或已过期 |
+| 403 | `FORBIDDEN` | 无权限执行此操作 |
+| 404 | `NOT_FOUND` | 资源不存在 |
+| 405 | `METHOD_NOT_ALLOWED` | 请求方法不被支持（带 `Allow`） |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | 不支持的 Content-Type |
+| 429 | `TOO_MANY_ATTEMPTS` | 登录失败次数过多，请 N 分钟后再试（带 `Retry-After`） |
+| 500 | `INTERNAL_ERROR` | 服务器内部错误，请稍后重试 |
+
+**语言协商**：只有显式 `Accept-Language: en` 返回英文；缺省、`zh`、`fr` 与 JVM 默认一律中文。
+原因：Security 过滤器在 MVC 之外只能 `request.getLocale()`，容器 JVM 默认 locale 常为 `en`，
+不归一「默认中文」会在生产静默失效。`ErrorMessages.normalize` 只认 `en`。
+
+**验证矩阵**
+
+| # | 验证点 | 结果 |
+| --- | --- | --- |
+| V1 | 后端全量 `mvn -B clean test` | ✅ `Tests run: 214, Failures: 0, Errors: 0, Skipped: 1`，26 个测试类 |
+| V2 | 前端 Vitest 336/33 | ✅ `Tests 336 passed (336)` / `Test Files 33 passed (33)` |
+| V3 | 构建 / bundle 预算 | ✅ `VITE_BASE_PATH=/forum/ pnpm build` 通过；`check:bundle` 五项在预算内 |
+| V4 | 坏 JSON→`BAD_JSON`、`text/plain`→`UNSUPPORTED_MEDIA_TYPE`、认证 `PUT`→`METHOD_NOT_ALLOWED`+`Allow: POST` | ✅ `ErrorCodeIntegrationTest` 真实 HTTP 覆盖 |
+| V5 | `Accept-Language: en` 英文、默认/`fr` 中文 | ✅ `ErrorCodeIntegrationTest` 覆盖 |
+| V6 | 匿名 `GET /api/auth/me` → 401 `UNAUTHORIZED` + `timestamp` | ✅ `ErrorCodeIntegrationTest.anonymousRequestReturnsUnauthorizedCodeFromSecurity` |
+| V7 | 变异：改坏 `messages.properties` 的中文后测试必须红 | ✅ `ErrorCodeIntegrationTest` 至少 2 例失败；恢复后 10/10 绿 |
+| V8 | 部署后公网复核 + 容器 ERROR 0（见本轮回填） | ⏳ 由 Task 6 回填 |
+
+**构建记录**：`344b664` 设计与计划 → `ff2966e` 后端错误码与双语 → `3ce8687` 测试守护（214/26）→
+`0306082` 前端兜底（336/33）→ 本提交记录 → 回填提交见下。
+
+**已知限制**
+
+1. 业务异常与 `@Valid` 字段文案仍为中文（本轮只框架级文案双语）。
+2. `IOException`（客户端提前断开）仍不写响应。
+3. 不设 `Content-Language`；语言只由请求头决定，且只认 `en`。
+4. 前端 `CODE_MESSAGES` 是中文兜底表，不与后端文案资源联动（后端正常都会带 `message`）。
+
 ## 5. 待办与后续计划
 
 ### 5.1 技术债与风险（建议优先处理）
@@ -1153,6 +1218,11 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 > 第十三轮关闭 T18（见 §4.18）：浏览器 CSP 违规经 `report-uri`/`report-to` 上报到公开端点 `/api/csp-report`，后端按 IP 限速并写结构化 WARN；部署期断言上报通道。新增候选：①CSP 违规日志聚合/看板（如按 directive 计数并暴露指标）；②`report-to` 的 `max_age`/多端点协商（当前只声明一个 group）。
 
 > 第十四轮收尾错误契约（见 §4.19）：坏 JSON→400、不支持的 `Content-Type`→415，405 扩展为 `PUT/PATCH/DELETE/HEAD` 并断言 `Allow: POST` 与无 ERROR；不加业务功能。新增候选：①错误文案国际化（当前硬编码中文，415 还混英文）；②逐步迁移到 RFC 9457 `ProblemDetail`（需要前端同步解析）；③CSP 上报日志聚合（承接第十三轮候选①）。
+
+> 第十五轮完成框架级错误码与双语文案（见 §4.20）：失败响应带 `code`，`message` 按
+> `Accept-Language` 返回中文/英文（默认中文），前端按 `code` 兜底。新增候选：①业务异常与字段
+> 校验文案翻译（需翻译词表与审核，属内容工作）；②按语言返回 `Content-Language` 或迁移 RFC 9457
+> `ProblemDetail`（需前端同步解析）；③前端 UI 文案整体 i18n（当前只覆盖错误提示）。
 
 ---
 
@@ -1218,6 +1288,11 @@ default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'sha25
 
 | 日期 | 类型 | 摘要 | 提交 |
 | --- | --- | --- | --- |
+| 2026-11-06 | docs | 记录第十五轮错误码与国际化（§4.20、基线 214/26） | 本次提交 |
+| 2026-11-06 | fix | 前端按错误码兜底展示并保留后端文案（336/33） | `0306082` |
+| 2026-11-06 | test | 守护错误码与双语错误文案（214/26） | `3ce8687` |
+| 2026-11-06 | feat | 为失败响应增加机器可读错误码并支持中英文案 | `ff2966e` |
+| 2026-11-06 | docs | 新增第十五轮错误码与国际化设计与计划 | `344b664` |
 | 2026-11-03 | docs | 补记文档修正提交与 Build #46（本轮 docs-only 收尾） | 本次提交 |
 | 2026-11-03 | docs | 修正错误契约文档与实际行为不一致（413/401/`timestamp`、§2.2 第十四轮、计划提交数） | `80903ef` |
 | 2026-11-03 | docs | 回填第十四轮构建与上线验收（Build #44 / 镜像 44、公网 400/415/405、E2E 8/8） | `466bff7` |

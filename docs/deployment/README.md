@@ -134,9 +134,13 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: raspi' \
 ```
 
 ```bash
-# 错误契约速查（第十四轮）：坏 JSON → 400「请求体格式错误」、text/plain → 415「不支持的 Content-Type」
-curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' --data '{bad' http://127.0.0.1:8086/api/auth/login
+# 错误码与双语速查（第十五轮）：失败响应带 code；message 随 Accept-Language 变（默认中文）
+curl -sS -H 'Content-Type: application/json' --data '{bad' http://127.0.0.1:8086/api/auth/login
+# 期望 body 含 "code":"BAD_JSON" 与 "message":"请求体格式错误"
+curl -sS -H 'Accept-Language: en' -H 'Content-Type: application/json' --data '{bad' http://127.0.0.1:8086/api/auth/login
+# 期望 body 含 "message":"Malformed request body"
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: text/plain' --data 'x' http://127.0.0.1:8086/api/auth/login
+# 期望 415
 ```
 
 ```bash

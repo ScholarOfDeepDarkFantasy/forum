@@ -28,20 +28,34 @@
 
 ### 错误响应契约
 
-失败响应体统一为 `{"success":false,"message":"…","timestamp":…}`，不泄露堆栈；例外是 Security 过滤器直接写出的 401/403（无 `timestamp`）与 nginx 层的 413（HTML 页面）：
+失败响应体统一为 `{"success":false,"code":"…","message":"…","timestamp":…}`（成功响应不含 `code`），
+不泄露堆栈；`code` 是机器可读错误码，`message` 按请求的 `Accept-Language` 返回中文或英文
+（默认中文，只有显式 `en` 才返回英文；业务异常与字段校验文案仍为中文）。Security 过滤器写出的
+401/403 与 MVC 同构。nginx 层的 413 仍是 HTML 页面：
 
-| 状态 | 何时出现 |
-|---|---|
-| 400 | 业务规则不满足、`@Valid` 字段错误、缺/错 query 参数、**请求体不是合法 JSON** |
-| 401 | 未登录、token 失效/过期、密码错误、SSE 票据无效 |
-| 403 | 角色不足 |
-| 404 | 资源不存在 |
-| 405 | 方法不允许（认证后 `PUT/PATCH/DELETE/HEAD`；匿名请求先被 Security 返回 401），带 `Allow: POST`；`OPTIONS` 由 Spring 返回 200 |
-| 415 | `Content-Type` 不受支持（如对 JSON 接口发 `text/plain`） |
-| 429 | 登录失败次数超限，带 `Retry-After` 秒数 |
-| 500 | 未预期异常（唯一兜底；出现即代表需要修） |
+| 状态 | `code` | 何时出现 |
+|---|---|---|
+| 400 | `BAD_JSON` / `VALIDATION_FAILED` / `BUSINESS_ERROR` / `MISSING_PARAMETER` / `TYPE_MISMATCH` / `UPLOAD_TOO_LARGE` / `MISSING_PART` / `MULTIPART_REQUIRED` | 业务规则不满足、`@Valid` 字段错误、缺/错 query 参数、**请求体不是合法 JSON**、上传超过 2MB |
+| 401 | `UNAUTHORIZED` / `BAD_CREDENTIALS` / `STREAM_TICKET_INVALID` | 未登录、token 失效/过期、密码错误、SSE 票据无效 |
+| 403 | `FORBIDDEN` | 角色不足 |
+| 404 | `NOT_FOUND` | 资源不存在 |
+| 405 | `METHOD_NOT_ALLOWED` | 方法不允许（认证后 `PUT/PATCH/DELETE/HEAD`；匿名请求先被 Security 返回 401），带 `Allow: POST`；`OPTIONS` 由 Spring 返回 200 |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | `Content-Type` 不受支持（如对 JSON 接口发 `text/plain`） |
+| 429 | `TOO_MANY_ATTEMPTS` | 登录失败次数超限，带 `Retry-After` 秒数 |
+| 500 | `INTERNAL_ERROR` | 未预期异常（唯一兜底；出现即代表需要修） |
 
-补充：上传超过 2MB 时后端返回 **400** `图片不能超过 2MB`（不是 413）；413 只出现在 nginx 的 `client_max_body_size 3m`（HTML 响应，非本契约）。
+**语言协商**：只有显式 `Accept-Language: en` 返回英文，其余（缺省/`zh`/其他）一律中文——容器的
+JVM 默认 locale 常是 `en`，后端做了归一。调用方应优先用 `code` 分支，`message` 只用于展示：
+
+```bash
+curl -s -H 'Content-Type: application/json' --data '{bad' http://127.0.0.1:8080/api/auth/login
+# {"success":false,"code":"BAD_JSON","message":"请求体格式错误","timestamp":...}
+curl -s -H 'Accept-Language: en' -H 'Content-Type: application/json' --data '{bad' http://127.0.0.1:8080/api/auth/login
+# {"success":false,"code":"BAD_JSON","message":"Malformed request body","timestamp":...}
+```
+
+补充：上传超过 2MB 时后端返回 **400** `图片不能超过 2MB`（不是 413）；413 只出现在 nginx 的
+`client_max_body_size 3m`（HTML 响应，非本契约）。
 
 ## 环境要求
 
@@ -267,7 +281,7 @@ location /forum/api/ {
 mvn test
 ```
 
-测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 25 个测试类、202 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
+测试使用 H2 内存库（PostgreSQL 兼容模式 `MODE=PostgreSQL`），Flyway 关闭、`ddl-auto=create-drop`，无需本地 PostgreSQL、也无需设置任何环境变量（`src/test/resources/application-test.yml` 由 `@ActiveProfiles("test")` 提供测试专用凭据）。当前为 26 个测试类、214 个用例（其中 1 个 POSIX 文件权限用例在 Windows 上跳过）。
 
 ### 前端测试
 
@@ -277,7 +291,7 @@ pnpm test        # Vitest 单元与组件测试
 pnpm build       # 生产构建
 ```
 
-当前为 33 个 spec、334 个用例，覆盖：
+当前为 33 个 spec、336 个用例，覆盖：
 
 - 通知跳转映射（`src/utils/notificationLink.js`）：REPLY 带评论锚点、缺 `commentId` 时退化为只跳帖子、LIKE/FAVORITE 跳帖子、SYSTEM 与非法输入不可跳转
 - 通知 store（`src/stores/notifications.js`）：未读数刷新、请求失败保留上次计数、全部已读、单条已读（就地更新列表项、未读角标钳在 0、已读不重复请求）、列表分页
@@ -286,7 +300,7 @@ pnpm build       # 生产构建
 - 分页样式收敛（`src/styles/common.spec.js`）：`.jf-pager` 规则完整、`common.css` 在 `tokens.css` 之后引入、没有视图重新定义 `.pager`、每个 `el-pagination` 都带 `jf-pager` 且数量精确相等
 - 时间格式化（`src/utils/format.spec.js`）：ISO 串截到分钟、空值返回空串、相对时间的刚刚/分钟/小时/回退日期四档，以及未来时间不产生负数
 - 后台卡片组件（`src/components/cards.spec.js`）：字段与空值占位渲染、`formatTime`/`statusTag` 透传、ADMIN 账号的操作按钮禁用、事件 payload
-- 接口层（`src/api/index.spec.js`）：401 时凭据类接口（登录/注册）原样展示后端消息且不清除登录态，其余接口清 token 并跳登录页（版块与列表加载、点赞交互与游客跳转、行点击跳详情）、`tagApi` 的请求路径与参数（`/tags` 携带 `keyword` 与分页参数、`/tags/posts` 携带 `name` 与分页参数）、`PostDetailView`（互动字段实时读共享状态：列表点的赞在详情页同步生效、置顶整体替换 `post` 后互动字段不被返回体带偏；正文按 Markdown 渲染后不得直接输出原始内容、无正文时显示占位）、`AdminView`（桌面表格 / 窄屏卡片、空状态、视口切换与监听清理、卡片事件接线）与 `ProfileView`（收藏分页渲染、空状态）
+- 接口层（`src/api/index.spec.js`）：401 时凭据类接口（登录/注册）原样展示后端消息且不清除登录态，其余接口清 token 并跳登录页（版块与列表加载、点赞交互与游客跳转、行点击跳详情）、`tagApi` 的请求路径与参数（`/tags` 携带 `keyword` 与分页参数、`/tags/posts` 携带 `name` 与分页参数）、错误码兜底（有 code 无 message 时按码映射，未知 code 回退「请求失败」）、`PostDetailView`（互动字段实时读共享状态：列表点的赞在详情页同步生效、置顶整体替换 `post` 后互动字段不被返回体带偏；正文按 Markdown 渲染后不得直接输出原始内容、无正文时显示占位）、`AdminView`（桌面表格 / 窄屏卡片、空状态、视口切换与监听清理、卡片事件接线）与 `ProfileView`（收藏分页渲染、空状态）
 - Markdown 渲染（`src/utils/markdown.js`）：CommonMark + 表格（标题/列表/表格）与代码块高亮、单换行转 `<br>`、外链补 `target`/`rel`、图片补 `loading=lazy`、原始 HTML 与事件属性被过滤、`javascript:` 链接不可点击、未注册语言降级为纯文本、裸链接自动识别、站内/锚点/邮件链接不加 `target`、表格包在横向滚动容器内、空输入与渲染异常兜底
 - 标签页（`src/views/TagsView.spec.js`、`src/views/TagPostsView.spec.js`、`src/components/PostListItem.spec.js`）：标签云渲染与点击跳转、关键词检索重置到第一页、分页切换、空态与失败重试、路由标签名变化时重置分页并重新加载、公共帖子行渲染置顶/精华标记与互动计数、点击标签按 URL 规则编码且不触发行跳转、点赞走共享计数
 - 编辑页 Markdown 预览（`src/views/PostEditView.spec.js`）：桌面左右分栏且输入正文时预览实时渲染、窄屏显示编辑/预览 tab 而不是分栏、编辑模式回填旧正文并渲染预览
