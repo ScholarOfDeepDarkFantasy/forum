@@ -37,6 +37,32 @@ function isCredentialEndpoint(url = '') {
   return CREDENTIAL_ENDPOINTS.some((path) => url.startsWith(path))
 }
 
+/**
+ * 错误码兜底文案：后端正常都会带 message（已按 Accept-Language 本地化），
+ * 只有「有 code 没 message」的场景（旧后端、网关错误页）才用这张表。
+ * 这里只兜中文，不引入 i18n 库。
+ */
+const CODE_MESSAGES = {
+  BAD_JSON: '请求体格式错误',
+  BAD_CREDENTIALS: '用户名或密码错误',
+  UNAUTHORIZED: '未登录或登录已过期',
+  FORBIDDEN: '无权限执行此操作',
+  NOT_FOUND: '资源不存在',
+  UNSUPPORTED_MEDIA_TYPE: '不支持的 Content-Type',
+  METHOD_NOT_ALLOWED: '请求方法不被支持',
+  TOO_MANY_ATTEMPTS: '操作过于频繁，请稍后再试',
+  INTERNAL_ERROR: '服务器内部错误，请稍后重试'
+}
+
+/** 优先后端 message；为空时按机器可读 code 兜底；都认不出时返回空串，由调用方决定默认文案。 */
+function errorMessageOf(data) {
+  if (data && typeof data === 'object') {
+    if (data.message) return data.message
+    if (data.code && CODE_MESSAGES[data.code]) return CODE_MESSAGES[data.code]
+  }
+  return ''
+}
+
 api.interceptors.response.use(
   (response) => {
     const res = response.data
@@ -45,14 +71,16 @@ api.interceptors.response.use(
       if (res.success) {
         return res.data
       }
-      ElMessage.error(res.message || '请求失败')
-      return Promise.reject(new Error(res.message || '请求失败'))
+      const message = errorMessageOf(res) || '请求失败'
+      ElMessage.error(message)
+      return Promise.reject(new Error(message))
     }
     return res
   },
   (error) => {
     const status = error.response?.status
-    const message = error.response?.data?.message || error.message || '网络错误'
+    const data = error.response?.data
+    const message = errorMessageOf(data) || (data ? '请求失败' : error.message || '网络错误')
     const url = error.config?.url || ''
     // 静默请求（用户主动登出）：语义与普通请求一致（401 仍清本地态），只是不弹提示、不跳转。
     // 重复登出时服务端返回 401，若按普通 401 处理，用户会先看到「已退出登录」再看到

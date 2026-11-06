@@ -179,6 +179,25 @@ describe('api 拦截器', () => {
   it('成功响应解包出 data 字段', () => {
     expect(handlers.response({ data: { success: true, data: { id: 7 } } })).toEqual({ id: 7 })
   })
+
+  it('业务失败只有 code 时按错误码兜底提示', async () => {
+    const rejected = handlers.response({ data: { success: false, code: 'INTERNAL_ERROR' } })
+
+    await expect(rejected).rejects.toThrow('服务器内部错误，请稍后重试')
+    expect(elMessageError).toHaveBeenCalledWith('服务器内部错误，请稍后重试')
+  })
+
+  it('未知错误码且无 message 时回退到「请求失败」', async () => {
+    const err = {
+      config: { url: '/posts' },
+      response: { status: 400, data: { success: false, code: 'SOMETHING_NEW' } },
+      message: 'Request failed'
+    }
+
+    await expect(handlers.responseError(err)).rejects.toBe(err)
+
+    expect(elMessageError).toHaveBeenCalledWith('请求失败')
+  })
 })
 
 describe('tagApi 请求路径', () => {
